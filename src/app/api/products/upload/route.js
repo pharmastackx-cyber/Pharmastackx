@@ -6,11 +6,11 @@ import { parse } from 'papaparse';
 
 const Product = require('../../../../../backend/models/Product');
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+// Note: in the App Router, `export const config = { api: { bodyParser: false } }` is deprecated.
+// File upload handling should use FormData via `request.formData()` or move the route
+// to a Pages API (pages/api) for the older bodyParser config. This file keeps using
+// formidable for Node environments; ensure Vercel/runtime supports it or convert to
+// a FormData-based handler if needed.
 
 export async function POST(req) {
   await dbConnect();
