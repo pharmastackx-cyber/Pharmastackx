@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import {
   Typography,
@@ -43,7 +43,7 @@ export default function Cart() {
   const router = useRouter();
   const [promoCode, setPromoCode] = useState('');
   const [promoMessage, setPromoMessage] = useState('');
-  const [deliveryOption, setDeliveryOption] = useState('standard');
+  const [deliveryOption, setDeliveryOption] = useState<'standard' | 'express'>('standard');
   const [orderType, setOrderType] = useState('MN'); // MN = Multiple Normal, MP = Multiple Premium
   const [isProcessingFreeOrder, setIsProcessingFreeOrder] = useState(false);
 
@@ -469,7 +469,7 @@ export default function Cart() {
                   </Typography>
                   <RadioGroup
                     value={deliveryOption}
-                    onChange={(e) => setDeliveryOption(e.target.value)}
+                    onChange={(e) => setDeliveryOption(e.target.value as 'standard' | 'express')}
                     sx={{ gap: 0 }}
                   >
                     <FormControlLabel

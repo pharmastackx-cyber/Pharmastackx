@@ -669,12 +669,12 @@ export default function EditMedics() {
               <FormControl fullWidth>
                 <InputLabel>Online Status</InputLabel>
                 <Select
-                  value={editForm.isOnline}
-                  onChange={(e) => handleFormChange('isOnline', e.target.value)}
+                  value={editForm.isOnline ? 'true' : 'false'}
+                  onChange={(e) => handleFormChange('isOnline', e.target.value === 'true')}
                   label="Online Status"
                 >
-                  <MenuItem value={true}>Online</MenuItem>
-                  <MenuItem value={false}>Offline</MenuItem>
+                  <MenuItem value="true">Online</MenuItem>
+                  <MenuItem value="false">Offline</MenuItem>
                 </Select>
               </FormControl>
             </Box>

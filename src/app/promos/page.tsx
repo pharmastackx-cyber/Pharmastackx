@@ -9,7 +9,6 @@ import {
   Card,
   CardContent,
   TextField,
-  Grid,
   Chip,
   Divider,
   FormControl,
@@ -305,8 +304,8 @@ export default function Promos() {
               {editingPromo ? 'Edit Promotion' : 'Create New Promotion'}
             </Typography>
             
-            <Grid container spacing={2}>
-              <Grid xs={12} sm={6}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ flex: '1 1 45%' }}>
                 <TextField
                   fullWidth
                   label="Promo Code"
@@ -315,8 +314,8 @@ export default function Promos() {
                   placeholder="e.g., SAVE20, DELIVERYOFF"
                   sx={{ mb: 2 }}
                 />
-              </Grid>
-              <Grid xs={12} sm={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 45%' }}>
                 <FormControl fullWidth sx={{ mb: 2 }}>
                   <InputLabel>Promo Type</InputLabel>
                   <Select
@@ -331,10 +330,10 @@ export default function Promos() {
                     <MenuItem value="all_free">All Fees Free</MenuItem>
                   </Select>
                 </FormControl>
-              </Grid>
+              </Box>
               
               {(newPromo.type === 'percentage' || newPromo.type === 'fixed_amount' || newPromo.type === 'all_discount') && (
-                <Grid xs={12} sm={6}>
+                <Box sx={{ flex: '1 1 45%' }}>
                   <TextField
                     fullWidth
                     label="Discount Value"
@@ -351,10 +350,10 @@ export default function Promos() {
                     }}
                     sx={{ mb: 2 }}
                   />
-                </Grid>
+                </Box>
               )}
               
-              <Grid xs={12} sm={6}>
+              <Box sx={{ flex: '1 1 45%' }}>
                 <TextField
                   fullWidth
                   label="Max Uses"
@@ -363,9 +362,9 @@ export default function Promos() {
                   onChange={(e) => setNewPromo({...newPromo, maxUses: Number(e.target.value)})}
                   sx={{ mb: 2 }}
                 />
-              </Grid>
+              </Box>
               
-              <Grid xs={12} sm={6}>
+              <Box sx={{ flex: '1 1 45%' }}>
                 <TextField
                   fullWidth
                   label="Expiry Date"
@@ -375,9 +374,9 @@ export default function Promos() {
                   InputLabelProps={{ shrink: true }}
                   sx={{ mb: 2 }}
                 />
-              </Grid>
+              </Box>
               
-              <Grid xs={12}>
+              <Box sx={{ flex: '1 1 100%' }}>
                 <TextField
                   fullWidth
                   label="Description"
@@ -386,8 +385,8 @@ export default function Promos() {
                   placeholder="Brief description of the promotion"
                   sx={{ mb: 2 }}
                 />
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
             
             <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
               <Button
@@ -419,9 +418,9 @@ export default function Promos() {
         )}
 
         {/* Promos Grid */}
-        <Grid container spacing={3}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
           {promos.map((promo) => (
-            <Grid xs={12} sm={6} md={4} key={promo.id}>
+            <Box sx={{ flex: '1 1 300px' }} key={promo.id}>
               <Card 
                 elevation={2} 
                 sx={{ 
@@ -577,9 +576,9 @@ export default function Promos() {
                   </Box>
                 </CardContent>
               </Card>
-            </Grid>
+            </Box>
           ))}
-        </Grid>
+        </Box>
       </Container>
 
       {/* Footer */}

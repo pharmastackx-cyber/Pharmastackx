@@ -2,7 +2,7 @@ import React from "react";
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Avatar } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { Product } from "../admin/business-management/mockProducts";
+import { Product } from "../app/admin/business-management/mockProducts";
 
 interface ProductTableProps {
   products: Product[];

@@ -176,7 +176,7 @@ export default function BusinessManagementPage() {
               const storeSlug = biz.name.toLowerCase().replace(/\s+/g, "-");
               const storeUrl = `https://psx.ng/${storeSlug}`;
               return (
-                <Grid xs={12} sm={6} md={4} key={biz.id}>
+                <Box sx={{ width: { xs: '100%', sm: '50%', md: '33.33%' }, padding: 2 }} key={biz.id}>
                   <Paper
                     onClick={() => router.push(`/admin/business-management/${biz.id}`)}
                     sx={{
@@ -200,11 +200,6 @@ export default function BusinessManagementPage() {
                     <Typography variant="body2" color="text.secondary">
                       <b>Store Link:</b> {storeUrl}
                     </Typography>
-                    {biz.license && (
-                      <Typography variant="body2" color="text.secondary">
-                        <b>License:</b> {biz.license}
-                      </Typography>
-                    )}
                     <Typography variant="body2" color="text.secondary">
                       <b>Phone:</b> {biz.phone}
                     </Typography>
@@ -237,7 +232,7 @@ export default function BusinessManagementPage() {
                       Visit Store
                     </Button>
                   </Paper>
-                </Grid>
+                </Box>
               );
             })}
           </Grid>

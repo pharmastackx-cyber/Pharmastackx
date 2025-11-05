@@ -1,8 +1,8 @@
-import React from "react";
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Link as MuiLink } from "@mui/material";
+import { DataGrid, GridColDef } from "@mui/x-data-grid";
+import { Button, IconButton } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { BulkUpload } from "../admin/business-management/mockBulkUploads";
+import { BulkUpload } from "../app/admin/business-management/mockBulkUploads";
 
 interface BulkTableProps {
   bulks: BulkUpload[];
@@ -10,40 +10,44 @@ interface BulkTableProps {
   onDelete: (id: string) => void;
 }
 
-const BulkTable: React.FC<BulkTableProps> = ({ bulks, onEdit, onDelete }) => (
-  <TableContainer component={Paper}>
-    <Table size="small">
-      <TableHead>
-        <TableRow>
-          <TableCell>CSV</TableCell>
-          <TableCell>Business</TableCell>
-          <TableCell>Timestamp</TableCell>
-          <TableCell align="right">Actions</TableCell>
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {bulks.map((bulk) => (
-          <TableRow key={bulk.id}>
-            <TableCell>
-              <MuiLink href={bulk.csvUrl} target="_blank" rel="noopener" underline="hover">
-                {bulk.csvName}
-              </MuiLink>
-            </TableCell>
-            <TableCell>{bulk.business}</TableCell>
-            <TableCell>{new Date(bulk.timestamp).toLocaleString()}</TableCell>
-            <TableCell align="right">
-              <IconButton color="primary" onClick={() => onEdit(bulk.id)} size="small">
-                <EditIcon />
-              </IconButton>
-              <IconButton color="error" onClick={() => onDelete(bulk.id)} size="small">
-                <DeleteIcon />
-              </IconButton>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  </TableContainer>
-);
+export default function BulkTable({ bulks, onEdit, onDelete }: BulkTableProps) {
+  const columns: GridColDef[] = [
+    { field: "id", headerName: "ID", width: 90 },
+    { field: "name", headerName: "Name", width: 150 },
+    { field: "status", headerName: "Status", width: 150 },
+    { field: "created_at", headerName: "Date", width: 150 },
+    {
+      field: "actions",
+      headerName: "Actions",
+      width: 150,
+      renderCell: (params) => (
+        <>
+          <IconButton aria-label="edit" onClick={() => onEdit(params.row.id)}>
+            <EditIcon />
+          </IconButton>
+          <IconButton aria-label="delete" onClick={() => onDelete(params.row.id)}>
+            <DeleteIcon />
+          </IconButton>
+        </>
+      ),
+    },
+  ];
 
-export default BulkTable;
+  return (
+    <div style={{ height: 400, width: "100%" }}>
+      <DataGrid
+        rows={bulks}
+        columns={columns}
+        initialState={{
+          pagination: {
+            paginationModel: {
+              pageSize: 5,
+            },
+          },
+        }}
+        pageSizeOptions={[5]}
+        checkboxSelection
+      />
+    </div>
+  );
+}

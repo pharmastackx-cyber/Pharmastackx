@@ -1,0 +1,12 @@
+{
+  "pages": {
+    "/_app": []
+  },
+  "devFiles": [],
+  "polyfillFiles": [],
+  "lowPriorityFiles": [
+    "static/HiBel8bDI-VIC_Bmp1mq7/_ssgManifest.js",
+    "static/HiBel8bDI-VIC_Bmp1mq7/_buildManifest.js"
+  ],
+  "rootMainFiles": []
+}

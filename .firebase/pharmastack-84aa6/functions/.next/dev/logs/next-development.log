@@ -1,0 +1,31 @@
+[00:00:00.963] Server  LOG      ✓ Ready in 720ms
+[00:00:07.068] Server  LOG      ○ Compiling / ...
+[00:00:13.076] Server  WARN     ⚠ Cross origin request detected from 3000-firebase-pharmastackx-1762345758453.cluster-cbeiita7rbe7iuwhvjs5zww2i4.cloudworkstations.dev to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+[00:00:13.954] Browser ERROR   Location error: {}
+[00:04:11.070] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:04:31.959] Browser ERROR   React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element. fullWidth fullwidth
+[00:04:31.959] Browser ERROR   Received `%s` for a non-boolean attribute `%s`.
+
+If you want to write it to the DOM, pass a string instead: %s="%s" or %s={value.toString()}.
+
+If you used to conditionally omit it with %s={condition && value}, pass %s={condition ? value : undefined} instead. false indicator indicator false indicator indicator indicator
+[00:04:31.959] Browser ERROR   React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element. selectionFollowsFocus selectionfollowsfocus
+[00:04:31.959] Browser ERROR   React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element. textColor textcolor
+[00:06:59.487] Server  ERROR   (node:593) [MONGODB DRIVER] Warning: useNewUrlParser is a deprecated option: useNewUrlParser has no effect since Node.js Driver version 4.0.0 and will be removed in the next major version
+(Use `node --trace-warnings ...` to show where the warning was created)
+[00:06:59.487] Server  ERROR   (node:593) [MONGODB DRIVER] Warning: useUnifiedTopology is a deprecated option: useUnifiedTopology has no effect since Node.js Driver version 4.0.0 and will be removed in the next major version
+[00:07:03.483] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:07:06.413] Browser ERROR   React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element. fullWidth fullwidth
+[00:07:06.413] Browser ERROR   Received `%s` for a non-boolean attribute `%s`.
+
+If you want to write it to the DOM, pass a string instead: %s="%s" or %s={value.toString()}.
+
+If you used to conditionally omit it with %s={condition && value}, pass %s={condition ? value : undefined} instead. false indicator indicator false indicator indicator indicator
+[00:07:06.413] Browser ERROR   React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element. selectionFollowsFocus selectionfollowsfocus
+[00:07:06.413] Browser ERROR   React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element. textColor textcolor
+[00:29:39.186] Server  LOG      ✓ Compiled in 394ms
+[00:30:45.829] Server  LOG      ✓ Compiled in 81ms
+[01:08:44.977] Browser ERROR   Location error: {}
+[01:10:37.189] Browser ERROR   Location error: {}
+[02:02:52.582] Browser ERROR   Location error: {}

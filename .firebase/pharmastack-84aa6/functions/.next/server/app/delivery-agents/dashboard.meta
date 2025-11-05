@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/delivery-agents/layout,_N_T_/delivery-agents/dashboard/layout,_N_T_/delivery-agents/dashboard/page,_N_T_/delivery-agents/dashboard"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/delivery-agents/dashboard/__PAGE__",
+    "/delivery-agents/dashboard",
+    "/delivery-agents",
+    "/_index"
+  ]
+}

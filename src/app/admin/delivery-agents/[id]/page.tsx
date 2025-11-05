@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { useParams } from "next/navigation";
-import { Box, Typography, Paper, Stack, Button, Divider, Grid } from "@mui/material";
+import { Box, Typography, Paper, Stack, Button, Divider } from "@mui/material";
 import Navbar from "@/components/Navbar";
 
 // Mock agent and order log data
@@ -51,12 +51,12 @@ export default function AgentDetailPage() {
             {agent.status ? "Active" : "Inactive"}
           </Typography>
         </Paper>
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.totalOrders}</Typography><Typography variant="caption">Total Orders</Typography></Paper></Grid>
-          <Grid xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.accepted}</Typography><Typography variant="caption">Accepted</Typography></Paper></Grid>
-          <Grid xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.completed}</Typography><Typography variant="caption">Completed</Typography></Paper></Grid>
-          <Grid xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.cancelled}</Typography><Typography variant="caption">Cancelled</Typography></Paper></Grid>
-        </Grid>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+          <Box sx={{ flexGrow: 1, minWidth: { xs: 'calc(50% - 8px)', sm: 150 } }}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.totalOrders}</Typography><Typography variant="caption">Total Orders</Typography></Paper></Box>
+          <Box sx={{ flexGrow: 1, minWidth: { xs: 'calc(50% - 8px)', sm: 150 } }}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.accepted}</Typography><Typography variant="caption">Accepted</Typography></Paper></Box>
+          <Box sx={{ flexGrow: 1, minWidth: { xs: 'calc(50% - 8px)', sm: 150 } }}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.completed}</Typography><Typography variant="caption">Completed</Typography></Paper></Box>
+          <Box sx={{ flexGrow: 1, minWidth: { xs: 'calc(50% - 8px)', sm: 150 } }}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.cancelled}</Typography><Typography variant="caption">Cancelled</Typography></Paper></Box>
+        </Box>
         <Box sx={{ mb: 2 }}>
           <Button variant="contained" color="primary" sx={{ mr: 2 }}>Download CSV</Button>
           <Button variant="outlined" color="secondary">Download PDF</Button>

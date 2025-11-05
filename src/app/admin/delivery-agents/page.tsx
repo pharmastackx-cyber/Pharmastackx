@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Box, Typography, Paper, Switch, Button, Stack } from "@mui/material";
-import Grid from "@mui/material/Grid";
 import Navbar from "@/components/Navbar";
 
 // Mock agent data
@@ -57,9 +56,9 @@ export default function DeliveryAgentsPage() {
         <Typography variant="h4" sx={{ fontWeight: 700, color: "#1B5E20", mb: 3 }}>
           Delivery Agent Management
         </Typography>
-  <Grid container spacing={3} component="div">
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
           {agents.map((agent) => (
-            <Box key={agent.id} sx={{ width: '100%', display: { xs: 'block', sm: 'inline-block', md: 'inline-block' }, px: 1, mb: 3 }}>
+            <Box key={agent.id} sx={{ width: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.33% - 16px)'}, minWidth: 280, flexGrow: 1 }}>
               <Paper
                 sx={{ p: 2, borderLeft: 4, borderColor: agent.status ? "#1B5E20" : "#E91E63", cursor: "pointer", transition: "box-shadow 0.2s", '&:hover': { boxShadow: 6 } }}
                 onClick={() => handleAgentClick(agent.id)}
@@ -93,7 +92,7 @@ export default function DeliveryAgentsPage() {
               </Paper>
             </Box>
           ))}
-        </Grid>
+        </Box>
       </Box>
     </>
   );

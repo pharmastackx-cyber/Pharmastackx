@@ -12,7 +12,6 @@ import {
   Chip,
   IconButton,
   Divider,
-  Grid,
   Avatar,
   LinearProgress,
   Menu,
@@ -360,8 +359,8 @@ const OrderCard = ({ order, status }: { order: any; status: string }) => {
 
         <Divider sx={{ my: 2 }} />
 
-        <Grid container spacing={2}>
-          <Grid xs={6}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Box>
             <Typography variant="body2" color="text.secondary">
               Order Date
             </Typography>
@@ -374,16 +373,16 @@ const OrderCard = ({ order, status }: { order: any; status: string }) => {
                 minute: '2-digit'
               })}
             </Typography>
-          </Grid>
-          <Grid xs={6}>
+          </Box>
+          <Box>
             <Typography variant="body2" color="text.secondary">
               Total Amount
             </Typography>
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#006D5B' }}>
               ₦{order.total.toLocaleString()}
             </Typography>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
 
         {status === 'pending' && order.estimatedDelivery && (
           <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(255, 152, 0, 0.1)', borderRadius: 2 }}>

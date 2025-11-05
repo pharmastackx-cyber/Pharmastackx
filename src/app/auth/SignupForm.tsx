@@ -3,9 +3,6 @@ import React, { useState } from "react";
 import { TextField, Button, MenuItem, Box, Typography } from "@mui/material";
 import axios from "axios";
 
-
-
-
 export default function SignupForm({ setError, setSuccess }: { setError: (msg: string) => void, setSuccess: (msg: string) => void }) {
   const [form, setForm] = useState({
     username: "",
@@ -35,7 +32,17 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
     try {
       await axios.post("/api/auth/signup", { ...form, userType: "customer" });
       setSuccess("Signup successful! You can now log in.");
-      setForm({ username: "", email: "", password: "" });
+      setForm({
+        username: "",
+        email: "",
+        password: "",
+        businessName: "",
+        state: "",
+        city: "",
+        businessAddress: "",
+        phoneNumber: "",
+        license: ""
+      });
     } catch (err: any) {
       setError(err.response?.data?.error || "Signup failed");
     } finally {
