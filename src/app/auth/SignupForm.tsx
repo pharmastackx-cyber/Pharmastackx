@@ -30,7 +30,7 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
     setSuccess("");
     setLoading(true);
     try {
-      await axios.post("/api/auth/signup", { ...form, userType: "customer" });
+      await axios.post("/api/auth/signup", { ...form, role: "customer" });
       setSuccess("Signup successful! You can now log in.");
       setForm({
         username: "",
@@ -55,7 +55,7 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
     { label: "Pharmacy", value: "pharmacy" },
     { label: "Clinic", value: "clinic" },
     { label: "Vendor", value: "vendor" },
-    { label: "Delivery Agent", value: "delivery_agent" },
+    { label: "Delivery Agent", value: "agent" },
   ];
 
   const handleProviderSignup = async (e: React.FormEvent) => {
@@ -64,7 +64,7 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
     setSuccess("");
     setProviderLoading(true);
     try {
-      await axios.post("/api/auth/signup", { ...form, userType: providerType });
+      await axios.post("/api/auth/signup", { ...form, role: providerType });
       setSuccess("Service provider signup successful! You can now log in.");
       setForm({
         username: "",

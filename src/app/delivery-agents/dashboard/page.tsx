@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -12,9 +12,12 @@ import {
   Select,
   MenuItem,
   InputLabel,
-  FormControl
+  FormControl,
+  CircularProgress
 } from "@mui/material";
 import Navbar from "@/components/Navbar";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/context/SessionProvider";
 
 // Sample order type (should match business dashboard)
 type Order = {
@@ -73,7 +76,20 @@ export default function DeliveryAgentsDashboard() {
   const [agentName] = useState("Agent A");
   const [orderStatus, setOrderStatus] = useState("");
   const [openItems, setOpenItems] = useState<{ [orderId: string]: boolean }>({});
-  // No need for pickedUpTimes state, handled in order object
+  
+  const router = useRouter();
+  const { user, isLoading } = useSession();
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (!user) {
+        router.push('/auth'); // Redirect to login if not authenticated
+      } else if (user.role !== 'admin' && user.role !== 'agent') {
+        router.push('/'); // Redirect to home if not authorized
+      }
+    }
+  }, [user, isLoading, router]);
+
 
   // Toggle online/offline
   const handleToggleOnline = () => setOnline((prev) => !prev);
@@ -131,6 +147,17 @@ export default function DeliveryAgentsDashboard() {
     );
   };
 
+  if (isLoading || !user || (user.role !== 'admin' && user.role !== 'agent')) {
+    return (
+      <>
+        <Navbar />
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100vh - 64px)' }}>
+          <CircularProgress />
+        </Box>
+      </>
+    );
+  }
+
   return (
     <>
       <Navbar />
@@ -144,7 +171,7 @@ export default function DeliveryAgentsDashboard() {
               control={<Switch checked={online} onChange={handleToggleOnline} color="success" />}
               label={online ? "Online" : "Offline"}
             />
-            <Typography variant="subtitle1">Welcome, {agentName}</Typography>
+            <Typography variant="subtitle1">Welcome, {user.username}</Typography>
           </Stack>
         </Paper>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#1B5E20", mb: 2 }}>

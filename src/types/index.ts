@@ -1,11 +1,13 @@
 // User and Authentication Types
 export interface User {
+  _id?: string; // from mongodb
   id: string;
   email: string;
   firstName: string;
   lastName: string;
+  name?: string; // for user.name access
   phone: string;
-  role: 'customer' | 'business' | 'admin';
+  role: string; // Made more generic to support more roles
   isVerified: boolean;
   createdAt: Date;
   updatedAt: Date;

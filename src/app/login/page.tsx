@@ -1,7 +1,8 @@
 "use client";
 import React, { useState } from "react";
-import { TextField, Button, Typography, Box, MenuItem, Alert } from "@mui/material";
+import { TextField, Button, Typography, Box, Alert } from "@mui/material";
 import axios from "axios";
+import Cookies from "js-cookie"; // Using js-cookie now
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -15,9 +16,12 @@ export default function LoginPage() {
     setError("");
     try {
       const res = await axios.post("/api/auth/login", { email, password });
-      // Store token (for demo, use localStorage)
-      localStorage.setItem("token", res.data.token);
-      window.location.href = "/"; // Redirect to home or dashboard
+      
+      // The FIX: Use cookies to store the session token
+      Cookies.set("session_token", res.data.token, { expires: 7 });
+
+      // Redirect to home page after successful login
+      window.location.href = "/"; 
     } catch (err: any) {
       setError(err.response?.data?.error || "Login failed");
     } finally {
@@ -26,15 +30,17 @@ export default function LoginPage() {
   };
 
   return (
-    <Box maxWidth={400} mx="auto" mt={8} p={3} bgcolor="#1B5E20" borderRadius={2} boxShadow={3}>
-      <Typography variant="h5" color="white" mb={2}>Login</Typography>
-      {error && <Alert severity="error">{error}</Alert>}
+    <Box sx={{ maxWidth: 400, mx: "auto", mt: 8, p: 4, boxShadow: 3, borderRadius: 2 }}>
+      <Typography variant="h4" component="h1" gutterBottom align="center">
+        Login
+      </Typography>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <form onSubmit={handleSubmit}>
         <TextField
           label="Email"
           type="email"
           value={email}
-          onChange={e => setEmail(e.target.value)}
+          onChange={(e) => setEmail(e.target.value)}
           fullWidth
           margin="normal"
           required
@@ -43,7 +49,7 @@ export default function LoginPage() {
           label="Password"
           type="password"
           value={password}
-          onChange={e => setPassword(e.target.value)}
+          onChange={(e) => setPassword(e.target.value)}
           fullWidth
           margin="normal"
           required
@@ -51,7 +57,7 @@ export default function LoginPage() {
         <Button
           type="submit"
           variant="contained"
-          color="secondary"
+          color="primary"
           fullWidth
           disabled={loading}
           sx={{ mt: 2 }}

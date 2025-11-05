@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { dbConnect } from '@/lib/mongoConnect';
@@ -6,10 +7,28 @@ import User from '@/models/User';
 export async function POST(req) {
   await dbConnect();
   const body = await req.json();
-  const { username, email, password, userType, businessName, businessAddress, state, city, phoneNumber } = body;
 
-  if (!username || !email || !password || !userType) {
-    return NextResponse.json({ error: 'All fields are required.' }, { status: 400 });
+  // Definitive Fix: Prioritize 'role' from the form, with 'userType' as a fallback.
+  const { username, email, password, role: formRole, userType, businessName, businessAddress, state, city, phoneNumber } = body;
+  let role = formRole || userType;
+
+  // Definitive safeguard: Correct 'delivery_agent' to 'agent'.
+  if (role === 'delivery_agent') {
+    role = 'agent';
+  }
+
+  if (!username || !email || !password) {
+    return NextResponse.json({ error: 'Username, email, and password are required.' }, { status: 400 });
+  }
+
+  // Default to 'customer' only if absolutely no role is provided.
+  if (!role) {
+    role = 'customer';
+  }
+
+  // Force admin role for the specific email, overriding any role from the form.
+  if (email.toLowerCase() === 'pharmastackx@gmail.com') {
+    role = 'admin';
   }
 
   const existingUser = await User.findOne({ email });
@@ -17,11 +36,9 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Email already in use.' }, { status: 409 });
   }
 
-  // Generate slug for service providers
   let slug = undefined;
-  if (["pharmacy", "clinic", "vendor", "agent", "delivery_agent"].includes(userType) && businessName) {
-    slug = businessName.trim().split(" ")[0].toLowerCase();
-    // Ensure slug is unique
+  if (['pharmacy', 'clinic', 'vendor', 'agent'].includes(role) && businessName) {
+    slug = businessName.trim().split(' ')[0].toLowerCase();
     let slugExists = await User.findOne({ slug });
     let count = 1;
     let baseSlug = slug;
@@ -37,7 +54,7 @@ export async function POST(req) {
     username,
     email,
     password: hashedPassword,
-    userType,
+    role, // This will now be correct.
     businessName,
     businessAddress,
     state,

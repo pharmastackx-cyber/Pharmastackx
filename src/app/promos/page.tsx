@@ -33,9 +33,11 @@ import {
   Visibility,
   VisibilityOff,
 } from '@mui/icons-material';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
 import { usePromo } from '../../contexts/PromoContext';
+import { useSession } from '../../context/SessionProvider';
+import { useRouter } from 'next/navigation';
 
 const existingPromos = [
   {
@@ -97,6 +99,8 @@ const existingPromos = [
 
 export default function Promos() {
   const { promos, addPromo, updatePromo, deletePromo, togglePromoStatus } = usePromo();
+  const { user, isLoading } = useSession();
+  const router = useRouter();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingPromo, setEditingPromo] = useState<any>(null);
   const [newPromo, setNewPromo] = useState({
@@ -107,6 +111,16 @@ export default function Promos() {
     maxUses: 100,
     expiryDate: ''
   });
+
+  useEffect(() => {
+    if (!isLoading && user?.role !== 'admin') {
+      router.push('/');
+    }
+  }, [user, isLoading, router]);
+
+  if (isLoading || user?.role !== 'admin') {
+    return <p>Loading...</p>;
+  }
 
   const getPromoTypeIcon = (type: string) => {
     switch (type) {

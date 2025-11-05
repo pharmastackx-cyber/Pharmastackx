@@ -5,14 +5,15 @@ import axios from "axios";
 
 const userTypes = [
   { value: "admin", label: "Admin" },
-  { value: "business", label: "Business (Medicine Provider)" },
   { value: "customer", label: "Customer" },
-  { value: "health_provider", label: "Health Provider" },
-  { value: "delivery_agent", label: "Delivery Agent" },
+  { value: "pharmacy", label: "Pharmacy" },
+  { value: "clinic", label: "Clinic" },
+  { value: "vendor", label: "Vendor" },
+  { value: "agent", label: "Delivery Agent" },
 ];
 
 export default function SignupPage() {
-  const [form, setForm] = useState({ name: "", email: "", password: "", userType: "customer" });
+  const [form, setForm] = useState({ username: "", email: "", password: "", role: "customer" });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,7 @@ export default function SignupPage() {
     try {
       await axios.post("/api/auth/signup", form);
       setSuccess("Signup successful! You can now log in.");
-      setForm({ name: "", email: "", password: "", userType: "customer" });
+      setForm({ username: "", email: "", password: "", role: "customer" });
     } catch (err: any) {
       setError(err.response?.data?.error || "Signup failed");
     } finally {
@@ -44,9 +45,9 @@ export default function SignupPage() {
       {success && <Alert severity="success">{success}</Alert>}
       <form onSubmit={handleSubmit}>
         <TextField
-          label="Name"
-          name="name"
-          value={form.name}
+          label="Username"
+          name="username"
+          value={form.username}
           onChange={handleChange}
           fullWidth
           margin="normal"
@@ -75,8 +76,8 @@ export default function SignupPage() {
         <TextField
           select
           label="User Type"
-          name="userType"
-          value={form.userType}
+          name="role"
+          value={form.role}
           onChange={handleChange}
           fullWidth
           margin="normal"

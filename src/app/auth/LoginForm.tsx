@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { TextField, Button } from "@mui/material";
 import axios from "axios";
+import Cookies from "js-cookie"; // Import js-cookie
 
 export default function LoginForm({ setError, setSuccess }: { setError: (msg: string) => void, setSuccess: (msg: string) => void }) {
   const [email, setEmail] = useState("");
@@ -15,7 +16,8 @@ export default function LoginForm({ setError, setSuccess }: { setError: (msg: st
     setSuccess("");
     try {
       const res = await axios.post("/api/auth/login", { email, password });
-      localStorage.setItem("token", res.data.token);
+      // Set the token in a cookie instead of localStorage
+      Cookies.set("session_token", res.data.token, { expires: 7 }); // Expires in 7 days
       setSuccess("Login successful!");
       window.location.href = "/";
     } catch (err: any) {

@@ -1,0 +1,38 @@
+import mongoose, { Document, Model, Schema } from 'mongoose';
+
+export interface IUser extends Document {
+  username: string;
+  email: string;
+  password?: string;
+  role: 'admin' | 'customer' | 'pharmacy' | 'clinic' | 'vendor' | 'agent';
+  businessName?: string;
+  slug?: string;
+  businessAddress?: string;
+  state?: string;
+  city?: string;
+  phoneNumber?: string;
+  createdAt: Date;
+}
+
+const userSchema: Schema<IUser> = new mongoose.Schema({
+  username: { type: String, required: true },
+  email: { type: String, required: true, unique: true, lowercase: true },
+  password: { type: String, required: true },
+  role: {
+    type: String,
+    enum: ['admin', 'customer', 'pharmacy', 'clinic', 'vendor', 'agent'],
+    required: true,
+  },
+  businessName: { type: String },
+  slug: { type: String, unique: true, sparse: true },
+  businessAddress: { type: String },
+  state: { type: String },
+  city: { type: String },
+  phoneNumber: { type: String },
+  createdAt: { type: Date, default: Date.now },
+});
+
+// Explicitly specify the collection name as the third argument
+const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', userSchema, 'users');
+
+export default User;

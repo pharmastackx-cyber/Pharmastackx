@@ -1,8 +1,9 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Box, Typography, Paper, Switch, Button, Stack } from "@mui/material";
+import { Box, Typography, Paper, Switch, Button, Stack, CircularProgress } from "@mui/material";
 import Navbar from "@/components/Navbar";
+import { useSession } from "@/context/SessionProvider";
 
 // Mock agent data
 const mockAgents = [
@@ -36,6 +37,17 @@ const mockAgents = [
 export default function DeliveryAgentsPage() {
   const [agents, setAgents] = useState(mockAgents);
   const router = useRouter();
+  const { user, isLoading } = useSession();
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (!user) {
+        router.push('/auth'); // Redirect to login if not authenticated
+      } else if (user.role !== 'admin' && user.role !== 'agent') {
+        router.push('/'); // Redirect to home if not authorized
+      }
+    }
+  }, [user, isLoading, router]);
 
   const handleToggle = (id: string) => {
     setAgents((prev) =>
@@ -48,6 +60,18 @@ export default function DeliveryAgentsPage() {
   const handleAgentClick = (id: string) => {
     router.push(`/admin/delivery-agents/${id}`);
   };
+
+  // Render a loading state while checking for authentication and authorization
+  if (isLoading || !user || (user.role !== 'admin' && user.role !== 'agent')) {
+    return (
+      <>
+        <Navbar />
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100vh - 64px)' }}>
+          <CircularProgress />
+        </Box>
+      </>
+    );
+  }
 
   return (
     <>

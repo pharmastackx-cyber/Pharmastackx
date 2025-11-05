@@ -25,10 +25,11 @@ export async function POST(req) {
   }
 
   const token = jwt.sign(
-    { userId: user._id, userType: user.userType, email: user.email },
+    { userId: user._id, role: user.role, email: user.email }, // Use role instead of userType
     JWT_SECRET,
     { expiresIn: '7d' }
   );
 
-  return NextResponse.json({ token, user: { name: user.name, email: user.email, userType: user.userType } });
+  // Return user object with role
+  return NextResponse.json({ token, user: { name: user.name, email: user.email, role: user.role } });
 }

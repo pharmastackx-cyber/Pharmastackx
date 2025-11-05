@@ -70,18 +70,6 @@ export default function AuthPage() {
         TabIndicatorProps={{ style: { zIndex: 2 } }}
       >
         <Tab label="LOGIN" sx={{ mr: 1, position: 'relative' }} />
-        <Box
-          component="span"
-          sx={{
-            width: 1.5,
-            height: 28,
-            bgcolor: '#e0e0e0',
-            mx: 0.5,
-            borderRadius: 1,
-            alignSelf: 'center',
-            display: { xs: 'none', sm: 'inline-block' },
-          }}
-        />
         <Tab label="SIGN UP" sx={{ ml: 1, position: 'relative' }} />
       </Tabs>
       {success && <Alert severity="success" sx={{ mt: 2 }}>{success}</Alert>}
