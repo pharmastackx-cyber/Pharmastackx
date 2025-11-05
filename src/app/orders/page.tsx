@@ -361,7 +361,7 @@ const OrderCard = ({ order, status }: { order: any; status: string }) => {
         <Divider sx={{ my: 2 }} />
 
         <Grid container spacing={2}>
-          <Grid item xs={6}>
+          <Grid xs={6}>
             <Typography variant="body2" color="text.secondary">
               Order Date
             </Typography>
@@ -375,7 +375,7 @@ const OrderCard = ({ order, status }: { order: any; status: string }) => {
               })}
             </Typography>
           </Grid>
-          <Grid item xs={6}>
+          <Grid xs={6}>
             <Typography variant="body2" color="text.secondary">
               Total Amount
             </Typography>

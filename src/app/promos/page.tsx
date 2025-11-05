@@ -306,7 +306,7 @@ export default function Promos() {
             </Typography>
             
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
+              <Grid xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Promo Code"
@@ -316,7 +316,7 @@ export default function Promos() {
                   sx={{ mb: 2 }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid xs={12} sm={6}>
                 <FormControl fullWidth sx={{ mb: 2 }}>
                   <InputLabel>Promo Type</InputLabel>
                   <Select
@@ -334,7 +334,7 @@ export default function Promos() {
               </Grid>
               
               {(newPromo.type === 'percentage' || newPromo.type === 'fixed_amount' || newPromo.type === 'all_discount') && (
-                <Grid item xs={12} sm={6}>
+                <Grid xs={12} sm={6}>
                   <TextField
                     fullWidth
                     label="Discount Value"
@@ -354,7 +354,7 @@ export default function Promos() {
                 </Grid>
               )}
               
-              <Grid item xs={12} sm={6}>
+              <Grid xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Max Uses"
@@ -365,7 +365,7 @@ export default function Promos() {
                 />
               </Grid>
               
-              <Grid item xs={12} sm={6}>
+              <Grid xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Expiry Date"
@@ -377,7 +377,7 @@ export default function Promos() {
                 />
               </Grid>
               
-              <Grid item xs={12}>
+              <Grid xs={12}>
                 <TextField
                   fullWidth
                   label="Description"
@@ -421,7 +421,7 @@ export default function Promos() {
         {/* Promos Grid */}
         <Grid container spacing={3}>
           {promos.map((promo) => (
-            <Grid item xs={12} sm={6} md={4} key={promo.id}>
+            <Grid xs={12} sm={6} md={4} key={promo.id}>
               <Card 
                 elevation={2} 
                 sx={{ 

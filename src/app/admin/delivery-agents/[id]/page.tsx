@@ -52,10 +52,10 @@ export default function AgentDetailPage() {
           </Typography>
         </Paper>
         <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.totalOrders}</Typography><Typography variant="caption">Total Orders</Typography></Paper></Grid>
-          <Grid item xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.accepted}</Typography><Typography variant="caption">Accepted</Typography></Paper></Grid>
-          <Grid item xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.completed}</Typography><Typography variant="caption">Completed</Typography></Paper></Grid>
-          <Grid item xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.cancelled}</Typography><Typography variant="caption">Cancelled</Typography></Paper></Grid>
+          <Grid xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.totalOrders}</Typography><Typography variant="caption">Total Orders</Typography></Paper></Grid>
+          <Grid xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.accepted}</Typography><Typography variant="caption">Accepted</Typography></Paper></Grid>
+          <Grid xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.completed}</Typography><Typography variant="caption">Completed</Typography></Paper></Grid>
+          <Grid xs={6} sm={3}><Paper sx={{ p: 2, textAlign: 'center' }}><Typography variant="h6">{analytics.cancelled}</Typography><Typography variant="caption">Cancelled</Typography></Paper></Grid>
         </Grid>
         <Box sx={{ mb: 2 }}>
           <Button variant="contained" color="primary" sx={{ mr: 2 }}>Download CSV</Button>
