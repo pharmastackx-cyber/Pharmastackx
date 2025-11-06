@@ -30,7 +30,7 @@ export async function dbConnect(): Promise<Mongoose> {
   // 4. Create connection promise if it doesn't exist (simplified .then)
   if (!cached.promise) {
     // Optional: Add configuration options here
-    cached.promise = mongoose.connect(MONGO_URI); 
+    cached.promise = mongoose.connect(MONGO_URI!); 
   }
 
   // 5. Await and store the resolved connection
