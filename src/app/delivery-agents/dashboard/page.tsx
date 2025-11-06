@@ -171,7 +171,7 @@ export default function DeliveryAgentsDashboard() {
               control={<Switch checked={online} onChange={handleToggleOnline} color="success" />}
               label={online ? "Online" : "Offline"}
             />
-            <Typography variant="subtitle1">Welcome, {user.username}</Typography>
+            <Typography variant="subtitle1">Welcome, {user.name}</Typography>
           </Stack>
         </Paper>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#1B5E20", mb: 2 }}>
