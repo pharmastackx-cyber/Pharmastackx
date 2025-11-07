@@ -12,6 +12,7 @@ export interface IUser extends Document {
   city?: string;
   phoneNumber?: string;
   createdAt: Date;
+  businessCoordinates?: string;
 }
 
 const userSchema: Schema<IUser> = new mongoose.Schema({
@@ -30,6 +31,14 @@ const userSchema: Schema<IUser> = new mongoose.Schema({
   city: { type: String },
   phoneNumber: { type: String },
   createdAt: { type: Date, default: Date.now },
+  businessCoordinates: {
+    type: {
+      latitude: { type: Number, required: false },
+      longitude: { type: Number, required: false },
+    },
+    default: null,
+  },
+  
 });
 
 // Explicitly specify the collection name as the third argument

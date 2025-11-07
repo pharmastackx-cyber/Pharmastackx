@@ -146,6 +146,16 @@ export default function Navbar() {
             <ListItemText primary="Business" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
         </ListItem>}
+        <ListItem disablePadding sx={{ mb: 0.5 }}>
+      <ListItemButton component={Link} href="/store-management" onClick={handleDrawerToggle} sx={{  borderRadius: '8px',
+      mx: 0.5,
+      py: 1,
+      bgcolor: isActive('/store-management') ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+      '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+        <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><BusinessCenter fontSize="small" /></ListItemIcon>
+        <ListItemText primary="Store Management" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
+      </ListItemButton>
+    </ListItem>
         {isAgentOrAdmin && <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/delivery-agents/dashboard" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/delivery-agents') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
             <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><DeliveryDining fontSize="small" /></ListItemIcon>
@@ -244,6 +254,8 @@ export default function Navbar() {
             {isBusinessUser && <Button color="inherit" startIcon={<BusinessCenter />} component={Link} href="/business/dashboard">
               Business Portal
             </Button>}
+            <Button color="inherit" startIcon={<BusinessCenter />} component={Link} href="/store-management"> Store Management </Button>
+            
             {isAgentOrAdmin && <Button color="inherit" startIcon={<DeliveryDining />} component={Link} href="/delivery-agents/dashboard">
               Delivery Agents
             </Button>}
