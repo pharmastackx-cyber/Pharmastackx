@@ -253,7 +253,28 @@ export default function StoreManagementPage() {
             <Typography variant="body2">{loadingUser ? 'Loading...' : userSlug ? `Slug: ${userSlug}` : 'Click to fetch store info.'}</Typography>
           </Box>
 
-          <Box sx={{ width: 350, height: 120, background: businessCoordinates ? 'linear-gradient(90deg, #9e9e9e 0%, #bdbdbd 100%)' : 'linear-gradient(90deg, #006400 0%, #8b008b 100%)', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 3, cursor: businessCoordinates ? 'default' : 'pointer', '&:hover': !businessCoordinates && { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' }, transition: '0.3s' }} onClick={!businessCoordinates ? handleGetLocation : undefined}>
+          <Box
+  sx={{
+    width: 350,
+    height: 120,
+    background: businessCoordinates
+      ? 'linear-gradient(90deg, #9e9e9e 0%, #bdbdbd 100%)'
+      : 'linear-gradient(90deg, #006400 0%, #8b008b 100%)',
+    color: 'white',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 3,
+    cursor: businessCoordinates ? 'default' : 'pointer',
+    '&:hover': !businessCoordinates
+      ? { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' }
+      : undefined,
+    transition: '0.3s',
+  }}
+  onClick={!businessCoordinates ? handleGetLocation : undefined}
+>
+
             <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.2)', mb: 1 }}><LocationOn sx={{ color: 'white' }} /></IconButton>
             {businessCoordinates ? (
               <>
