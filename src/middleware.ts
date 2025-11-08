@@ -19,7 +19,7 @@ export async function middleware(request: NextRequest) {
   const sessionToken = request.cookies.get('session_token')?.value;
 
   // Define routes that require authentication
-  const protectedRoutes = ['/admin', '/business', '/delivery-agents', '/orders', '/carechat'];
+  const protectedRoutes = ['/admin', '/business', '/delivery-agents', '/orders', '/carechat', '/store-management'];
 
   // Check if the path is a protected route
   const isProtectedRoute = protectedRoutes.some(path => pathname.startsWith(path));
@@ -44,8 +44,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // Business routes
-    if (pathname.startsWith('/business')) {
+    // Business and Store Management routes
+    if (pathname.startsWith('/business') || pathname.startsWith('/store-management')) {
       const allowedRoles = ['pharmacy', 'vendor', 'admin'];
       if (!allowedRoles.includes(payload.role)) {
         return NextResponse.redirect(new URL('/', request.url));
@@ -82,5 +82,6 @@ export const config = {
     '/delivery-agents/:path*',
     '/orders/:path*',
     '/carechat/:path*',
+    '/store-management/:path*',
   ],
 };

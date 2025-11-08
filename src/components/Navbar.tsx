@@ -146,7 +146,7 @@ export default function Navbar() {
             <ListItemText primary="Business" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
         </ListItem>}
-        <ListItem disablePadding sx={{ mb: 0.5 }}>
+        {isBusinessUser && <ListItem disablePadding sx={{ mb: 0.5 }}>
       <ListItemButton component={Link} href="/store-management" onClick={handleDrawerToggle} sx={{  borderRadius: '8px',
       mx: 0.5,
       py: 1,
@@ -155,7 +155,7 @@ export default function Navbar() {
         <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><BusinessCenter fontSize="small" /></ListItemIcon>
         <ListItemText primary="Store Management" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
       </ListItemButton>
-    </ListItem>
+    </ListItem>}
         {isAgentOrAdmin && <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/delivery-agents/dashboard" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/delivery-agents') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
             <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><DeliveryDining fontSize="small" /></ListItemIcon>
@@ -245,6 +245,9 @@ export default function Navbar() {
             <Button color="inherit" startIcon={<Chat />} component={Link} href="/carechat" sx={{ bgcolor: isActive('/carechat') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
               CareChat
             </Button>
+            <Button color="inherit" startIcon={<ShoppingBag />} component={Link} href="/orders" sx={{ bgcolor: isActive('/orders') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
+              Orders
+            </Button>
             <IconButton color="inherit" component={Link} href="/cart" sx={{ mx: 1, bgcolor: isActive('/cart') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' } }}>
               <Badge badgeContent={getTotalItems()} color="error" max={99}>
                 <ShoppingCart />
@@ -254,7 +257,7 @@ export default function Navbar() {
             {isBusinessUser && <Button color="inherit" startIcon={<BusinessCenter />} component={Link} href="/business/dashboard">
               Business Portal
             </Button>}
-            <Button color="inherit" startIcon={<BusinessCenter />} component={Link} href="/store-management"> Store Management </Button>
+            {isBusinessUser && <Button color="inherit" startIcon={<BusinessCenter />} component={Link} href="/store-management"> Store Management </Button>}
             
             {isAgentOrAdmin && <Button color="inherit" startIcon={<DeliveryDining />} component={Link} href="/delivery-agents/dashboard">
               Delivery Agents

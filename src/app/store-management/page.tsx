@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Tabs, Tab, IconButton, TextField, Button,
-  Table, TableHead, TableBody, TableRow, TableCell, Paper
+  Table, TableHead, TableBody, TableRow, TableCell, Paper, useTheme, useMediaQuery, CircularProgress
 } from '@mui/material';
 import { Storefront, LocationOn, UploadFile } from '@mui/icons-material';
 import Papa from 'papaparse';
 
 interface StockItem {
+  _id?: string;
   itemName: string;
   activeIngredient: string;
   category: string;
@@ -28,34 +29,26 @@ export default function StoreManagementPage() {
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [showBulkPreview, setShowBulkPreview] = useState(false);
   const [bulkData, setBulkData] = useState<StockItem[]>([]);
-  const [stockData, setStockData] = useState<StockItem[]>([
-    { itemName: 'Paracetamol 500mg', activeIngredient: 'Paracetamol', category: 'Analgesic', amount: 500, imageUrl: 'https://via.placeholder.com/50', businessName: 'PharmaStackx Store', coordinates: 'Lat: 6.5244, Lon: 3.3792' },
-    { itemName: 'Amoxicillin 250mg', activeIngredient: 'Amoxicillin', category: 'Antibiotic', amount: 1200, imageUrl: 'https://via.placeholder.com/50', businessName: 'PharmaStackx Store', coordinates: 'Lat: 6.5244, Lon: 3.3792' },
-    { itemName: 'Cough Syrup', activeIngredient: 'Dextromethorphan', category: 'Cough & Cold', amount: 850, imageUrl: 'https://d3ckuu7lxvlwp2.cloudfront.net/products/01JM2PEQQND2VAQ2PAA3VTQZGN.jpg', businessName: 'PharmaStackx Store', coordinates: 'Lat: 6.5244, Lon: 3.3792' },
-  ]);
+  const [stockData, setStockData] = useState<StockItem[]>([]);
+  const [loadingStock, setLoadingStock] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // STOCK Table helpers
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortColumn, setSortColumn] = useState<keyof StockItem | ''>('');
+  const [sortColumn, setSortColumn] = useState<keyof StockItem | ''>( '');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editingRowData, setEditingRowData] = useState<StockItem | {}>({});
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const formRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  interface FormValues {
-    itemName: string;
-    activeIngredient: string;
-    category: string;
-    amount: string | number;
-    imageUrl: string;
-    businessName: string;
-    coordinates: string;
-  }
 
-  const [formValues, setFormValues] = useState<FormValues>({
+  const [formValues, setFormValues] = useState<Omit<StockItem, '_id'>>({
     itemName: '',
     activeIngredient: '',
     category: '',
@@ -65,7 +58,68 @@ export default function StoreManagementPage() {
     coordinates: '',
   });
 
-  // --- Filtering, Sorting, Pagination ---
+  const fetchStockData = useCallback(async (businessName: string | null, coordinates: string | null) => {
+    setLoadingStock(true);
+    try {
+      const stockRes = await fetch('/api/stock');
+      if (!stockRes.ok) throw new Error('Failed to fetch stock');
+      const stockJson = await stockRes.json();
+
+      const transformedData = stockJson.items.map((product: any) => ({
+        _id: product._id,
+        itemName: product.itemName || 'N/A',
+        activeIngredient: product.activeIngredient || 'N/A',
+        category: product.category || 'N/A',
+        amount: product.amount || 0,
+        imageUrl: product.imageUrl || '',
+        businessName: product.businessName || businessName || 'N/A',
+        coordinates: product.coordinates || coordinates || 'N/A',
+      }));
+      setStockData(transformedData);
+    } catch (error) {
+      console.error('Error fetching stock data:', error);
+      alert('Could not load stock data.');
+    }
+    setLoadingStock(false);
+  }, []);
+
+  useEffect(() => {
+    const fetchUserAndStock = async () => {
+      setLoadingUser(true);
+      try {
+        const userRes = await fetch('/api/user/me');
+        if (!userRes.ok) throw new Error('Failed to fetch user');
+        const userData = await userRes.json();
+
+        let currentBusinessName: string | null = null;
+        let currentCoordinates: string | null = null;
+
+        if (userData.user?.businessName) {
+            currentBusinessName = userData.user.businessName;
+            setUserBusinessName(currentBusinessName);
+            setFormValues(prev => ({ ...prev, businessName: currentBusinessName! }));
+        }
+        if (userData.user?.slug) setUserSlug(userData.user.slug);
+
+        if (userData.user?.businessCoordinates) {
+          const { latitude, longitude } = userData.user.businessCoordinates;
+          currentCoordinates = `Lat: ${latitude?.toFixed(4)}, Lon: ${longitude?.toFixed(4)}`;
+          setBusinessCoordinates({ latitude, longitude });
+          setLocation(currentCoordinates);
+          setFormValues(prev => ({ ...prev, coordinates: currentCoordinates! }));
+        }
+
+        await fetchStockData(currentBusinessName, currentCoordinates);
+
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+      }
+      setLoadingUser(false);
+    };
+    fetchUserAndStock();
+  }, [fetchStockData]);
+
+
   const filteredStock = stockData.filter(item =>
     Object.values(item).join(' ').toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -85,31 +139,6 @@ export default function StoreManagementPage() {
     else { setSortColumn(column); setSortDirection('asc'); }
     setCurrentPage(1);
   };
-
-  // ✅ Fetch user info
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await fetch('/api/user/me');
-        if (!res.ok) throw new Error('Failed to fetch user');
-        const data = await res.json();
-
-        if (data.user?.businessName) setUserBusinessName(data.user.businessName);
-        if (data.user?.slug) setUserSlug(data.user.slug);
-
-        if (data.user?.businessCoordinates) {
-          setBusinessCoordinates(data.user.businessCoordinates);
-          const { latitude, longitude } = data.user.businessCoordinates;
-          const coordsString = `Lat: ${latitude?.toFixed(4)}, Lon: ${longitude?.toFixed(4)}`;
-          setLocation(coordsString);
-          setFormValues(prev => ({ ...prev, coordinates: coordsString }));
-        }
-      } catch (error) {
-        console.error('Error fetching user:', error);
-      }
-    };
-    fetchUser();
-  }, []);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => setSelectedTab(newValue);
 
@@ -161,40 +190,67 @@ export default function StoreManagementPage() {
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setFormValues({ ...formValues, [e.target.name]: e.target.value });
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted:', formValues);
-    alert('Form submitted! Check console.');
+    setIsSubmitting(true);
+    try {
+        const newProduct = { 
+            ...formValues, 
+            businessName: userBusinessName,
+            amount: Number(formValues.amount) || 0
+        };
+        const response = await fetch('/api/stock', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newProduct),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to submit form');
+        }
+        const { product: savedProduct } = await response.json();
+        setStockData(prev => [savedProduct, ...prev]);
+        alert('Item added successfully!');
+        setShowUploadForm(false);
+        setFormValues({
+            itemName: '', activeIngredient: '', category: '', 
+            amount: '', imageUrl: '', 
+            businessName: userBusinessName || '', 
+            coordinates: location || ''
+        });
+    } catch (error) {
+        console.error('Error submitting form:', error);
+        alert(`Error: ${(error as Error).message}`);
+    }
+    setIsSubmitting(false);
   };
 
-  // CSV helpers
   const normalizeCSVHeaders = (headers: string[]) => {
-    const headerMap: Record<string, string[]> = {
-      itemName: ['item name', 'item', 'product', 'drug', 'medicine name', 'name'],
-      activeIngredient: ['active ingredient', 'ingredient', 'compound', 'api', 'substance'],
-      category: ['category', 'class', 'type', 'drug class'],
-      amount: ['amount', 'price', 'cost', 'value', '₦', 'naira'],
-      imageUrl: ['image', 'photo', 'picture', 'img', 'image url'],
+    const headerMap: Record<string, keyof StockItem> = {
+      'item name': 'itemName', 'item': 'itemName', 'product': 'itemName', 'drug': 'itemName', 'medicine name': 'itemName', 'name': 'itemName',
+      'active ingredient': 'activeIngredient', 'ingredient': 'activeIngredient', 'compound': 'activeIngredient', 'api': 'activeIngredient', 'substance': 'activeIngredient',
+      'category': 'category', 'class': 'category', 'type': 'category', 'drug class': 'category',
+      'amount': 'amount', 'price': 'amount', 'cost': 'amount', 'value': 'amount', '₦': 'amount', 'naira': 'amount',
+      'image': 'imageUrl', 'photo': 'imageUrl', 'picture': 'imageUrl', 'img': 'imageUrl', 'image url': 'imageUrl',
     };
-    const normalized: Record<string, string> = {};
+    const mapping: { [key: string]: keyof StockItem } = {};
     headers.forEach(header => {
-      const lower = header.trim().toLowerCase();
-      for (const [key, aliases] of Object.entries(headerMap)) {
-        if (aliases.includes(lower)) { normalized[key] = header; return; }
-      }
+        const lower = header.trim().toLowerCase();
+        if (headerMap[lower]) {
+            mapping[header] = headerMap[lower];
+        }
     });
-    return normalized;
+    return mapping;
   };
-
-  const normalizeValue = (key: string, rawValue: any) => {
-    if (!rawValue) return 'N/A';
-    const value = rawValue.toString().trim();
+  
+  const normalizeValue = (key: keyof StockItem, rawValue: any) => {
+    if (rawValue === null || rawValue === undefined) return '';
+    const value = String(rawValue).trim();
     if (key === 'amount') {
       const numeric = value.replace(/[₦$,]/g, '').replace(/k/i, '000').match(/\d+(\.\d+)?/);
-      return numeric ? parseFloat(numeric[0]) : 'N/A';
+      return numeric ? parseFloat(numeric[0]) : 0;
     }
-    if (['itemName', 'activeIngredient', 'category'].includes(key)) return value.replace(/\s+/g, ' ').trim();
-    return value;
+    return value.replace(/\s+/g, ' ').trim();
   };
 
   const handleBulkFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -207,114 +263,178 @@ export default function StoreManagementPage() {
       complete: (result) => {
         const headers = result.meta.fields || [];
         const headerMapping = normalizeCSVHeaders(headers);
-
+        
         const parsedData = result.data.map((row: any) => {
-          const normalizedRow: StockItem = {
-            itemName: normalizeValue('itemName', row[headerMapping.itemName]),
-            activeIngredient: normalizeValue('activeIngredient', row[headerMapping.activeIngredient]),
-            category: normalizeValue('category', row[headerMapping.category]),
-            amount: normalizeValue('amount', row[headerMapping.amount]),
-            imageUrl: normalizeValue('imageUrl', row[headerMapping.imageUrl]),
-            businessName: userBusinessName || 'N/A',
-            coordinates: businessCoordinates?.latitude && businessCoordinates?.longitude
-              ? `Lat: ${businessCoordinates.latitude.toFixed(4)}, Lon: ${businessCoordinates.longitude.toFixed(4)}`
-              : 'N/A',
-          };
-          return normalizedRow;
+          const normalizedRow: Partial<StockItem> = {};
+          for (const header of headers) {
+              const mappedKey = headerMapping[header];
+              if (mappedKey) {
+                  (normalizedRow as any)[mappedKey] = normalizeValue(mappedKey, row[header]);
+              }
+          }
+
+          return {
+              ...normalizedRow,
+              businessName: userBusinessName || 'N/A',
+              coordinates: location || 'N/A',
+          } as StockItem;
         });
 
         setBulkData(parsedData);
         setShowBulkPreview(true);
       },
+       error: (error) => {
+        console.error("CSV parsing error:", error);
+        alert("Failed to parse CSV file. Please check the format.");
+      }
     });
   };
 
-  const handleConfirmBulkUpload = () => {
-    console.log('✅ Final bulk upload data:', bulkData);
-    alert('Bulk upload data logged to console!');
+  const handleConfirmBulkUpload = async () => {
+    if (!bulkData.length) {
+      alert('No data to upload.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+        const payload = {
+            products: bulkData,
+            fileName: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv'
+        };
+      const response = await fetch('/api/bulk-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        const { savedProducts } = await response.json();
+        setStockData(prev => [...savedProducts, ...prev]);
+        alert('Bulk upload successful!');
+        setShowBulkPreview(false);
+        setBulkData([]);
+        if(fileInputRef.current) fileInputRef.current.value = "";
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Bulk upload failed');
+      }
+    } catch (error) {
+      console.error('Error during bulk upload:', error);
+      alert(`An unexpected error occurred: ${(error as Error).message}`);
+    }
+    setIsSubmitting(false);
   };
 
-  // --- RENDER ---
+  const handleDelete = async (productId: string) => {
+    if (!window.confirm('Are you sure you want to request deletion for this item?')) return;
+    console.log(`Deletion requested for product ID: ${productId} by user: ${userBusinessName}`);
+    alert('Deletion request sent for admin approval.');
+  };
+
+  const handleSave = async (productId: string) => {
+    try {
+      const response = await fetch(`/api/stock/${productId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingRowData),
+      });
+
+      if (response.ok) {
+        const { product: updatedProduct } = await response.json();
+        setStockData(prev => prev.map(item => item._id === productId ? updatedProduct : item));
+        alert('Item updated successfully');
+        setEditingRowIndex(null);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Update failed');
+      }
+    } catch (error) {
+      console.error('Error updating item:', error);
+      alert(`An unexpected error occurred: ${(error as Error).message}`);
+    }
+  };
+
+
   return (
-    <Box sx={{ p: 4 }}>
-      <Typography variant="h4" gutterBottom>Store Management</Typography>
-      <Tabs value={selectedTab} onChange={handleTabChange}>
+    <Box sx={{ p: isMobile ? 2 : 4 }}>
+      <Typography variant={isMobile ? 'h5' : 'h4'} gutterBottom>Store Management</Typography>
+      <Tabs value={selectedTab} onChange={handleTabChange} variant={isMobile ? 'scrollable' : 'standard'} scrollButtons="auto">
         <Tab label="Storefront" />
         <Tab label="Upload" />
         <Tab label="Stock" />
       </Tabs>
 
-      {/* STORE FRONT */}
       {selectedTab === 0 && (
         <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
-          <Box sx={{ width: 350, background: 'linear-gradient(90deg, #004d40 0%, #800080 100%)', color: 'white', p: 3, borderRadius: 3, textAlign: 'center', cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }} onClick={handleStoreInfoClick}>
+           <Box sx={{ maxWidth: 350, width: '100%', background: 'linear-gradient(90deg, #004d40 0%, #800080 100%)', color: 'white', p: 3, borderRadius: 3, textAlign: 'center', cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }} onClick={handleStoreInfoClick}>
             <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.2)', mb: 1 }}><Storefront sx={{ color: 'white' }} /></IconButton>
             <Typography variant="h6">Store Info</Typography>
-            <Typography variant="body2">{loadingUser ? 'Loading...' : userSlug ? `Slug: ${userSlug}` : 'Click to fetch store info.'}</Typography>
+            {loadingUser ? <CircularProgress size={20} color="inherit" /> : <Typography variant="body2">{userBusinessName ? `Name: ${userBusinessName}` : 'Click to fetch info'}</Typography>}
+            {userSlug && <Typography variant="caption">Slug: {userSlug}</Typography>}
           </Box>
 
           <Box
-  sx={{
-    width: 350,
-    height: 120,
-    background: businessCoordinates
-      ? 'linear-gradient(90deg, #9e9e9e 0%, #bdbdbd 100%)'
-      : 'linear-gradient(90deg, #006400 0%, #8b008b 100%)',
-    color: 'white',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 3,
-    cursor: businessCoordinates ? 'default' : 'pointer',
-    '&:hover': !businessCoordinates
-      ? { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' }
-      : undefined,
-    transition: '0.3s',
-  }}
-  onClick={!businessCoordinates ? handleGetLocation : undefined}
->
-
+            sx={{
+              maxWidth: 350, 
+              width: '100%',
+              height: 120,
+              background: businessCoordinates
+                ? 'linear-gradient(90deg, #9e9e9e 0%, #bdbdbd 100%)'
+                : 'linear-gradient(90deg, #006400 0%, #8b008b 100%)',
+              color: 'white',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 3,
+              cursor: businessCoordinates ? 'default' : 'pointer',
+              transition: '0.3s',
+              '&:hover': !businessCoordinates ? { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } : undefined,
+            }}
+            onClick={!businessCoordinates ? handleGetLocation : undefined}
+          >
             <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.2)', mb: 1 }}><LocationOn sx={{ color: 'white' }} /></IconButton>
             {businessCoordinates ? (
               <>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Store Location:</Typography>
-                <Typography variant="body2" sx={{ mt: 0.5 }}>Lat: {businessCoordinates.latitude?.toFixed(4)}, Lon: {businessCoordinates.longitude?.toFixed(4)}</Typography>
+                <Typography variant="body2" sx={{ mt: 0.5 }}>{location}</Typography>
               </>
             ) : <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Click to get your location</Typography>}
           </Box>
         </Box>
       )}
 
-      {/* UPLOAD */}
       {selectedTab === 1 && (
         <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
           {!showUploadForm ? (
-            <Box sx={{ width: 350, height: 150, bgcolor: '#1976d2', color: 'white', borderRadius: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }} onClick={handleUploadClick}>
+            <Box sx={{ maxWidth: 350, width: '100%', height: 150, bgcolor: '#1976d2', color: 'white', borderRadius: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }} onClick={handleUploadClick}>
               <IconButton sx={{ color: 'white', mb: 1 }}><UploadFile /></IconButton>
-              <Typography variant="h6">Upload</Typography>
-              <Typography variant="body2">Click to add new items.</Typography>
+              <Typography variant="h6">Upload Single Item</Typography>
+              <Typography variant="body2">Click to add a new item.</Typography>
             </Box>
           ) : (
-            <Box ref={formRef} component="form" onSubmit={handleFormSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: 350, p: 3, bgcolor: '#e0f7fa', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
-              <TextField label="Item Name" name="itemName" value={formValues.itemName} onChange={handleFormChange} fullWidth />
-              <TextField label="Active Ingredient" name="activeIngredient" value={formValues.activeIngredient} onChange={handleFormChange} fullWidth />
-              <TextField label="Category" name="category" value={formValues.category} onChange={handleFormChange} fullWidth />
-              <TextField label="Amount" name="amount" value={formValues.amount} onChange={handleFormChange} fullWidth />
+            <Box ref={formRef} component="form" onSubmit={handleFormSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 350, width: '100%', p: 3, bgcolor: '#e0f7fa', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+              <TextField label="Item Name" name="itemName" value={formValues.itemName} onChange={handleFormChange} fullWidth required />
+              <TextField label="Active Ingredient" name="activeIngredient" value={formValues.activeIngredient} onChange={handleFormChange} fullWidth required />
+              <TextField label="Category" name="category" value={formValues.category} onChange={handleFormChange} fullWidth required/>
+              <TextField label="Amount" name="amount" type="number" value={formValues.amount} onChange={handleFormChange} fullWidth required/>
               <TextField label="Image URL" name="imageUrl" value={formValues.imageUrl} onChange={handleFormChange} fullWidth />
               <TextField label="Business Name" value={userBusinessName || ''} InputProps={{ readOnly: true }} fullWidth />
               <TextField label="Coordinates" value={location || ''} InputProps={{ readOnly: true }} fullWidth />
-              <Button type="submit" variant="contained" color="primary">Submit</Button>
+              <Button type="submit" variant="contained" color="primary" disabled={isSubmitting}>
+                {isSubmitting ? <CircularProgress size={24} /> : 'Submit'}
+              </Button>
+               <Button variant="outlined" color="secondary" onClick={() => setShowUploadForm(false)} sx={{mt: 1}}>Cancel</Button>
             </Box>
           )}
 
-          <Box sx={{ width: 350, height: 'auto', background: 'linear-gradient(90deg, #004d40 0%, #800080 100%)', color: 'white', borderRadius: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', p: 3 }}>
+          <Box sx={{ maxWidth: 350, width: '100%', height: 'auto', background: 'linear-gradient(90deg, #004d40 0%, #800080 100%)', color: 'white', borderRadius: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', p: 3 }}>
             <IconButton sx={{ color: 'white', mb: 1 }}><UploadFile /></IconButton>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>Bulk Upload</Typography>
             <Typography variant="body2" sx={{ mb: 2 }}>Upload multiple items using a CSV file</Typography>
             <Button variant="contained" component="label" color="secondary">
               Choose CSV
-              <input type="file" accept=".csv" hidden onChange={handleBulkFileUpload} />
+              <input type="file" accept=".csv" hidden onChange={handleBulkFileUpload} ref={fileInputRef} />
             </Button>
 
             {showBulkPreview && (
@@ -322,108 +442,141 @@ export default function StoreManagementPage() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      {['Item Name', 'Active Ingredient', 'Category', 'Amount', 'Image', 'Business Name', 'Coordinates'].map(h => <TableCell key={h} sx={{ fontWeight: 600 }}>{h}</TableCell>)}
+                      <TableCell sx={{ fontWeight: 600 }}>Item Name</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Active Ingredient</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Amount</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {bulkData.map((row, i) => (
+                    {bulkData.slice(0, 5).map((row, i) => (
                       <TableRow key={i}>
                         <TableCell>{row.itemName}</TableCell>
                         <TableCell>{row.activeIngredient}</TableCell>
                         <TableCell>{row.category}</TableCell>
                         <TableCell>{row.amount}</TableCell>
-                        <TableCell>{row.imageUrl}</TableCell>
-                        <TableCell>{row.businessName}</TableCell>
-                        <TableCell>{row.coordinates}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-                <Button fullWidth variant="contained" color="primary" sx={{ mt: 2 }} onClick={handleConfirmBulkUpload}>Confirm Upload</Button>
+                {bulkData.length > 5 && <Typography sx={{p: 1, fontSize: 12}}>... and {bulkData.length - 5} more rows.</Typography>}
+                <Button fullWidth variant="contained" color="primary" sx={{ mt: 2 }} onClick={handleConfirmBulkUpload} disabled={isSubmitting}>
+                    {isSubmitting ? <CircularProgress size={24} /> : 'Confirm Upload'}
+                </Button>
               </Paper>
             )}
           </Box>
         </Box>
       )}
 
-      {/* STOCK */}
       {selectedTab === 2 && (
-        <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-          <Box sx={{ width: 700, p: 2, bgcolor: '#f5f5f5', borderRadius: 2, boxShadow: '0 2px 6px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Bulk Files</Typography>
-            <Typography variant="body2" color="text.secondary">Upload CSV files here for batch stock updates</Typography>
-          </Box>
-
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Current Stock Catalogue</Typography>
-
-          <Paper sx={{ width: 700, overflowX: 'auto', bgcolor: 'white', color: 'black', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', borderRadius: 2, p: 2 }}>
-            <TextField label="Search items" variant="outlined" size="small" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ mb: 2, width: '50%' }} />
-
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  {(['itemName', 'activeIngredient', 'category', 'amount', 'imageUrl', 'businessName', 'coordinates'] as (keyof StockItem)[]).map(key => (
-                    <TableCell key={key} onClick={() => handleSort(key)} sx={{ cursor: 'pointer', fontWeight: 600, '&:hover': { color: 'primary.main' } }}>
-                      {key.charAt(0).toUpperCase() + key.slice(1)}
-                      {sortColumn === key && <span style={{ marginLeft: 4, fontSize: 12, color: 'gray' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>}
-                    </TableCell>
-                  ))}
-                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginatedStock.map((row, i) => {
-                  const globalIndex = (currentPage - 1) * itemsPerPage + i;
-                  return (
-                    <TableRow key={globalIndex}>
-                      {editingRowIndex === globalIndex ? (
-                        <>
-                          {(['itemName','activeIngredient','category','amount','imageUrl'] as (keyof StockItem)[]).map(field => (
-                            <TableCell key={field}>
-                              <TextField
-                                type={field==='amount' ? 'number' : 'text'}
-                                value={(editingRowData as any)[field]}
-                                onChange={e => setEditingRowData({ ...(editingRowData as any), [field]: field==='amount' ? Number(e.target.value) : e.target.value })}
-                              />
-                            </TableCell>
-                          ))}
-                          <TableCell>{row.businessName}</TableCell>
-                          <TableCell>{row.coordinates}</TableCell>
-                          <TableCell>
-                            <Button variant="contained" size="small" color="success" sx={{ mr: 1 }} onClick={() => { const updated = [...stockData]; updated[globalIndex] = editingRowData as StockItem; setStockData(updated); setEditingRowIndex(null); }}>Save</Button>
-                            <Button size="small" onClick={() => setEditingRowIndex(null)}>Cancel</Button>
-                          </TableCell>
-                        </>
-                      ) : (
-                        <>
-                          <TableCell>{row.itemName}</TableCell>
-                          <TableCell>{row.activeIngredient}</TableCell>
-                          <TableCell>{row.category}</TableCell>
-                          <TableCell>{row.amount}</TableCell>
-                          <TableCell>{row.imageUrl ? <img src={row.imageUrl} alt={row.itemName} width={50} height={50} style={{ borderRadius: 6 }} /> : 'N/A'}</TableCell>
-                          <TableCell>{row.businessName}</TableCell>
-                          <TableCell>{row.coordinates}</TableCell>
-                          <TableCell>
-                            <Button variant="contained" size="small" sx={{ mr: 1 }} onClick={() => { setEditingRowIndex(globalIndex); setEditingRowData(row); }}>Edit</Button>
-                            <Button variant="outlined" color="error" size="small" onClick={() => { if(window.confirm('Are you sure you want to delete this item?')) setStockData(stockData.filter((_, idx) => idx !== globalIndex)); }}>Delete</Button>
-                          </TableCell>
-                        </>
-                      )}
+         <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Current Stock Catalogue</Typography>
+             {loadingStock ? <CircularProgress /> :
+              <Paper sx={{ maxWidth: 900, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', borderRadius: 2, p: 2 }}>
+                <TextField label="Search items" variant="outlined" size="small" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ mb: 2, width: isMobile ? '100%' : '50%' }} />
+    
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      {(['itemName', 'activeIngredient', 'category', 'amount', 'imageUrl', 'businessName', 'coordinates'] as (keyof StockItem)[]).map(key => (
+                        <TableCell 
+                        key={key} 
+                        onClick={() => handleSort(key)} 
+                        sx={{ 
+                          cursor: 'pointer', 
+                          fontWeight: 600, 
+                          '&:hover': { color: 'primary.main' },
+                          // 👇 NEW STYLES FOR IMAGE URL HEADER
+                          ...(key === 'imageUrl' && { 
+                            maxWidth: '150px', // Set a maximum width for the header
+                            minWidth: '100px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          })
+                        }}
+                      >
+                          {key.replace(/([A-Z])/g, ' $1').charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
+                          {sortColumn === key && <span style={{ marginLeft: 4, fontSize: 12, color: 'gray' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                        </TableCell>
+                      ))}
+                      <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  </TableHead>
+                  <TableBody>
+                    {paginatedStock.map((row, i) => {
+                      const globalIndex = stockData.findIndex(item => item._id === row._id);
+                      return (
+                        <TableRow key={row._id}>
+                          {editingRowIndex === globalIndex ? (
+                            <>
+                              {(['itemName','activeIngredient','category','amount','imageUrl', 'businessName', 'coordinates'] as (keyof StockItem)[]).map(field => (
+                                <TableCell key={field}>
+                                  <TextField
+                                    type={field==='amount' ? 'number' : 'text'}
+                                    value={(editingRowData as any)[field]}
+                                    onChange={e => setEditingRowData({ ...(editingRowData as any), [field]: field==='amount' ? Number(e.target.value) : e.target.value })}
+                                  />
+                                </TableCell>
+                              ))}
+                              <TableCell>
+                                <Button variant="contained" size="small" color="success" sx={{ mr: 1 }} onClick={() => handleSave(row._id!)}>Save</Button>
+                                <Button size="small" onClick={() => setEditingRowIndex(null)}>Cancel</Button>
+                              </TableCell>
+                            </>
+                          ) : (
+                            <>
+                              <TableCell>{row.itemName}</TableCell>
+                              <TableCell>{row.activeIngredient}</TableCell>
+                              <TableCell>{row.category}</TableCell>
+                              <TableCell>{typeof row.amount === 'number' ? `₦${row.amount.toFixed(2)}` : row.amount}</TableCell>
+                              <TableCell>
+  {editingRowIndex === globalIndex ? (
+    <TextField
+      value={(editingRowData as any).imageUrl || ''}
+      onChange={e =>
+        setEditingRowData({ ...(editingRowData as any), imageUrl: e.target.value })
+      }
+      variant="outlined"
+      size="small"
+      placeholder="Image URL"
+      fullWidth
+    />
+  ) : (
+    <img
+      src={row.imageUrl || '/placeholder.png'}
+      alt={row.itemName || 'Product image'}
+      style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }}
+      onError={e => (e.currentTarget.src = '/placeholder.png')}
+    />
+  )}
+</TableCell>
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, width: '100%' }}>
-              <Typography variant="body2" color="text.secondary">Page {currentPage} of {Math.ceil(filteredStock.length / itemsPerPage)}</Typography>
-              <Box>
-                <Button variant="outlined" size="small" disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} sx={{ mr:1 }}>Prev</Button>
-                <Button variant="outlined" size="small" disabled={currentPage===Math.ceil(filteredStock.length/itemsPerPage)} onClick={()=>setCurrentPage(p=>p+1)}>Next</Button>
-              </Box>
-            </Box>
 
-          </Paper>
+                              <TableCell>{row.businessName}</TableCell>
+                              <TableCell>{row.coordinates}</TableCell>
+                              <TableCell>
+                                <Button variant="contained" size="small" sx={{ mr: 1 }} onClick={() => { setEditingRowIndex(globalIndex); setEditingRowData(row); }}>Edit</Button>
+                                <Button variant="outlined" color="error" size="small" onClick={() => handleDelete(row._id!)}>Delete</Button>
+                              </TableCell>
+                            </>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+    
+                <Box sx={{ display: 'flex', justifyContent: isMobile ? 'center' : 'space-between', alignItems: 'center', mt: 2, width: '100%', flexDirection: isMobile ? 'column' : 'row' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: isMobile ? 2 : 0 }}>Page {currentPage} of {Math.ceil(filteredStock.length / itemsPerPage)}</Typography>
+                  <Box>
+                    <Button variant="outlined" size="small" disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} sx={{ mr:1 }}>Prev</Button>
+                    <Button variant="outlined" size="small" disabled={currentPage===Math.ceil(filteredStock.length/itemsPerPage)} onClick={()=>setCurrentPage(p=>p+1)}>Next</Button>
+                  </Box>
+                </Box>
+    
+              </Paper>}
         </Box>
       )}
     </Box>

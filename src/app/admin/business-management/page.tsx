@@ -133,7 +133,13 @@ export default function BusinessManagementPage() {
   };
   const handleInventoryTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setInventoryTab(newValue);
+
+    
+
+
   };
+
+
 
   return (
     <>
