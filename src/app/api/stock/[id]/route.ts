@@ -3,10 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
 import Product from '@/models/Product';
 
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export const dynamic = 'force-dynamic';
+
+export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   await dbConnect();
   try {
-    const { id } = context.params;
+    const { id } = params;
     const body = await req.json();
     const updatedProduct = await Product.findByIdAndUpdate(id, body, { new: true });
     if (!updatedProduct) {
