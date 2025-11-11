@@ -163,7 +163,7 @@ export default function Navbar() {
           </ListItemButton>
         </ListItem>}
         {isAdmin && <ListItem disablePadding sx={{ mb: 0.5 }}>
-          <ListItemButton component={Link} href="/promos" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+          <ListItemButton component={Link} href="/promos" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/promos') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
             <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><LocalOffer fontSize="small" /></ListItemIcon>
             <ListItemText primary="Promos" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
@@ -263,6 +263,12 @@ export default function Navbar() {
               Delivery Agents
             </Button>}
 
+            {isAdmin && (
+              <Button color="inherit" startIcon={<LocalOffer />} component={Link} href="/promos" sx={{ bgcolor: isActive('/promos') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
+                Promos
+              </Button>
+            )}
+
             {desktopAdminLinks}
 
             {isLoading ? (
@@ -280,6 +286,11 @@ export default function Navbar() {
                   onClose={handleMenuClose}
                 >
                   <MenuItem disabled>{user.email}</MenuItem>
+                  {isAdmin && (
+                    <MenuItem component={Link} href="/promos" onClick={handleMenuClose}>
+                      Promos
+                    </MenuItem>
+                  )}
                   <MenuItem onClick={handleLogout}>Logout</MenuItem>
                 </Menu>
               </>
@@ -314,6 +325,11 @@ export default function Navbar() {
                   onClose={handleMenuClose}
                 >
                   <MenuItem disabled>{user.email}</MenuItem>
+                  {isAdmin && (
+                    <MenuItem component={Link} href="/promos" onClick={handleMenuClose}>
+                      Promos
+                    </MenuItem>
+                  )}
                   <MenuItem onClick={handleLogout}>Logout</MenuItem>
                 </Menu>
               </>
@@ -353,3 +369,4 @@ export default function Navbar() {
     </>
   );
 }
+''

@@ -23,15 +23,18 @@ const OrderSchema = new mongoose.Schema({
   ],
   totalAmount: Number,
   status: String,
-  timeAccepted: String,
-  timeDispatched: String,
+  
+  // Renamed timestamp fields for consistency with the frontend
+  acceptedAt: String,
+  dispatchedAt: String, 
+  pickedUpAt: String,
+  completedAt: String,
+
   deliveryAgent: {
     name: String,
     phone: String,
     email: String,
   },
-  timePickup: String,
-  timeDelivered: String,
 }, { timestamps: true });
 
 module.exports = mongoose.models.Order || mongoose.model('Order', OrderSchema);

@@ -1,42 +1,43 @@
-'use client'
+'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-export interface OrderItem {
-  id: number;
-  name: string;
-  image: string;
-  activeIngredients: string;
-  drugClass: string;
-  price: number;
-  pharmacy: string;
-  quantity: number;
-}
-
+// Define the shape of an Order object
+// This should match the data coming from your API
 export interface Order {
-  id: string;
-  items: OrderItem[];
-  subtotal: number;
-  deliveryFee: number;
-  discount: number;
-  deliveryDiscount: number;
-  total: number;
-  promoCode?: string;
-  deliveryOption: 'standard' | 'express';
-  orderType: 'S' | 'MN' | 'MP';
-  pharmacies: string[];
-  status: 'processing' | 'completed' | 'cancelled';
+  _id: string; // MongoDB typically uses _id
+  id: string; // You might have a separate friendly ID
   date: string;
-  estimatedDelivery?: string;
-  completedDate?: string;
-  cancelReason?: string;
-  progress?: number;
+  status: 'Pending' | 'Accepted' | 'Dispatched' | 'In Transit' | 'Completed' | 'Cancelled';
+  
+  // User & Patient Information
+  user: { name: string; phone: string; email: string };
+  
+  // Delivery Information (assuming it comes with the order object)
+  deliveryAddress?: string;
+
+  // Order Contents
+  items: { name: string; qty: number }[];
+  businesses: { name: string }[];
+  orderType: string;
+  deliveryOption: string;
+  
+  // Financials
+  totalAmount: number;
+
+  // Timestamps from the backend
+  createdAt: string;
+  acceptedAt?: string;
+  dispatchedAt?: string;
+  pickedUpAt?: string;
+  completedAt?: string;
 }
 
 interface OrderContextType {
   orders: Order[];
-  addOrder: (orderData: Omit<Order, 'id' | 'date' | 'status'>) => string;
-  updateOrderStatus: (orderId: string, status: Order['status']) => void;
+  loading: boolean;
+  addOrder: (orderData: any) => Promise<string>; // Keeping this flexible for now
+  updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
   getOrderById: (orderId: string) => Order | undefined;
 }
 
@@ -55,82 +56,88 @@ interface OrderProviderProps {
 }
 
 export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
-  const [orders, setOrders] = useState<Order[]>([
-    // Sample existing orders
-    {
-      id: 'ORD003',
-      items: [
-        {
-          id: 1,
-          name: 'Blood Pressure Monitor',
-          image: 'https://example.com/bp-monitor.jpg',
-          activeIngredients: 'Digital Monitor',
-          drugClass: 'Medical Device',
-          price: 10000,
-          pharmacy: 'Wellness Pharmacy',
-          quantity: 1
-        },
-        {
-          id: 2,
-          name: 'Aspirin 100mg',
-          image: 'https://example.com/aspirin.jpg',
-          activeIngredients: 'Acetylsalicylic Acid',
-          drugClass: 'Analgesic',
-          price: 2500,
-          pharmacy: 'Wellness Pharmacy',
-          quantity: 1
-        }
-      ],
-      subtotal: 12500,
-      deliveryFee: 1000,
-      discount: 0,
-      deliveryDiscount: 0,
-      total: 13500,
-      deliveryOption: 'standard',
-      orderType: 'S',
-      pharmacies: ['Wellness Pharmacy'],
-      status: 'processing',
-      date: '2025-11-02T14:20:00',
-      progress: 65,
-      estimatedDelivery: '2025-11-03T16:00:00'
-    }
-  ]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const addOrder = (orderData: Omit<Order, 'id' | 'date' | 'status'>) => {
-    const orderId = `ORD${String(Date.now()).slice(-6)}`;
-    const newOrder: Order = {
-      ...orderData,
-      id: orderId,
-      date: new Date().toISOString(),
-      status: 'processing',
-      estimatedDelivery: new Date(Date.now() + (2 * 60 * 60 * 1000)).toISOString() // 2 hours from now
+  // Fetch initial orders from the database when the provider mounts
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/orders');
+        if (!response.ok) {
+          throw new Error('Failed to fetch orders');
+        }
+        const data = await response.json();
+        setOrders(data);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    setOrders(prev => [newOrder, ...prev]);
-    return orderId;
+    fetchOrders();
+  }, []);
+
+  // This function is for creating a NEW order (from PaystackButton)
+  const addOrder = async (orderData: any) => {
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json();
+        throw new Error(errorBody.message || 'Failed to save order to the database');
+      }
+
+      const newOrder = await response.json();
+      setOrders(prev => [newOrder, ...prev]); // Add new order to the top of the list
+      return newOrder._id; // Return the database ID
+
+    } catch (error) {
+      console.error('Error saving order:', error);
+      throw error; // Re-throw to be caught by the calling function if needed
+    }
   };
 
-  const updateOrderStatus = (orderId: string, status: Order['status']) => {
-    setOrders(prev =>
-      prev.map(order =>
-        order.id === orderId
-          ? {
-              ...order,
-              status,
-              completedDate: status === 'completed' ? new Date().toISOString() : order.completedDate,
-              progress: status === 'completed' ? 100 : order.progress
-            }
-          : order
-      )
-    );
+  // This function now saves status changes to the backend
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update order status');
+      }
+
+      const updatedOrder = await response.json();
+
+      // Update the local state with the returned order data
+      setOrders(prev =>
+        prev.map(order =>
+          order._id === orderId ? { ...order, ...updatedOrder } : order
+        )
+      );
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      // Optionally, you could add state to show an error in the UI
+    }
   };
 
   const getOrderById = (orderId: string) => {
-    return orders.find(order => order.id === orderId);
+    return orders.find(order => order._id === orderId);
   };
 
   const value: OrderContextType = {
     orders,
+    loading,
     addOrder,
     updateOrderStatus,
     getOrderById,
