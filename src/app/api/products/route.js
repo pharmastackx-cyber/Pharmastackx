@@ -12,68 +12,72 @@ const formatPrice = (price) => {
   return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(numericPrice);
 };
 
+// --- NEW: Helper to parse the coordinate string --- //
+const parseCoordinatesString = (coordString) => {
+  if (typeof coordString !== 'string') {
+    return null;
+  }
+
+  try {
+    const latMatch = coordString.match(/Lat: ([\d.-]+)/);
+    const lonMatch = coordString.match(/Lon: ([\d.-]+)/);
+
+    if (latMatch && lonMatch) {
+      const lat = parseFloat(latMatch[1]);
+      const lon = parseFloat(lonMatch[1]);
+      
+      if (!isNaN(lat) && !isNaN(lon)) {
+        return { lat, lon };
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Error parsing coordinate string:", coordString, error);
+    return null;
+  }
+};
+
 export async function GET(req) {
   try {
     await dbConnect();
 
-    // Fetch all products as plain JavaScript objects for efficiency.
     const products = await Product.find({}).lean();
     
-    const transformedProducts = [];
-    const transformationErrors = [];
-
-    for (const product of products) {
+    const transformedProducts = products.map(product => {
       try {
-        // --- CORRECT DATA TRANSFORMATION ---
-        // A product must have a name (itemName) and a price (amount).
         if (!product.itemName || typeof product.amount === 'undefined') {
           throw new Error('Product record is missing required fields: itemName or amount.');
         }
 
-        transformedProducts.push({
+        return {
           id: product._id.toString(),
-          // Map `imageUrl` (from DB) to `image` (for frontend)
           image: product.imageUrl || 'https://via.placeholder.com/150',
-          // Map `itemName` (from DB) to `name` (for frontend)
           name: product.itemName,
-          // Map `activeIngredient` (from DB) to `activeIngredients` (for frontend)
           activeIngredients: product.activeIngredient || '',
-          // Map `category` (from DB) to `drugClass` (for frontend)
           drugClass: product.category || 'N/A',
-          // Use `amount` for the raw numeric price
           price: product.amount,
-          // Use `amount` to create the formatted price string
           formattedPrice: formatPrice(product.amount),
-          // Use `businessName` (from DB) for `pharmacy` (for frontend)
           pharmacy: product.businessName || 'Unknown Pharmacy',
-          // Set a default for inStock, as it's not in the DB schema
+          // --- FIX: Parse the coordinate string into an object --- //
+          pharmacyCoordinates: parseCoordinatesString(product.coordinates),
           inStock: true, 
-          // Set a default for rating
           rating: 4.5, 
-        });
-
+        };
       } catch (error) {
-        // If one product record is malformed, we log it and skip it.
-        transformationErrors.push({ 
+        console.error('Error transforming product:', { 
           productId: product && product._id ? product._id.toString() : 'Unknown', 
           error: error.message 
         });
+        return null; // Exclude malformed products from the final list
       }
-    }
-
-    // This is helpful for debugging on the server if some products don't appear.
-    if (transformationErrors.length > 0) {
-      console.error('Errors during product transformation:', transformationErrors);
-    }
+    }).filter(p => p !== null); // Filter out any nulls from transformation errors
 
     return NextResponse.json({ 
       success: true, 
       data: transformedProducts, 
-      errors: transformationErrors 
     });
 
   } catch (error) {
-    // This is a safety net for any unexpected crashes (e.g., DB connection fails).
     console.error("Fatal uncaught error in /api/products:", error);
     return NextResponse.json({ 
       success: false, 
