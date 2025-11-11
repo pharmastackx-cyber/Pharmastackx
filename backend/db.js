@@ -1,6 +1,7 @@
+require('dotenv').config({ path: '.env.local' });
 const mongoose = require('mongoose');
 
-const MONGO_URI = 'mongodb+srv://pharmastakx_db_user:pharmastackx007@cluster0.tpkohgb.mongodb.net/?appName=Cluster0';
+const MONGO_URI = process.env.MONGO_URI;
 
 mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
