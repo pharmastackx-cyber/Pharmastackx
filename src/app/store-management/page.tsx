@@ -3,9 +3,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Tabs, Tab, IconButton, TextField, Button,
-  Table, TableHead, TableBody, TableRow, TableCell, Paper, useTheme, useMediaQuery, CircularProgress
+  Table, TableHead, TableBody, TableRow, TableCell, Paper, useTheme, useMediaQuery, CircularProgress, Tooltip
+  , Select, MenuItem, FormControl, InputLabel, Divider, Collapse
 } from '@mui/material';
-import { Storefront, LocationOn, UploadFile } from '@mui/icons-material';
+import { Storefront, LocationOn, UploadFile, ExpandMore } from '@mui/icons-material';
 import Papa from 'papaparse';
 
 interface StockItem {
@@ -18,6 +19,21 @@ interface StockItem {
   businessName: string;
   coordinates: string;
 }
+
+interface Order {
+  _id: string;
+  customerName: string;
+  totalPrice: number;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  items: {
+    name: string;
+    qty: number;
+    amount: number;
+    image?: string;
+  }[];
+  createdAt: string;
+}
+
 
 export default function StoreManagementPage() {
   const [selectedTab, setSelectedTab] = useState(0);
@@ -32,6 +48,13 @@ export default function StoreManagementPage() {
   const [stockData, setStockData] = useState<StockItem[]>([]);
   const [loadingStock, setLoadingStock] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [orderStatusFilter, setOrderStatusFilter] = useState('all');
+
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<keyof StockItem | ''>( '');
@@ -57,7 +80,6 @@ export default function StoreManagementPage() {
     businessName: '',
     coordinates: '',
   });
-
   const fetchStockData = useCallback(async (businessName: string | null, coordinates: string | null) => {
     setLoadingStock(true);
     try {
@@ -83,8 +105,44 @@ export default function StoreManagementPage() {
     setLoadingStock(false);
   }, []);
 
+  const fetchOrders = useCallback(async () => {
+    setLoadingOrders(true);
+    setOrdersError(null);
+    try {
+        const response = await fetch('/api/orders');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to fetch orders');
+        }
+        const data = await response.json();
+
+        const transformedOrders = data.map((order: any) => ({
+
+            _id: order._id,
+            customerName: order.user?.name || 'N/A',
+            totalPrice: order.totalAmount || 0,
+            status: order.status?.toLowerCase() || 'pending',
+            items: (order.items || []).map((item: any) => ({
+              name: item.name || 'Unnamed Item',
+              qty: item.qty || 1,
+              amount: item.amount || item.price || 0, // Safely checks for 'amount' or 'price', defaults to 0
+              image: item.image || item.imageUrl || '', // Safely checks for 'image' or 'imageUrl'
+            })),
+            
+            createdAt: new Date(order.createdAt).toLocaleDateString(),
+        }));
+
+        setOrders(transformedOrders);
+    } catch (error) {
+        console.error('Error fetching orders:', error);
+        setOrdersError((error as Error).message);
+    } finally {
+        setLoadingOrders(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchUserAndStock = async () => {
+    const fetchInitialData = async () => {
       setLoadingUser(true);
       try {
         const userRes = await fetch('/api/user/me');
@@ -109,16 +167,25 @@ export default function StoreManagementPage() {
           setFormValues(prev => ({ ...prev, coordinates: currentCoordinates! }));
         }
 
-        await fetchStockData(currentBusinessName, currentCoordinates);
+        // Fetch both stock and orders data in parallel
+        await Promise.all([
+            fetchStockData(currentBusinessName, currentCoordinates),
+            fetchOrders()
+        ]);
 
       } catch (error) {
         console.error('Error fetching initial data:', error);
       }
       setLoadingUser(false);
     };
-    fetchUserAndStock();
-  }, [fetchStockData]);
+    fetchInitialData();
+  }, [fetchStockData, fetchOrders]);
 
+
+
+  const filteredOrders = orders.filter(order =>
+    orderStatusFilter === 'all' || order.status === orderStatusFilter
+  );
 
   const filteredStock = stockData.filter(item =>
     Object.values(item).join(' ').toLowerCase().includes(searchQuery.toLowerCase())
@@ -362,6 +429,7 @@ export default function StoreManagementPage() {
         <Tab label="Storefront" />
         <Tab label="Upload" />
         <Tab label="Stock" />
+        <Tab label="Orders" />
       </Tabs>
 
       {selectedTab === 0 && (
@@ -579,6 +647,151 @@ export default function StoreManagementPage() {
               </Paper>}
         </Box>
       )}
+
+      {selectedTab === 3 && (
+        <Box sx={{ mt: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>Recent Orders</Typography>
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={orderStatusFilter}
+                label="Status"
+                onChange={(e) => setOrderStatusFilter(e.target.value)}
+              >
+                <MenuItem value="all">All</MenuItem>
+                <MenuItem value="pending">Pending</MenuItem>
+                <MenuItem value="processing">Processing</MenuItem>
+                <MenuItem value="completed">Completed</MenuItem>
+                <MenuItem value="cancelled">Cancelled</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          {loadingOrders ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : ordersError ? (
+            <Typography color="error" sx={{ textAlign: 'center', p: 4 }}>
+              Failed to load orders: {ordersError}
+            </Typography>
+          ) : (
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 3 }}>
+              {filteredOrders.map((order) => (
+                <Paper key={order._id} sx={{ p: 2, borderRadius: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          {order.createdAt}
+                        </Typography>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                          {order.customerName}
+                        </Typography>
+                      </Box>
+                      <Box
+                        sx={{
+                          color: 'white',
+                          p: '4px 10px',
+                          borderRadius: '16px',
+                          textAlign: 'center',
+                          textTransform: 'capitalize',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          bgcolor:
+                            order.status === 'completed' ? 'success.dark' :
+                            order.status === 'processing' ? 'info.dark' :
+                            order.status === 'cancelled' ? 'error.dark' :
+                            'warning.dark',
+                        }}
+                      >
+                        {order.status}
+                      </Box>
+                    </Box>
+                    <Divider sx={{ my: 1.5 }} />
+                    <Collapse in={expandedOrderId === order._id} timeout="auto" unmountOnExit>
+                    <Typography variant="body2" color="text.secondary">
+                      Items:
+                    </Typography>
+                    <Box sx={{ my: 1 }}>
+                      {order.items.map(item => (
+                      <Box key={item.name} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        
+                        <img
+                        src={item.image || '/placeholder.png'}
+                        alt={item.name}
+                        style={{ width: 40, height: 40, borderRadius: '4px', objectFit: 'cover' }}
+                        onError={e => (e.currentTarget.src = '/placeholder.png')}
+                        />
+
+<Box sx={{ flexGrow: 1 }}>
+    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+      {item.name}
+    </Typography>
+    <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+      {item.qty} x ₦{item.amount.toFixed(2)}
+    </Typography>
+  </Box>
+
+                      </Box>
+                      
+
+                      ))}
+                      
+                    </Box>
+                    </Collapse>
+                    
+                  </Box>
+                  
+                  <Box>
+                    <Divider />
+                    
+                    
+
+                    {/* Card Footer: Expander, ID and Total Price */}
+                    <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center' }}>
+                      <IconButton
+                        onClick={() => setExpandedOrderId(expandedOrderId === order._id ? null : order._id)}
+                        aria-expanded={expandedOrderId === order._id}
+                        aria-label="show more"
+                        size="small"
+                        sx={{
+                          transform: expandedOrderId === order._id ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: (theme) => theme.transitions.create('transform', {
+                            duration: theme.transitions.duration.shortest,
+                          }),
+                        }}
+                      >
+                        <ExpandMore />
+                      </IconButton>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', ml: 1 }}>
+                        <Tooltip title={order._id}>
+                          <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
+                            ID: {order._id.substring(0, 8)}...
+                          </Typography>
+                        </Tooltip>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                          {`₦${order.totalPrice.toFixed(2)}`}
+                        </Typography>
+                      </Box>
+                      
+                    </Box>
+                    
+                  </Box>
+                  
+                  
+
+                </Paper>
+              ))}
+            </Box>
+            
+          )}
+        </Box>
+        
+      )}
+
     </Box>
   );
 }

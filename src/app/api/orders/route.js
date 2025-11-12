@@ -71,7 +71,16 @@ export async function POST(request) {
     const body = await request.json();
 
     const user = { name: body.patientName, phone: body.deliveryPhone, email: body.deliveryEmail };
-    const items = body.items.map(item => ({ name: item.name, qty: item.quantity }));
+    
+    
+    const items = body.items.map(item => ({ 
+    name: item.name, 
+    qty: item.quantity, 
+    amount: item.amount, 
+    image: item.image
+}));
+
+
     const businesses = body.businesses.map(pharmacyName => ({ name: pharmacyName }));
 
     const newOrderData = {

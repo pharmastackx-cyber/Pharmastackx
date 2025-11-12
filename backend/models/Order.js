@@ -12,6 +12,8 @@ const OrderSchema = new mongoose.Schema({
     {
       name: String,
       qty: Number,
+      amount: Number,
+      image: String,
     }
   ],
   businesses: [
