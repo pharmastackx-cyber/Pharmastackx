@@ -24,7 +24,7 @@ interface Order {
   _id: string;
   customerName: string;
   totalPrice: number;
-  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'failed';
   items: {
     name: string;
     qty: number;
@@ -421,6 +421,63 @@ export default function StoreManagementPage() {
     }
   };
 
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: 'processing' | 'completed' | 'cancelled' | 'failed') => {
+    const confirmationMessage = `Are you sure you want to change the order status to ${newStatus}?`;
+    if (!window.confirm(confirmationMessage)) return;
+
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status: newStatus }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || `Failed to update status to ${newStatus}`);
+      }
+
+      const updatedOrder = await res.json();
+
+      // Update the order in the local state to reflect the change instantly
+      setOrders(prevOrders =>
+        prevOrders.map(o => (o._id === orderId ? { ...o, status: updatedOrder.status.toLowerCase() } : o))
+      );
+
+      alert(`Order status updated to ${updatedOrder.status}`);
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      alert(`Error: ${(error as Error).message}`);
+    }
+  };
+
+  const OrderActionButtons = ({ order }: { order: Order }) => {
+    if (order.status === 'pending') {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'space-around', mt: 2, p: 1, borderTop: '1px solid #eee' }}>
+          <Button size="small" variant="contained" color="success" onClick={() => handleUpdateOrderStatus(order._id, 'processing')}>
+            Accept
+          </Button>
+          <Button size="small" variant="contained" color="error" onClick={() => handleUpdateOrderStatus(order._id, 'cancelled')}>
+            Reject
+          </Button>
+        </Box>
+      );
+    }
+    if (order.status === 'processing') {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'space-around', mt: 2, p: 1, borderTop: '1px solid #eee' }}>
+          <Button size="small" variant="contained" color="primary" onClick={() => handleUpdateOrderStatus(order._id, 'completed')}>
+            Completed
+          </Button>
+          <Button size="small" variant="contained" color="warning" onClick={() => handleUpdateOrderStatus(order._id, 'failed')}>
+            Failed
+          </Button>
+        </Box>
+      );
+    }
+    return null; // Don't show buttons for 'completed', 'cancelled', or 'failed' statuses
+  };
 
   return (
     <Box sx={{ p: isMobile ? 2 : 4 }}>
@@ -781,7 +838,7 @@ export default function StoreManagementPage() {
                     
                   </Box>
                   
-                  
+                  <OrderActionButtons order={order} />
 
                 </Paper>
               ))}

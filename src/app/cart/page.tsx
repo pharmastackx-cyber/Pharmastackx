@@ -111,8 +111,14 @@ export default function Cart() {
     if (total === 0 && items.length > 0 && activePromo && !isProcessingFreeOrder && isFormValid && user) {
       setIsProcessingFreeOrder(true);
       
+      // THE FIX IS APPLIED HERE
+      const itemsForBackend = items.map(item => ({
+        productId: item.id, // Use item.id as productId
+        qty: item.quantity,
+      }));
+
+
       addOrder({
-        customerId: user.id,
         patientName,
         patientAge,
         patientCondition,
@@ -121,13 +127,8 @@ export default function Cart() {
         deliveryAddress,
         deliveryCity,
         deliveryState,
-        items: items.map(item => ({ ...item })),
-        subtotal,
-        deliveryFee,
-        discount: discountAmount,
-        deliveryDiscount,
-        total: 0,
-        promoCode: activePromo.code,
+        items: itemsForBackend, // Pass the corrected items
+        coupon: activePromo.code,
         deliveryOption,
         orderType: actualOrderType as any,
         businesses: uniquePharmacies,

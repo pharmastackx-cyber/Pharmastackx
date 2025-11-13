@@ -51,27 +51,28 @@ const PaystackButton: React.FC<PaystackButtonProps> = (props) => {
     }
 
     try {
-      // Consolidate all order data into a single object
+
+         // THE FIX IS APPLIED HERE
+      const itemsForBackend = items.map(item => ({
+        productId: item.id, // Use item.id as productId
+        qty: item.quantity,
+      }));
+
+
       const orderData = {
-        customerId: user.id,
+      
         patientName: props.patientName,
-        patientAge: props.patientAge,
-        patientCondition: props.patientCondition,
+        
         deliveryEmail: props.deliveryEmail,
         deliveryPhone: props.deliveryPhone,
-        deliveryAddress: props.deliveryAddress,
-        deliveryCity: props.deliveryCity,
-        deliveryState: props.deliveryState,
-        items: items.map(item => ({ ...item })),
+        
+        items: itemsForBackend, // Pass the corrected items
+        
         businesses: props.uniquePharmacies,
         orderType: props.orderType,
         deliveryOption: props.deliveryOption,
-        subtotal: props.subtotal,
-        deliveryFee: props.deliveryFee,
-        discount: props.discountAmount,
-        deliveryDiscount: props.deliveryDiscount,
-        total: props.total,
-        promoCode: props.promoCode,
+        
+        coupon: props.promoCode,
       };
 
       // addOrder now handles everything: API call and state update

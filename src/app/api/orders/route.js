@@ -6,12 +6,14 @@ import jwt from 'jsonwebtoken';
 
 const Order = require('../../../../backend/models/Order');
 const User = require('../../../../backend/models/User');
+// The Product model is likely a JS file, but it mirrors the TS interface.
+const Product = require('../../../../backend/models/Product');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
 // --- Authorization Helper ---
 async function authorize() {
-  // Correctly get the cookie store
+
   const cookieStore = cookies();
   const sessionToken = cookieStore.get('session_token');
 
@@ -20,7 +22,7 @@ async function authorize() {
   }
 
   try {
-    // Verify the token
+
     const payload = jwt.verify(sessionToken.value, JWT_SECRET);
     const userId = payload.userId;
     
@@ -35,16 +37,15 @@ async function authorize() {
       return { error: 'User not found', status: 404 };
     }
 
-    // Check for authorized roles
+
     if (user.role !== 'admin' && user.role !== 'deliveryAgent') {
       return { error: `Forbidden: User role '${user.role}' is not authorized`, status: 403 };
     }
 
-    // If all checks pass, return the user
     return { user };
 
   } catch (error) {
-    console.error("Authorization error:", error); // Log the actual JWT error
+    console.error("Authorization error:", error);
     return { error: 'Authentication failed: Invalid token', status: 401 };
   }
 }
@@ -70,26 +71,63 @@ export async function POST(request) {
     await dbConnect();
     const body = await request.json();
 
-    const user = { name: body.patientName, phone: body.deliveryPhone, email: body.deliveryEmail };
+    // 1. Destructure all expected data from the client
+    const { 
+      patientName, 
+      deliveryPhone, 
+      deliveryEmail, 
+      items: itemsFromClient, 
+      businesses,
+      orderType,
+      deliveryOption,
+      coupon 
+    } = body;
+    if (!itemsFromClient || itemsFromClient.length === 0) {
+      return NextResponse.json({ message: 'No items in order' }, { status: 400 });
+    }
+    // 2. Prepare for server-side calculation
+    let serverCalculatedTotal = 0;
+    const finalOrderItems = [];
+    // 3. Loop through client items and get authoritative data from the DB
+    for (const clientItem of itemsFromClient) {
+      // Find the product in the database using the ID provided by the client
+      const product = await Product.findById(clientItem.productId).lean();
+      
+      if (!product) {
+        return NextResponse.json({ message: `Product with ID ${clientItem.productId} not found` }, { status: 404 });
+      }
+      // CORRECTED: Use the correct field names from the Product model
+      finalOrderItems.push({
+        name: product.itemName,   // Was product.name
+        qty: clientItem.qty,
+        amount: product.amount,   // Was product.price
+        image: product.imageUrl, // Was product.image
+      });
+      // CORRECTED: Use product.amount for calculation
+      serverCalculatedTotal += product.amount * clientItem.qty;
+    }
+
     
     
-    const items = body.items.map(item => ({ 
-    name: item.name, 
-    qty: item.quantity, 
-    amount: item.amount, 
-    image: item.image
-}));
+    let finalAmount = serverCalculatedTotal;
 
-
-    const businesses = body.businesses.map(pharmacyName => ({ name: pharmacyName }));
+    // 4. Validate coupon and apply discount on the server-calculated total
+    if (coupon && coupon === 'ALLFREE') {
+      finalAmount = 0; 
+    }
 
     const newOrderData = {
-      user,
-      orderType: body.orderType,
-      deliveryOption: body.deliveryOption,
-      items,
-      businesses,
-      totalAmount: body.total,
+      user: {
+        name: patientName,
+        phone: deliveryPhone,
+        email: deliveryEmail
+      },
+      orderType,
+      deliveryOption,
+      items: finalOrderItems,
+      businesses: businesses.map(name => ({ name })),
+      totalAmount: finalAmount,
+      coupon: coupon || null,
       status: 'Pending',
     };
 
@@ -111,20 +149,35 @@ export async function PUT(request) {
 
   try {
     const body = await request.json();
-    const { orderId, status } = body;
+    const { orderId, status } = body; // e.g., status is 'processing'
 
     if (!orderId || !status) {
       return NextResponse.json({ message: "Missing orderId or status" }, { status: 400 });
     }
 
+    const validStatuses = ['processing', 'completed', 'cancelled', 'failed'];
+    if (!validStatuses.includes(status)) {
+        return NextResponse.json({ message: `Invalid status: ${status}` }, { status: 400 });
+    }
+
     await dbConnect();
 
-    const update = { status };
-    const now = new Date().toISOString();
-    if (status === 'Accepted') update.acceptedAt = now;
-    else if (status === 'Dispatched') update.dispatchedAt = now;
-    else if (status === 'In Transit') update.pickedUpAt = now;
-    else if (status === 'Completed') update.completedAt = now;
+    // If the frontend sends 'failed', we'll store it as 'Cancelled' in the DB.
+    const finalStatus = status === 'failed' ? 'cancelled' : status;
+
+    // **THE FIX**: Capitalize the status to match the database schema (e.g., 'processing' -> 'Processing')
+    const capitalizedStatus = finalStatus.charAt(0).toUpperCase() + finalStatus.slice(1);
+    
+    const update = { status: capitalizedStatus };
+    const now = new Date();
+
+    // Add timestamps based on the new status
+    if (finalStatus === 'processing') {
+      update.acceptedAt = now;
+    } else if (finalStatus === 'completed') {
+      update.completedAt = now;
+    }
+    // Note: We are not adding a 'cancelledAt' timestamp to avoid potential schema errors.
 
     const updatedOrder = await Order.findByIdAndUpdate(
       orderId,
@@ -140,10 +193,7 @@ export async function PUT(request) {
 
   } catch (error) {
     console.error("Error updating order:", error);
-    // Check for parsing errors, which can happen if the body is already consumed
-    if (error instanceof SyntaxError) {
-        return NextResponse.json({ message: "Invalid JSON in request body" }, { status: 400 });
-    }
     return NextResponse.json({ message: "Failed to update order", error: error.message }, { status: 500 });
   }
 }
+
