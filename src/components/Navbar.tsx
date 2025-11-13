@@ -136,7 +136,7 @@ export default function Navbar() {
       <List sx={{ px: 0.5, py: 1 }}>
         <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/find-medicines" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/find-medicines') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
-            <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><Search fontSize="small" /></ListItemIcon>
+          <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><LocalPharmacy fontSize="small" /></ListItemIcon>
             <ListItemText primary="Find Medicines" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
         </ListItem>
@@ -150,7 +150,7 @@ export default function Navbar() {
 
         
         {isBusinessUser && <ListItem disablePadding sx={{ mb: 0.5 }}>
-          <ListItemButton component={Link} href="/store-management" onClick={handleDrawerToggle} sx={{  borderRadius: '8px',
+        <ListItemButton component={Link} href="/store-management" onClick={handleDrawerToggle} sx={{  borderRadius: '8px',
           mx: 0.5,
           py: 1,
           bgcolor: isActive('/store-management') ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
@@ -244,7 +244,7 @@ export default function Navbar() {
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }} />
           
           <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-            <Button color="inherit" startIcon={<Search />} component={Link} href="/find-medicines" sx={{ bgcolor: isActive('/find-medicines') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
+          <Button color="inherit" startIcon={<LocalPharmacy />} component={Link} href="/find-medicines" sx={{ bgcolor: isActive('/find-medicines') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
               Find Meds
             </Button>
             {isAdmin && <Button color="inherit" startIcon={<Chat />} component={Link} href="/carechat" sx={{ bgcolor: isActive('/carechat') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
@@ -310,9 +310,11 @@ export default function Navbar() {
 
           <Box sx={{ display: { xs: 'flex', sm: 'none' }, alignItems: 'center', gap: 1, ml: 'auto' }}>
             <IconButton color="inherit" component={Link} href="/find-medicines">
-                <Search />
+              <LocalPharmacy sx={{ color: '#004D40' }} />
             </IconButton>
-            <IconButton color="inherit" component={Link} href="/cart">
+  
+            {/* Add a negative margin to this IconButton */}
+            <IconButton color="inherit" component={Link} href="/cart" sx={{ ml: -0.5 }}>
               <Badge badgeContent={getTotalItems()} color="error" max={99}>
                 <ShoppingCart />
               </Badge>

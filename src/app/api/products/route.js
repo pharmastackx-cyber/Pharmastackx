@@ -60,8 +60,9 @@ export async function GET(req) {
           pharmacy: product.businessName || 'Unknown Pharmacy',
           // --- FIX: Parse the coordinate string into an object --- //
           pharmacyCoordinates: parseCoordinatesString(product.coordinates),
+          POM: product.POM || false,
+          info: product.info,
           inStock: true, 
-          rating: 4.5, 
         };
       } catch (error) {
         console.error('Error transforming product:', { 

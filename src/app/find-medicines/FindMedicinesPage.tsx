@@ -17,8 +17,9 @@ import {
   IconButton,
   Modal,
   Grid,
-  Snackbar, // Import Snackbar
-  Alert,      // Import Alert for styling
+  Snackbar,
+  Alert,
+  Chip,      
 } from '@mui/material';
 import {
   Search,
@@ -260,9 +261,24 @@ export default function FindMedicinesPage() {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
           {paginatedMedicines.map((medicine) => (
             <Card key={medicine.id} sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: '20px', border: '2px solid #e0e0e0', bgcolor: 'white', cursor: 'pointer', transition: 'box-shadow 0.3s', '&:hover': { boxShadow: 6 } }} onClick={() => handleOpenModal(medicine)}>
-              <Box sx={{ height: { xs: '100px', md: '120px' }, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f0f7f4', p: 1 }}>
-                <CardMedia component="img" image={medicine.image} alt={medicine.name} sx={{ objectFit: 'contain', width: '100%', height: '100%', maxWidth: '80%' }}/>
-              </Box>
+              <Box sx={{ position: 'relative', height: { xs: '100px', md: '120px' }, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f0f7f4', p: 1 }}>
+  {medicine.POM && (
+      <Chip
+          label="POM"
+          color="error"
+          size="small"
+          sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              zIndex: 1,
+              fontWeight: 'bold',
+          }}
+      />
+  )}
+  <CardMedia component="img" image={medicine.image} alt={medicine.name} sx={{ objectFit: 'contain', width: '100%', height: '100%', maxWidth: '80%' }}/>
+</Box>
+
               <CardContent sx={{ flexGrow: 1, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem', lineHeight: 1.2, mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{medicine.name}</Typography>
@@ -326,6 +342,14 @@ export default function FindMedicinesPage() {
                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Drug Class:</Typography>
                     <Typography variant="body1">{selectedMedicine.drugClass}</Typography>
                 </Box>
+
+                {selectedMedicine.info && (
+                    <Box sx={{ my: 2 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Additional Information:</Typography>
+                        <Typography variant="body1">{selectedMedicine.info}</Typography>
+                    </Box>
+                )}
+
                  <IconButton onClick={(e) => { e.stopPropagation(); handleAddToCart({ ...selectedMedicine, price: selectedMedicine.price }); handleCloseModal(); }} sx={{ bgcolor: '#E91E63', color: 'white', borderRadius: '25px', px: 4, py: 1, mt: 2, '&:hover': { bgcolor: '#C2185B' } }}>
                       <Add sx={{ mr: 1 }}/>
                       <Typography>Add to Cart</Typography>
