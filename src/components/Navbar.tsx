@@ -140,22 +140,26 @@ export default function Navbar() {
             <ListItemText primary="Find Medicines" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
         </ListItem>
-        {isBusinessUser && <ListItem disablePadding sx={{ mb: 0.5 }}>
+        
+        {isAdmin && <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/business/dashboard" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/business') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
             <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><BusinessCenter fontSize="small" /></ListItemIcon>
             <ListItemText primary="Business" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
         </ListItem>}
+
+        
         {isBusinessUser && <ListItem disablePadding sx={{ mb: 0.5 }}>
-      <ListItemButton component={Link} href="/store-management" onClick={handleDrawerToggle} sx={{  borderRadius: '8px',
-      mx: 0.5,
-      py: 1,
-      bgcolor: isActive('/store-management') ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-      '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
-        <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><BusinessCenter fontSize="small" /></ListItemIcon>
-        <ListItemText primary="Store Management" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
-      </ListItemButton>
-    </ListItem>}
+          <ListItemButton component={Link} href="/store-management" onClick={handleDrawerToggle} sx={{  borderRadius: '8px',
+          mx: 0.5,
+          py: 1,
+          bgcolor: isActive('/store-management') ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+          '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+            <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><BusinessCenter fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Store Management" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
+          </ListItemButton>
+        </ListItem>}
+
         {isAgentOrAdmin && <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/delivery-agents/dashboard" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/delivery-agents') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
             <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><DeliveryDining fontSize="small" /></ListItemIcon>
@@ -174,12 +178,13 @@ export default function Navbar() {
             <ListItemText primary="Orders" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
         </ListItem>
-        <ListItem disablePadding sx={{ mb: 0.5 }}>
+        {isAdmin && <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/carechat" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/carechat') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
             <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><Chat fontSize="small" /></ListItemIcon>
             <ListItemText primary="CareChat" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
-        </ListItem>
+        </ListItem>}
+
        {drawerAdminLinks}
       </List>
 
@@ -242,9 +247,10 @@ export default function Navbar() {
             <Button color="inherit" startIcon={<Search />} component={Link} href="/find-medicines" sx={{ bgcolor: isActive('/find-medicines') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
               Find Meds
             </Button>
-            <Button color="inherit" startIcon={<Chat />} component={Link} href="/carechat" sx={{ bgcolor: isActive('/carechat') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
+            {isAdmin && <Button color="inherit" startIcon={<Chat />} component={Link} href="/carechat" sx={{ bgcolor: isActive('/carechat') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
               CareChat
-            </Button>
+            </Button>}
+
             <Button color="inherit" startIcon={<ShoppingBag />} component={Link} href="/orders" sx={{ bgcolor: isActive('/orders') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
               Orders
             </Button>
@@ -254,10 +260,11 @@ export default function Navbar() {
               </Badge>
             </IconButton>
             
-            {isBusinessUser && <Button color="inherit" startIcon={<BusinessCenter />} component={Link} href="/business/dashboard">
+            {isAdmin && <Button color="inherit" startIcon={<BusinessCenter />} component={Link} href="/business/dashboard">
               Business Portal
             </Button>}
             {isBusinessUser && <Button color="inherit" startIcon={<BusinessCenter />} component={Link} href="/store-management"> Store Management </Button>}
+
             
             {isAgentOrAdmin && <Button color="inherit" startIcon={<DeliveryDining />} component={Link} href="/delivery-agents/dashboard">
               Delivery Agents
@@ -353,7 +360,7 @@ export default function Navbar() {
           display: { xs: 'block', sm: 'none' },
           '& .MuiDrawer-paper': {
             boxSizing: 'border-box',
-            width: '130px',
+            width: '140px',
             borderRadius: '0 16px 16px 0',
             border: 'none',
             boxShadow: '4px 0 20px rgba(0, 0, 0, 0.15)'

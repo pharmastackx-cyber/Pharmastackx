@@ -120,12 +120,23 @@ export default function StoreManagementPage() {
   }, []);
 
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (businessName: string | null) => {
+    if (!businessName) {
+      setLoadingOrders(false);
+      setOrders([]); // Clear orders if no business name is available
+      return;
+    }
     setLoadingOrders(true);
     setOrdersError(null);
     try {
-        // Add the query parameter to the fetch request
-        const response = await fetch('/api/orders?deliveryOption=express');
+        // Construct URL with both deliveryOption and businessName
+        const params = new URLSearchParams({
+            deliveryOption: 'express',
+            businessName: businessName,
+        });
+
+        const response = await fetch(`/api/orders?${params.toString()}`);
+
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || 'Failed to fetch orders');
@@ -133,7 +144,6 @@ export default function StoreManagementPage() {
         const data = await response.json();
 
         const transformedOrders = data.map((order: any) => ({
-
             _id: order._id,
             customerName: order.user?.name || 'N/A',
             totalPrice: order.totalAmount || 0,
@@ -144,7 +154,6 @@ export default function StoreManagementPage() {
               amount: item.amount || item.price || 0, 
               image: item.image || item.imageUrl || '', 
             })),
-            
             createdAt: new Date(order.createdAt).toLocaleDateString(),
         }));
 
@@ -156,6 +165,7 @@ export default function StoreManagementPage() {
         setLoadingOrders(false);
     }
   }, []);
+
 
 
   useEffect(() => {
@@ -187,7 +197,8 @@ export default function StoreManagementPage() {
         // Fetch both stock and orders data in parallel
         await Promise.all([
           fetchStockData(currentBusinessName),
-          fetchOrders()
+          fetchOrders(currentBusinessName)
+
       ]);
       
 

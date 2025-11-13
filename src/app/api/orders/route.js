@@ -56,10 +56,18 @@ export async function GET(request) {
     await dbConnect();
     const { searchParams } = new URL(request.url);
     const deliveryOption = searchParams.get('deliveryOption');
+    const businessName = searchParams.get('businessName');
+
     const query = {};
     if (deliveryOption) {
       query.deliveryOption = deliveryOption;
     }
+
+    if (businessName) {
+      query['businesses.name'] = decodeURIComponent(businessName);
+    }
+
+
     const orders = await Order.find(query).sort({ createdAt: -1 }).lean();
     return NextResponse.json(orders);
   } catch (error) {
