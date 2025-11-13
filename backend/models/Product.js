@@ -1,21 +1,16 @@
 const mongoose = require('mongoose');
 
 const ProductSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  description: { type: String },
-  category: { type: String },
-  price: { type: Number, default: 0 },
-  stockQuantity: { type: Number, default: 0 },
-  manufacturer: { type: String },
-  dosage: { type: String },
-  prescriptionRequired: { type: Boolean, default: false },
-  activeIngredients: [{ type: String }],
-  sideEffects: [{ type: String }],
-  warnings: [{ type: String }],
-  expiryDate: { type: Date },
-  images: [{ type: String }],
-  businessId: { type: String },
-  isActive: { type: Boolean, default: true },
+  itemName: { type: String, required: true },
+  activeIngredient: { type: String, required: true },
+  category: { type: String, required: true },
+  amount: { type: Number, required: true },
+  imageUrl: { type: String, default: '' },
+  businessName: { type: String, required: true },
+  coordinates: { type: String, default: '' },
+  info: { type: String, default: '' },
+  POM: { type: Boolean, default: false },
+  bulkUploadId: { type: mongoose.Schema.Types.ObjectId, ref: 'BulkUpload', default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.models.Product || mongoose.model('Product', ProductSchema);

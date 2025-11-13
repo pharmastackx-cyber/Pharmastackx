@@ -22,7 +22,21 @@ export async function POST(req: NextRequest) {
     const bulkUpload = await BulkUpload.create({ csvName: fileName });
 
     const productsToSave = products.map((p: any) => ({
-      ...p,
+    
+      itemName: p.itemName,
+      activeIngredient: p.activeIngredient,
+      category: p.category,
+      amount: Number(p.amount) || 0,
+      imageUrl: p.imageUrl || '',
+      businessName: p.businessName,
+      coordinates: p.coordinates || '',
+      // Ensure info is a string
+      info: String(p.info || ''),
+      // Convert POM to a strict boolean
+      POM: ['true', 'yes', '1'].includes(String(p.POM).toLowerCase()),
+
+
+
       bulkUploadId: bulkUpload._id,
     }));
 

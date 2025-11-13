@@ -8,8 +8,12 @@ export async function GET(req: NextRequest) {
   try {
     await dbConnect(); // connect to MongoDB
 
-    // Fetch all products (stock items)
-    const stock = await Product.find({});
+    const { searchParams } = new URL(req.url);
+    const businessName = searchParams.get('businessName');
+
+    const query = businessName ? { businessName } : {};
+    // Fetch products based on the query
+    const stock = await Product.find(query);
 
     return NextResponse.json({ items: stock });
 
@@ -24,20 +28,44 @@ export async function POST(req: NextRequest) {
     await dbConnect();
     const body = await req.json();
     
-    // Basic validation to ensure we have the necessary fields
-    const { itemName, activeIngredient, category, amount, businessName } = body;
+    const { 
+      itemName, 
+      activeIngredient, 
+      category, 
+      amount, 
+      businessName, 
+      imageUrl, 
+      coordinates, 
+      info, 
+      POM 
+    } = body;
+
     if (!itemName || !activeIngredient || !category || !amount || !businessName) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const newProduct = new Product(body);
+    // Create a new product instance with all fields
+    const newProduct = new Product({
+      itemName,
+      activeIngredient,
+      category,
+      amount,
+      businessName,
+      imageUrl: imageUrl || '', // Provide default if not present
+      coordinates: coordinates || '', // Provide default if not present
+      info: info || '', // Provide default if not present
+      POM: POM || false // Provide default if not present
+    });
+
+
     const savedProduct = await newProduct.save();
     
     return NextResponse.json({ message: 'Product added successfully', product: savedProduct }, { status: 201 });
 
   } catch (error) {
     console.error('Error adding stock:', error);
-    // Provide a more specific error message if it's a validation error
+    
+    
     if (error instanceof Error && error.name === 'ValidationError') {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

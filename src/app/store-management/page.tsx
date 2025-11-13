@@ -3,8 +3,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Tabs, Tab, IconButton, TextField, Button,
-  Table, TableHead, TableBody, TableRow, TableCell, Paper, useTheme, useMediaQuery, CircularProgress, Tooltip
-  , Select, MenuItem, FormControl, InputLabel, Divider, Collapse
+  Table, TableHead, TableBody, TableRow, TableCell, Paper, useTheme, 
+  useMediaQuery, CircularProgress, Tooltip, Select, MenuItem, 
+  FormControl, InputLabel, Divider, Collapse, Checkbox, FormControlLabel
 } from '@mui/material';
 import { Storefront, LocationOn, UploadFile, ExpandMore } from '@mui/icons-material';
 import Papa from 'papaparse';
@@ -18,6 +19,8 @@ interface StockItem {
   imageUrl: string;
   businessName: string;
   coordinates: string;
+  info: string;
+  POM: boolean;  
 }
 
 interface Order {
@@ -79,11 +82,20 @@ export default function StoreManagementPage() {
     imageUrl: '',
     businessName: '',
     coordinates: '',
+    info: '',
+    POM: false,
   });
-  const fetchStockData = useCallback(async (businessName: string | null, coordinates: string | null) => {
+
+  const fetchStockData = useCallback(async (businessName: string | null) => {
+    if (!businessName) {
+      setLoadingStock(false);
+      setStockData([]); // Clear stock data if no business name
+      return;
+    }
     setLoadingStock(true);
     try {
-      const stockRes = await fetch('/api/stock');
+      const apiUrl = `/api/stock?businessName=${encodeURIComponent(businessName)}`;
+      const stockRes = await fetch(apiUrl);
       if (!stockRes.ok) throw new Error('Failed to fetch stock');
       const stockJson = await stockRes.json();
 
@@ -94,22 +106,26 @@ export default function StoreManagementPage() {
         category: product.category || 'N/A',
         amount: product.amount || 0,
         imageUrl: product.imageUrl || '',
-        businessName: product.businessName || businessName || 'N/A',
-        coordinates: product.coordinates || coordinates || 'N/A',
+        businessName: product.businessName || 'N/A',
+        coordinates: product.coordinates || 'N/A',
+        info: product.info || '',
+        POM: product.POM || false,
       }));
       setStockData(transformedData);
     } catch (error) {
       console.error('Error fetching stock data:', error);
-      alert('Could not load stock data.');
+      alert('Could not load your stock data.');
     }
     setLoadingStock(false);
   }, []);
+
 
   const fetchOrders = useCallback(async () => {
     setLoadingOrders(true);
     setOrdersError(null);
     try {
-        const response = await fetch('/api/orders');
+        // Add the query parameter to the fetch request
+        const response = await fetch('/api/orders?deliveryOption=express');
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || 'Failed to fetch orders');
@@ -125,8 +141,8 @@ export default function StoreManagementPage() {
             items: (order.items || []).map((item: any) => ({
               name: item.name || 'Unnamed Item',
               qty: item.qty || 1,
-              amount: item.amount || item.price || 0, // Safely checks for 'amount' or 'price', defaults to 0
-              image: item.image || item.imageUrl || '', // Safely checks for 'image' or 'imageUrl'
+              amount: item.amount || item.price || 0, 
+              image: item.image || item.imageUrl || '', 
             })),
             
             createdAt: new Date(order.createdAt).toLocaleDateString(),
@@ -140,6 +156,7 @@ export default function StoreManagementPage() {
         setLoadingOrders(false);
     }
   }, []);
+
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -169,9 +186,10 @@ export default function StoreManagementPage() {
 
         // Fetch both stock and orders data in parallel
         await Promise.all([
-            fetchStockData(currentBusinessName, currentCoordinates),
-            fetchOrders()
-        ]);
+          fetchStockData(currentBusinessName),
+          fetchOrders()
+      ]);
+      
 
       } catch (error) {
         console.error('Error fetching initial data:', error);
@@ -280,11 +298,18 @@ export default function StoreManagementPage() {
         alert('Item added successfully!');
         setShowUploadForm(false);
         setFormValues({
-            itemName: '', activeIngredient: '', category: '', 
-            amount: '', imageUrl: '', 
-            businessName: userBusinessName || '', 
-            coordinates: location || ''
+          itemName: '',
+          activeIngredient: '',
+          category: '',
+          amount: '',
+          imageUrl: '',
+          businessName: userBusinessName || '',
+          coordinates: location || '',
+          info: '',        // ✅ fixed line
+          POM: false,
         });
+        
+        
     } catch (error) {
         console.error('Error submitting form:', error);
         alert(`Error: ${(error as Error).message}`);
@@ -299,6 +324,8 @@ export default function StoreManagementPage() {
       'category': 'category', 'class': 'category', 'type': 'category', 'drug class': 'category',
       'amount': 'amount', 'price': 'amount', 'cost': 'amount', 'value': 'amount', '₦': 'amount', 'naira': 'amount',
       'image': 'imageUrl', 'photo': 'imageUrl', 'picture': 'imageUrl', 'img': 'imageUrl', 'image url': 'imageUrl',
+      'info': 'info', 'description': 'info', 'details': 'info', 'pack size': 'info',
+      'pom': 'POM', 'prescription': 'POM', 'prescription required': 'POM',
     };
     const mapping: { [key: string]: keyof StockItem } = {};
     headers.forEach(header => {
@@ -317,10 +344,14 @@ export default function StoreManagementPage() {
       const numeric = value.replace(/[₦$,]/g, '').replace(/k/i, '000').match(/\d+(\.\d+)?/);
       return numeric ? parseFloat(numeric[0]) : 0;
     }
+    if (key === 'POM') {
+        const lowerCaseValue = value.toLowerCase();
+        return ['true', 'yes', 'y', '1', 'pom'].includes(lowerCaseValue);
+    }
     return value.replace(/\s+/g, ' ').trim();
   };
 
-  const handleBulkFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleBulkFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -340,12 +371,25 @@ export default function StoreManagementPage() {
               }
           }
 
+          // Return a complete StockItem object with defaults
           return {
-              ...normalizedRow,
+              itemName: '',
+              activeIngredient: '',
+              category: '',
+              amount: 0,
+              imageUrl: '',
+              ...normalizedRow, // Overwrite defaults with any parsed values
+              info: normalizedRow.info || '', // Ensure info is a string
+              POM: normalizedRow.POM || false, // Ensure POM is a boolean
               businessName: userBusinessName || 'N/A',
               coordinates: location || 'N/A',
           } as StockItem;
-        });
+        })
+        // 🔥 Filter out any accidental garbage line like the one showing in your preview
+        .filter(item => 
+          item.itemName && 
+          !item.itemName.toLowerCase().includes('src/app/')
+        );
 
         setBulkData(parsedData);
         setShowBulkPreview(true);
@@ -356,6 +400,7 @@ export default function StoreManagementPage() {
       }
     });
   };
+
 
   const handleConfirmBulkUpload = async () => {
     if (!bulkData.length) {
@@ -543,9 +588,29 @@ export default function StoreManagementPage() {
               <TextField label="Active Ingredient" name="activeIngredient" value={formValues.activeIngredient} onChange={handleFormChange} fullWidth required />
               <TextField label="Category" name="category" value={formValues.category} onChange={handleFormChange} fullWidth required/>
               <TextField label="Amount" name="amount" type="number" value={formValues.amount} onChange={handleFormChange} fullWidth required/>
+              <TextField 
+                label="Info (e.g., pack size, quantity)" 
+                name="info" 
+                value={formValues.info} 
+                onChange={handleFormChange} 
+                fullWidth 
+                multiline 
+                rows={2} 
+              />
               <TextField label="Image URL" name="imageUrl" value={formValues.imageUrl} onChange={handleFormChange} fullWidth />
               <TextField label="Business Name" value={userBusinessName || ''} InputProps={{ readOnly: true }} fullWidth />
               <TextField label="Coordinates" value={location || ''} InputProps={{ readOnly: true }} fullWidth />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={formValues.POM}
+                    onChange={(e) => setFormValues({ ...formValues, POM: e.target.checked })}
+                    name="POM"
+                    color="primary"
+                  />
+                }
+                label="Prescription-Only Medicine (POM)"
+              />
               <Button type="submit" variant="contained" color="primary" disabled={isSubmitting}>
                 {isSubmitting ? <CircularProgress size={24} /> : 'Submit'}
               </Button>
@@ -563,32 +628,37 @@ export default function StoreManagementPage() {
             </Button>
 
             {showBulkPreview && (
-              <Paper sx={{ mt: 3, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black' }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Item Name</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Active Ingredient</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Amount</TableCell>
+            <Paper sx={{ mt: 3, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 600 }}>Item Name</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Active Ingredient</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Amount</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Info</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>POM</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {bulkData.slice(0, 5).map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell>{row.itemName}</TableCell>
+                      <TableCell>{row.activeIngredient}</TableCell>
+                      <TableCell>{row.category}</TableCell>
+                      <TableCell>{row.amount}</TableCell>
+                      <TableCell>{row.info}</TableCell>
+                      <TableCell>{row.POM ? 'Yes' : 'No'}</TableCell>
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {bulkData.slice(0, 5).map((row, i) => (
-                      <TableRow key={i}>
-                        <TableCell>{row.itemName}</TableCell>
-                        <TableCell>{row.activeIngredient}</TableCell>
-                        <TableCell>{row.category}</TableCell>
-                        <TableCell>{row.amount}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {bulkData.length > 5 && <Typography sx={{p: 1, fontSize: 12}}>... and {bulkData.length - 5} more rows.</Typography>}
-                <Button fullWidth variant="contained" color="primary" sx={{ mt: 2 }} onClick={handleConfirmBulkUpload} disabled={isSubmitting}>
-                    {isSubmitting ? <CircularProgress size={24} /> : 'Confirm Upload'}
-                </Button>
-              </Paper>
+                  ))}
+                </TableBody>
+              </Table>
+              {bulkData.length > 5 && <Typography sx={{p: 1, fontSize: 12}}>... and {bulkData.length - 5} more rows.</Typography>}
+              <Button fullWidth variant="contained" color="primary" sx={{ mt: 2 }} onClick={handleConfirmBulkUpload} disabled={isSubmitting}>
+                  {isSubmitting ? <CircularProgress size={24} /> : 'Confirm Upload'}
+              </Button>
+            </Paper>
+
             )}
           </Box>
         </Box>
@@ -602,95 +672,100 @@ export default function StoreManagementPage() {
                 <TextField label="Search items" variant="outlined" size="small" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ mb: 2, width: isMobile ? '100%' : '50%' }} />
     
                 <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      {(['itemName', 'activeIngredient', 'category', 'amount', 'imageUrl', 'businessName', 'coordinates'] as (keyof StockItem)[]).map(key => (
-                        <TableCell 
-                        key={key} 
-                        onClick={() => handleSort(key)} 
-                        sx={{ 
-                          cursor: 'pointer', 
-                          fontWeight: 600, 
-                          '&:hover': { color: 'primary.main' },
-                          // 👇 NEW STYLES FOR IMAGE URL HEADER
-                          ...(key === 'imageUrl' && { 
-                            maxWidth: '150px', // Set a maximum width for the header
-                            minWidth: '100px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          })
-                        }}
-                      >
-                          {key.replace(/([A-Z])/g, ' $1').charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
-                          {sortColumn === key && <span style={{ marginLeft: 4, fontSize: 12, color: 'gray' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>}
-                        </TableCell>
-                      ))}
-                      <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {paginatedStock.map((row, i) => {
-                      const globalIndex = stockData.findIndex(item => item._id === row._id);
-                      return (
-                        <TableRow key={row._id}>
-                          {editingRowIndex === globalIndex ? (
-                            <>
-                              {(['itemName','activeIngredient','category','amount','imageUrl', 'businessName', 'coordinates'] as (keyof StockItem)[]).map(field => (
-                                <TableCell key={field}>
-                                  <TextField
-                                    type={field==='amount' ? 'number' : 'text'}
-                                    value={(editingRowData as any)[field]}
-                                    onChange={e => setEditingRowData({ ...(editingRowData as any), [field]: field==='amount' ? Number(e.target.value) : e.target.value })}
-                                  />
-                                </TableCell>
-                              ))}
-                              <TableCell>
-                                <Button variant="contained" size="small" color="success" sx={{ mr: 1 }} onClick={() => handleSave(row._id!)}>Save</Button>
-                                <Button size="small" onClick={() => setEditingRowIndex(null)}>Cancel</Button>
-                              </TableCell>
-                            </>
-                          ) : (
-                            <>
-                              <TableCell>{row.itemName}</TableCell>
-                              <TableCell>{row.activeIngredient}</TableCell>
-                              <TableCell>{row.category}</TableCell>
-                              <TableCell>{typeof row.amount === 'number' ? `₦${row.amount.toFixed(2)}` : row.amount}</TableCell>
-                              <TableCell>
-  {editingRowIndex === globalIndex ? (
-    <TextField
-      value={(editingRowData as any).imageUrl || ''}
-      onChange={e =>
-        setEditingRowData({ ...(editingRowData as any), imageUrl: e.target.value })
-      }
-      variant="outlined"
-      size="small"
-      placeholder="Image URL"
-      fullWidth
-    />
-  ) : (
-    <img
-      src={row.imageUrl || '/placeholder.png'}
-      alt={row.itemName || 'Product image'}
-      style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }}
-      onError={e => (e.currentTarget.src = '/placeholder.png')}
-    />
-  )}
-</TableCell>
+                <TableHead>
+  <TableRow>
+    <TableCell sx={{ fontWeight: 600 }}>S/N</TableCell>
+    {(['itemName', 'activeIngredient', 'category', 'amount', 'imageUrl', 'info', 'POM', 'businessName', 'coordinates'] as (keyof StockItem)[]).map(key => (
+      <TableCell
+        key={key}
+        onClick={() => handleSort(key)}
+        sx={{
+          cursor: 'pointer',
+          fontWeight: 600,
+          '&:hover': { color: 'primary.main' },
+          ...(key === 'imageUrl' && {
+            maxWidth: '150px',
+            minWidth: '100px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          })
+        }}
+      >
+        {(key.replace(/([a-z])([A-Z])/g, '$1 $2')).charAt(0).toUpperCase() + (key.replace(/([a-z])([A-Z])/g, '$1 $2')).slice(1)}
+        {sortColumn === key && <span style={{ marginLeft: 4, fontSize: 12, color: 'gray' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+      </TableCell>
+    ))}
+    <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+  </TableRow>
+</TableHead>
 
 
-                              <TableCell>{row.businessName}</TableCell>
-                              <TableCell>{row.coordinates}</TableCell>
-                              <TableCell>
-                                <Button variant="contained" size="small" sx={{ mr: 1 }} onClick={() => { setEditingRowIndex(globalIndex); setEditingRowData(row); }}>Edit</Button>
-                                <Button variant="outlined" color="error" size="small" onClick={() => handleDelete(row._id!)}>Delete</Button>
-                              </TableCell>
-                            </>
-                          )}
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
+<TableBody>
+  {paginatedStock.map((row, i) => {
+    const globalIndex = stockData.findIndex(item => item._id === row._id);
+    const serialNumber = startIndex + i + 1;
+    return (
+      <TableRow key={row._id}>
+        {editingRowIndex === globalIndex ? (
+          <>
+            <TableCell>{serialNumber}</TableCell>
+            {(['itemName', 'activeIngredient', 'category', 'amount', 'imageUrl', 'info', 'POM', 'businessName', 'coordinates'] as (keyof StockItem)[]).map(field => (
+              <TableCell key={field}>
+                {field === 'POM' ? (
+                  <Checkbox
+                    checked={(editingRowData as any)[field]}
+                    onChange={e => setEditingRowData({ ...(editingRowData as any), [field]: e.target.checked })}
+                  />
+                ) : (
+                  <TextField
+                    type={field === 'amount' ? 'number' : 'text'}
+                    value={(editingRowData as any)[field] === 'N/A' ? '' : (editingRowData as any)[field]}
+                    onChange={e => setEditingRowData({ ...(editingRowData as any), [field]: field === 'amount' ? Number(e.target.value) : e.target.value })}
+                    multiline={field === 'info'}
+                    rows={field === 'info' ? 2 : 1}
+                    variant="standard"
+                    fullWidth
+                  />
+                )}
+              </TableCell>
+            ))}
+            <TableCell>
+              <Button variant="contained" size="small" color="success" sx={{ mr: 1 }} onClick={() => handleSave(row._id!)}>Save</Button>
+              <Button size="small" onClick={() => setEditingRowIndex(null)}>Cancel</Button>
+            </TableCell>
+          </>
+        ) : (
+          <>
+            <TableCell>{serialNumber}</TableCell>
+            <TableCell>{row.itemName}</TableCell>
+            <TableCell>{row.activeIngredient}</TableCell>
+            <TableCell>{row.category}</TableCell>
+            <TableCell>{typeof row.amount === 'number' ? `₦${row.amount.toFixed(2)}` : row.amount}</TableCell>
+            <TableCell>
+              <img
+                src={row.imageUrl || '/placeholder.png'}
+                alt={row.itemName || 'Product image'}
+                style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }}
+                onError={e => (e.currentTarget.src = '/placeholder.png')}
+              />
+            </TableCell>
+            <TableCell>{row.info}</TableCell>
+            <TableCell>{row.POM ? 'Yes' : 'No'}</TableCell>
+            <TableCell>{row.businessName}</TableCell>
+            <TableCell>{row.coordinates}</TableCell>
+            <TableCell>
+              <Button variant="contained" size="small" sx={{ mr: 1 }} onClick={() => { setEditingRowIndex(globalIndex); setEditingRowData(row); }}>Edit</Button>
+              <Button variant="outlined" color="error" size="small" onClick={() => handleDelete(row._id!)}>Delete</Button>
+            </TableCell>
+          </>
+        )}
+      </TableRow>
+    );
+  })}
+</TableBody>
+
+
                 </Table>
     
                 <Box sx={{ display: 'flex', justifyContent: isMobile ? 'center' : 'space-between', alignItems: 'center', mt: 2, width: '100%', flexDirection: isMobile ? 'column' : 'row' }}>

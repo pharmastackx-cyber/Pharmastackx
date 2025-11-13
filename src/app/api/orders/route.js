@@ -51,15 +51,16 @@ async function authorize() {
   }
 }
 
-
-
-// --- API Endpoints ---
-
-// GET all orders
-export async function GET() {
+export async function GET(request) {
   try {
     await dbConnect();
-    const orders = await Order.find({}).sort({ createdAt: -1 }).lean();
+    const { searchParams } = new URL(request.url);
+    const deliveryOption = searchParams.get('deliveryOption');
+    const query = {};
+    if (deliveryOption) {
+      query.deliveryOption = deliveryOption;
+    }
+    const orders = await Order.find(query).sort({ createdAt: -1 }).lean();
     return NextResponse.json(orders);
   } catch (error) {
     console.error("Failed to fetch orders:", error);
@@ -100,10 +101,10 @@ export async function POST(request) {
       }
       // CORRECTED: Use the correct field names from the Product model
       finalOrderItems.push({
-        name: product.itemName,   // Was product.name
+        name: product.itemName,   
         qty: clientItem.qty,
-        amount: product.amount,   // Was product.price
-        image: product.imageUrl, // Was product.image
+        amount: product.amount,   
+        image: product.imageUrl,
       });
       // CORRECTED: Use product.amount for calculation
       serverCalculatedTotal += product.amount * clientItem.qty;
@@ -151,7 +152,7 @@ export async function PUT(request) {
 
   try {
     const body = await request.json();
-    const { orderId, status } = body; // e.g., status is 'processing'
+    const { orderId, status } = body; 
 
     if (!orderId || !status) {
       return NextResponse.json({ message: "Missing orderId or status" }, { status: 400 });

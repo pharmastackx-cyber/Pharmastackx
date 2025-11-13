@@ -8,6 +8,8 @@ export interface IProduct extends Document {
   imageUrl: string;
   businessName: string;
   coordinates: string;
+  info: string;
+  POM: boolean;
   bulkUploadId?: mongoose.Types.ObjectId;
 }
 
@@ -19,6 +21,8 @@ const productSchema: Schema<IProduct> = new mongoose.Schema({
   imageUrl: { type: String, default: '' },
   businessName: { type: String, required: true },
   coordinates: { type: String, default: '' },
+  info: { type: String, default: '' },
+  POM: { type: Boolean, default: false },
   bulkUploadId: { type: mongoose.Schema.Types.ObjectId, ref: 'BulkUpload', default: null },
 });
 
