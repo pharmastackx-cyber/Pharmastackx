@@ -14,7 +14,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 // --- Authorization Helper ---
 async function authorize() {
 
-  const cookieStore = cookies();
+  // THE FIX: await the cookies() call to get the actual cookie store.
+  const cookieStore = await cookies();
   const sessionToken = cookieStore.get('session_token');
 
   if (!sessionToken || !sessionToken.value) {
@@ -38,7 +39,7 @@ async function authorize() {
     }
 
 
-    if (user.role !== 'admin' && user.role !== 'deliveryAgent') {
+    if (user.role !== 'admin' && user.role !== 'deliveryAgent' && user.role !== 'pharmacy' && user.role !== 'vendor') {
       return { error: `Forbidden: User role '${user.role}' is not authorized`, status: 403 };
     }
 
@@ -49,6 +50,7 @@ async function authorize() {
     return { error: 'Authentication failed: Invalid token', status: 401 };
   }
 }
+
 
 
 // --- API Endpoints ---
