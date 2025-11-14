@@ -9,6 +9,8 @@ import {
 } from '@mui/material';
 import { Storefront, LocationOn, UploadFile, ExpandMore } from '@mui/icons-material';
 import Papa from 'papaparse';
+import WhatsAppButton from '../../components/WhatsAppButton';
+
 
 interface StockItem {
   _id?: string;
@@ -85,6 +87,11 @@ export default function StoreManagementPage() {
     info: '',
     POM: false,
   });
+  
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+
 
   const fetchStockData = useCallback(async (businessName: string | null) => {
     if (!businessName) {
@@ -118,6 +125,24 @@ export default function StoreManagementPage() {
     }
     setLoadingStock(false);
   }, []);
+
+  const [showIncomplete, setShowIncomplete] = useState(false);
+
+  const isItemIncomplete = (item: StockItem) => {
+    // These fields are allowed to be empty or have default values
+    const fieldsToExclude: (keyof StockItem)[] = ['_id', 'POM', 'businessName', 'coordinates'];
+    
+    for (const key in item) {
+        if (fieldsToExclude.includes(key as keyof StockItem)) continue;
+        
+        const value = item[key as keyof StockItem];
+        if (value === null || value === undefined || value === '' || value === 'N/A' || (typeof value === 'number' && value === 0)) {
+            return true; // Found an incomplete field
+        }
+    }
+    return false; // All fields are complete
+  };
+
 
 
   const fetchOrders = useCallback(async (businessName: string | null) => {
@@ -211,21 +236,58 @@ export default function StoreManagementPage() {
   }, [fetchStockData, fetchOrders]);
 
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      // This function checks if the click was outside the form area
+      if (formRef.current && !formRef.current.contains(event.target as Node)) {
+        setShowUploadForm(false);
+      }
+    }
+
+    // We only want to listen for clicks when the form is actually visible
+    if (showUploadForm) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    // This is a cleanup step: it removes the listener when the form is closed
+    // to prevent memory leaks and unnecessary processing.
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showUploadForm]); // This effect will re-run whenever `showUploadForm` changes
+
+
+
 
   const filteredOrders = orders.filter(order =>
     orderStatusFilter === 'all' || order.status === orderStatusFilter
   );
 
-  const filteredStock = stockData.filter(item =>
-    Object.values(item).join(' ').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredStock = stockData.filter(item => {
+    const searchMatch = Object.values(item).join(' ').toLowerCase().includes(searchQuery.toLowerCase());
+    const incompleteMatch = !showIncomplete || isItemIncomplete(item);
+    return searchMatch && incompleteMatch;
+  });
 
   const sortedStock = [...filteredStock].sort((a, b) => {
+    const aIncomplete = isItemIncomplete(a);
+    const bIncomplete = isItemIncomplete(b);
+
+    // This will bring incomplete items to the top
+    if (aIncomplete && !bIncomplete) return -1;
+    if (!aIncomplete && bIncomplete) return 1;
+    
+    // This is your existing sorting logic
     if (!sortColumn) return 0;
     const valA = String(a[sortColumn] ?? '');
     const valB = String(b[sortColumn] ?? '');
-    return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    if (sortDirection === 'asc') {
+      return valA.localeCompare(valB);
+    } else {
+      return valB.localeCompare(valA);
+    }
   });
+
 
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedStock = sortedStock.slice(startIndex, startIndex + itemsPerPage);
@@ -381,6 +443,7 @@ export default function StoreManagementPage() {
                   (normalizedRow as any)[mappedKey] = normalizeValue(mappedKey, row[header]);
               }
           }
+              
 
           // Return a complete StockItem object with defaults
           return {
@@ -535,6 +598,68 @@ export default function StoreManagementPage() {
     return null; // Don't show buttons for 'completed', 'cancelled', or 'failed' statuses
   };
 
+
+  const handleImageFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Optional: Add a check for file size (e.g., limit to 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('File is too large. Please select an image under 2MB.');
+      return;
+    }
+
+    setIsUploadingImage(true);
+    const reader = new FileReader();
+    
+    reader.onload = () => {
+      // The result is the Base64 encoded Data URL
+      const result = reader.result as string;
+      setFormValues(prev => ({ ...prev, imageUrl: result }));
+      setIsUploadingImage(false);
+    };
+
+    reader.onerror = (error) => {
+        console.error('Error reading file:', error);
+        alert('Failed to read the image file.');
+        setIsUploadingImage(false);
+    };
+
+    reader.readAsDataURL(file);
+
+    // Clear the file input value to allow re-uploading the same file
+    if(imageInputRef.current) {
+        imageInputRef.current.value = "";
+    }
+  };
+
+  const handleEditRowImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('File is too large. Please select an image under 2MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    
+    reader.onload = () => {
+      const result = reader.result as string;
+      // This specifically updates the data for the row being edited
+      setEditingRowData(prev => ({ ...prev, imageUrl: result }));
+    };
+
+    reader.onerror = (error) => {
+        console.error('Error reading file:', error);
+        alert('Failed to read the image file.');
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+
+
   return (
     <Box sx={{ p: isMobile ? 2 : 4 }}>
       <Typography variant={isMobile ? 'h5' : 'h4'} gutterBottom>Store Management</Typography>
@@ -587,6 +712,22 @@ export default function StoreManagementPage() {
 
       {selectedTab === 1 && (
         <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+
+<Typography 
+      variant="body2" 
+      color="text.secondary" 
+      sx={{ 
+        mb: 2, 
+        maxWidth: 600, 
+        textAlign: 'center', 
+        fontStyle: 'italic' 
+      }}
+    >
+      This is your upload section where you add medications. You can add them one at a time or in bulk using a CSV file.
+      To add in bulk, you may need to export the stock list from your business's point-of-sale system.
+      For any challenges, use the WhatsApp icon at the bottom right for support.
+    </Typography>
+
           {!showUploadForm ? (
             <Box sx={{ maxWidth: 350, width: '100%', height: 150, bgcolor: '#1976d2', color: 'white', borderRadius: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }} onClick={handleUploadClick}>
               <IconButton sx={{ color: 'white', mb: 1 }}><UploadFile /></IconButton>
@@ -608,7 +749,37 @@ export default function StoreManagementPage() {
                 multiline 
                 rows={2} 
               />
-              <TextField label="Image URL" name="imageUrl" value={formValues.imageUrl} onChange={handleFormChange} fullWidth />
+              <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'flex-start', gap: 2 }}>
+    <TextField 
+      label="Image URL (or upload)" 
+      name="imageUrl" 
+      value={formValues.imageUrl} 
+      onChange={handleFormChange} 
+      fullWidth
+      multiline
+      rows={2} // More space to show a preview of the long data URL
+      InputProps={{
+        readOnly: isUploadingImage,
+        sx: { fontSize: '0.8rem' } // Use a smaller font for the Data URL
+      }}
+    />
+    <Button 
+      variant="outlined" 
+      component="label"
+      disabled={isUploadingImage}
+      sx={{ height: 56, flexShrink: 0, width: isMobile ? '100%' : 'auto' }}
+    >
+      {isUploadingImage ? <CircularProgress size={24} /> : 'Upload'}
+      <input 
+        type="file" 
+        accept="image/*" 
+        hidden 
+        ref={imageInputRef}
+        onChange={handleImageFileSelect}
+      />
+    </Button>
+</Box>
+
               <TextField label="Business Name" value={userBusinessName || ''} InputProps={{ readOnly: true }} fullWidth />
               <TextField label="Coordinates" value={location || ''} InputProps={{ readOnly: true }} fullWidth />
               <FormControlLabel
@@ -678,9 +849,34 @@ export default function StoreManagementPage() {
       {selectedTab === 2 && (
          <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Current Stock Catalogue</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, maxWidth: 900, width: '100%', textAlign: 'center', fontStyle: 'italic' }}>
+            These are all medications you have uploaded. A red dot indicates an item with incomplete details that you can edit.
+            Use the search bar to find items, click column headers to sort, or toggle the checkbox to only see incomplete products that need your attention.
+            </Typography>
+
              {loadingStock ? <CircularProgress /> :
               <Paper sx={{ maxWidth: 900, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', borderRadius: 2, p: 2 }}>
-                <TextField label="Search items" variant="outlined" size="small" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ mb: 2, width: isMobile ? '100%' : '50%' }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+              <TextField
+              label="Search items"
+              variant="outlined"
+              size="small"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              sx={{ width: isMobile ? '100%' : 300 }}
+              />
+              <FormControlLabel
+              control={
+              <Checkbox
+          checked={showIncomplete}
+          onChange={(e) => setShowIncomplete(e.target.checked)}
+          name="showIncomplete"
+        />
+      }
+      label="Show only incomplete items"
+    />
+</Box>
+
     
                 <Table size="small">
                 <TableHead>
@@ -728,6 +924,36 @@ export default function StoreManagementPage() {
                     checked={(editingRowData as any)[field]}
                     onChange={e => setEditingRowData({ ...(editingRowData as any), [field]: e.target.checked })}
                   />
+
+                ) : field === 'imageUrl' ? (
+                  <>
+                    <TextField
+                      label="Image URL"
+                      value={(editingRowData as any).imageUrl || ''}
+                      onChange={e => setEditingRowData({ ...(editingRowData as any), imageUrl: e.target.value })}
+                      variant="standard"
+                      fullWidth
+                      multiline
+                      rows={2}
+                      InputProps={{ sx: { fontSize: '0.8rem' } }}
+                    />
+                    <Button 
+                      variant="outlined" 
+                      size="small"
+                      component="label"
+                      fullWidth
+                      sx={{ mt: 1 }}
+                    >
+                      Or Upload from Device
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        hidden 
+                        onChange={handleEditRowImageSelect}
+                      />
+                    </Button>
+                  </>
+
                 ) : (
                   <TextField
                     type={field === 'amount' ? 'number' : 'text'}
@@ -748,7 +974,23 @@ export default function StoreManagementPage() {
           </>
         ) : (
           <>
-            <TableCell>{serialNumber}</TableCell>
+            <TableCell>
+    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        {isItemIncomplete(row) && (
+            <Tooltip title="This item has incomplete details.">
+                <Box sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: 'red',
+                    mr: 1,
+                }} />
+            </Tooltip>
+        )}
+        {serialNumber}
+    </Box>
+</TableCell>
+
             <TableCell>{row.itemName}</TableCell>
             <TableCell>{row.activeIngredient}</TableCell>
             <TableCell>{row.category}</TableCell>
@@ -934,6 +1176,9 @@ export default function StoreManagementPage() {
         </Box>
         
       )}
+
+        <WhatsAppButton />
+
 
     </Box>
   );
