@@ -25,6 +25,15 @@ interface StockItem {
   POM: boolean;  
 }
 
+interface IBulkUpload {
+  _id: string;
+  csvName: string;
+  itemCount: number;
+  uploadedAt: string;
+}
+
+
+
 interface Order {
   _id: string;
   customerName: string;
@@ -53,6 +62,9 @@ export default function StoreManagementPage() {
   const [stockData, setStockData] = useState<StockItem[]>([]);
   const [loadingStock, setLoadingStock] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bulkUploadHistory, setBulkUploadHistory] = useState<IBulkUpload[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
 
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -255,6 +267,30 @@ export default function StoreManagementPage() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showUploadForm]); // This effect will re-run whenever `showUploadForm` changes
+
+  useEffect(() => {
+    const fetchBulkUploadHistory = async () => {
+      // Only fetch if we have a business name to query
+      if (!userBusinessName) return;
+
+      setLoadingHistory(true);
+      try {
+        const response = await fetch(`/api/bulk-upload?businessName=${encodeURIComponent(userBusinessName)}`);
+        if (!response.ok) throw new Error('Failed to fetch history');
+        const data = await response.json();
+        setBulkUploadHistory(data.uploads);
+      } catch (error) {
+        console.error('Error fetching bulk upload history:', error);
+        // Avoid alerting on initial load if history is just empty
+      }
+      setLoadingHistory(false);
+    };
+
+    // Only fetch history when the "Upload" tab is visible
+    if (selectedTab === 1) {
+      fetchBulkUploadHistory();
+    }
+  }, [selectedTab, userBusinessName]); // Re-run if the user/business changes
 
 
 
@@ -481,11 +517,17 @@ export default function StoreManagementPage() {
       alert('No data to upload.');
       return;
     }
+    if (!userBusinessName) {
+      alert('Cannot upload without a business name. Please ensure your profile is set up.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
         const payload = {
             products: bulkData,
-            fileName: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv'
+            fileName: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv',
+            businessName: userBusinessName, // Add businessName to the payload
         };
       const response = await fetch('/api/bulk-upload', {
         method: 'POST',
@@ -494,8 +536,14 @@ export default function StoreManagementPage() {
       });
 
       if (response.ok) {
-        const { savedProducts } = await response.json();
+        const { savedProducts, bulkUploadRecord } = await response.json();
+        
         setStockData(prev => [...savedProducts, ...prev]);
+
+        if (bulkUploadRecord) {
+          setBulkUploadHistory(prev => [bulkUploadRecord, ...prev]);
+        }
+
         alert('Bulk upload successful!');
         setShowBulkPreview(false);
         setBulkData([]);
@@ -510,6 +558,8 @@ export default function StoreManagementPage() {
     }
     setIsSubmitting(false);
   };
+
+
 
   const handleDelete = async (productId: string) => {
     if (!window.confirm('Are you sure you want to request deletion for this item?')) return;
@@ -843,6 +893,43 @@ export default function StoreManagementPage() {
 
             )}
           </Box>
+
+          <Divider sx={{ my: 4, width: '80%' }} />
+
+<Typography variant="h6" sx={{ fontWeight: 600 }}>Bulk Upload History</Typography>
+<Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: 'italic' }}>
+    Showing your last 20 uploads.
+</Typography>
+
+{loadingHistory ? <CircularProgress /> : (
+  <Paper sx={{ maxWidth: 600, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black', p: 2, mt: 1 }}>
+    <Table size="small">
+      <TableHead>
+        <TableRow>
+          <TableCell sx={{ fontWeight: 'bold' }}>File Name</TableCell>
+          <TableCell sx={{ fontWeight: 'bold' }}>Items Uploaded</TableCell>
+          <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {bulkUploadHistory.length > 0 ? bulkUploadHistory.map((upload) => (
+          <TableRow key={upload._id}>
+            <TableCell>{upload.csvName}</TableCell>
+            <TableCell>{upload.itemCount}</TableCell>
+            <TableCell>{new Date(upload.uploadedAt).toLocaleString()}</TableCell>
+          </TableRow>
+        )) : (
+          <TableRow>
+              <TableCell colSpan={3} sx={{ textAlign: 'center' }}>No recent uploads found.</TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+  </Paper>
+)}
+
+
+
         </Box>
       )}
 
