@@ -15,6 +15,11 @@ export async function POST(req) {
   }
 
   const user = await User.findOne({ email });
+
+  // ***** START OF NEW DEBUGGING LOG *****
+  console.log('[Login API] User found in database:', user);
+  // ***** END OF NEW DEBUGGING LOG *****
+
   if (!user) {
     return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
   }
@@ -25,11 +30,10 @@ export async function POST(req) {
   }
 
   const token = jwt.sign(
-    { userId: user._id, role: user.role, email: user.email }, // Use role instead of userType
+    { userId: user._id, role: user.role, email: user.email },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
 
-  // Return user object with role
   return NextResponse.json({ token, user: { name: user.name, email: user.email, role: user.role } });
 }
