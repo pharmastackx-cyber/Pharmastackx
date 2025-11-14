@@ -30,7 +30,9 @@ import {
   LocalOffer,
   ShoppingBag,
   Chat,
-  DeliveryDining
+  DeliveryDining,
+  Article,
+  Create,
 } from '@mui/icons-material';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -140,6 +142,24 @@ export default function Navbar() {
             <ListItemText primary="Find Medicines" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
         </ListItem>
+
+        {/* Health Insights Link for Mobile Drawer */}
+        <ListItem disablePadding sx={{ mb: 0.5 }}>
+          <ListItemButton component={Link} href="/health-insights" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/health-insights') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+            <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><Article fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Insights" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
+          </ListItemButton>
+        </ListItem>
+
+        {isAdmin && (
+            <ListItem disablePadding sx={{ mb: 0.5 }}>
+                <ListItemButton component={Link} href="/blog" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/blog') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+                    <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><Create fontSize="small" /></ListItemIcon>
+                    <ListItemText primary="New Post" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
+                </ListItemButton>
+            </ListItem>
+        )}
+
         
         {isAdmin && <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/business/dashboard" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/business') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
@@ -198,6 +218,8 @@ export default function Navbar() {
 
   const desktopAdminLinks = isAdmin ? (
     <>
+      
+
       <Button color="inherit" startIcon={<Security />} component={Link} href="/admin/delivery-agents">
         Agent Management
       </Button>
@@ -247,6 +269,9 @@ export default function Navbar() {
           <Button color="inherit" startIcon={<LocalPharmacy />} component={Link} href="/find-medicines" sx={{ bgcolor: isActive('/find-medicines') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
               Find Meds
             </Button>
+
+            
+
             {isAdmin && <Button color="inherit" startIcon={<Chat />} component={Link} href="/carechat" sx={{ bgcolor: isActive('/carechat') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
               CareChat
             </Button>}

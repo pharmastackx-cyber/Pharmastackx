@@ -40,7 +40,7 @@ const sampleDrugs = [
     name: "Paracetamol 500mg",
     activeIngredients: "Acetaminophen",
     drugClass: "Analgesic/Antipyretic",
-    price: "₦1,200",
+    price: "₦200",
     pharmacy: "MedPlus Pharmacy"
   },
   {
@@ -73,20 +73,11 @@ const sampleDrugs = [
   {
     id: 5,
     image: "https://i.ibb.co/Xr6Vr2dF/visita-removebg-preview.png",
-    name: "Visita Eye Drops",
-    activeIngredients: "Tetrahydrozoline HCl",
-    drugClass: "Ophthalmic Decongestant",
-    price: "₦1,800",
-    pharmacy: "OptimalHealth Pharmacy"
-  },
-  {
-    id: 6,
-    name: "Amoxicillin 500mg",
-    image: "https://via.placeholder.com/200x150/006D5B/white?text=Amoxicillin",
-    activeIngredients: "Amoxicillin Trihydrate",
-    drugClass: "Antibiotic",
-    price: "₦2,100",
-    pharmacy: "CityMed Pharmacy"
+    name: "Visita Plus cream",
+    activeIngredients: "Clotrimazole, Betamethasone Dipropionate, and Neomycin Sulfate",
+    drugClass: "Tripple action antiinfective",
+    price: "₦1000",
+    pharmacy: "Ernie pharma"
   }
 ];
 
@@ -114,6 +105,8 @@ const drugImages = [
   }
 ];
 
+
+
 // Drug Rotator Component
 function DrugRotator() {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -129,31 +122,26 @@ function DrugRotator() {
   return (
     <Box
       sx={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden'
+        // THIS IS THE FIX: Set an explicit, responsive size for the container
+        width: { xs: '120px', sm: '180px', md: '280px' },
+        height: { xs: '120px', sm: '180px', md: '280px' },
+        position: 'relative', // Needed for the absolutely positioned children
       }}
     >
-      <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}></Box>
       {drugImages.map((drug, index) => (
         <Box
           key={index}
           sx={{
             position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
             opacity: index === currentIndex ? 1 : 0,
             transition: 'opacity 1s ease-in-out',
-            animation: index === currentIndex ? 'blink 3s ease-in-out infinite' : 'none',
-            '@keyframes blink': {
-              '0%, 100%': { opacity: 1 },
-              '50%': { opacity: 0.8 },
-            }
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <Box
@@ -161,20 +149,21 @@ function DrugRotator() {
             src={drug.src}
             alt={drug.name}
             sx={{
-              maxWidth: { xs: '120px', sm: '180px', md: '280px' },
-              maxHeight: { xs: '120px', sm: '180px', md: '280px' },
-              width: 'auto',
-              height: 'auto',
+              maxWidth: '100%',
+              maxHeight: '100%',
               objectFit: 'contain',
               filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))'
             }}
           />
-          
         </Box>
       ))}
     </Box>
   );
 }
+
+
+
+
 
 // Drug Carousel Component
 function DrugCarousel() {
@@ -349,15 +338,21 @@ export default function Home() {
 
 
   const drugClasses = [
-    { name: 'Analgesics', icon: '💊', count: '45+ drugs' },
-    { name: 'Antibiotics', icon: '🦠', count: '38+ drugs' },
-    { name: 'Antimalarials', icon: '🩺', count: '22+ drugs' },
-    { name: 'Antifungals', icon: '🔬', count: '18+ drugs' },
-    { name: 'Vitamins', icon: '🌟', count: '35+ drugs' },
-    { name: 'Cardiovascular', icon: '❤️', count: '41+ drugs' },
-    { name: 'Respiratory', icon: '🫁', count: '29+ drugs' },
-    { name: 'Gastrointestinal', icon: '🍃', count: '32+ drugs' }
+    { name: 'Analgesics', icon: '💊', count: '' },
+    { name: 'Antibiotics', icon: '🦠', count: '' },
+    { name: 'Antimalarials', icon: '🩺', count: '' },
+    { name: 'Antifungals', icon: '🔬', count: '' },
+    { name: 'Vitamins', icon: '🌟', count: '' },
+    { name: 'Cardiovascular', icon: '❤️', count: '' },
+    { name: 'Respiratory', icon: '🫁', count: '' },
+    { name: 'Gastrointestinal', icon: '🍃', count: '' }
   ];
+
+  const handleDrugClassClick = () => {
+    router.push('/find-medicines');
+  };
+  
+
 
   const scrollClasses = (direction: 'left' | 'right') => {
     const itemsPerView = window.innerWidth < 600 ? 2 : 4;
@@ -448,149 +443,184 @@ export default function Home() {
   return (
     <Box>
       <Navbar />
-
-      {/* Hero Section with Rotating Drugs */}
-      <Box 
-        sx={{ 
-          width: '100%', 
-          minHeight: { xs: 'auto', md: '50vh' }, 
-          bgcolor: 'white',
-          pt: { xs: 1, md: 2 },
-          pb: { xs: 0, md: 6 },
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'center'
-        }}
-      >
-      </Box>
       {/* Search Bar */}
       <Container maxWidth="lg" sx={{ mt: { xs: 2, md: 3 }, mb: 4 }}>
-        <Paper
-          elevation={3}
-          sx={{
-            p: 3,
-            borderRadius: '16px',
-            bgcolor: '#f8f9fa'
-          }}
-        >
-          <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            <TextField
-              fullWidth
-              placeholder="Search for medicines by proximity, pharmacy, class, or name..."
-              variant="outlined"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={handleSearchKeyPress}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search sx={{ color: '#006D5B' }} />
-                  </InputAdornment>
-                ),
-                sx: {
-                  borderRadius: '12px',
-                  bgcolor: 'white',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#006D5B',
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#006D5B',
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#006D5B',
-                  }
-                }
-              }}
-            />
-            <Button
-              variant="contained"
-              onClick={handleSearch}
-              sx={{
-                bgcolor: '#006D5B',
-                '&:hover': { bgcolor: '#004D40' },
-                px: 4,
-                borderRadius: '12px'
-              }}
-            >
-              Search
-            </Button>
-          </Box>
-          
-          {/* Search Filter Chips */}
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Chip 
-              icon={<LocationOn />} 
-              label="Near Me" 
-              clickable 
-              variant="outlined"
-              sx={{ 
-                borderColor: '#006D5B',
-                color: '#006D5B',
-                '&:hover': { bgcolor: '#E91E63', color: 'white' }
-              }}
-            />
-            <Chip 
-              icon={<LocalPharmacy />} 
-              label="By Pharmacy" 
-              clickable 
-              variant="outlined"
-              sx={{ 
-                borderColor: '#006D5B',
-                color: '#006D5B',
-                '&:hover': { bgcolor: '#E91E63', color: 'white' }
-              }}
-            />
-            <Chip 
-              icon={<FilterList />} 
-              label="Drug Class" 
-              clickable 
-              variant="outlined"
-              sx={{ 
-                borderColor: '#006D5B',
-                color: '#006D5B',
-                '&:hover': { bgcolor: '#E91E63', color: 'white' }
-              }}
-            />
-            <Chip 
-              label="Generic" 
-              clickable 
-              variant="outlined"
-              sx={{ 
-                borderColor: '#006D5B',
-                color: '#006D5B',
-                '&:hover': { bgcolor: '#E91E63', color: 'white' }
-              }}
-            />
-            <Chip 
-              label="Brand Name" 
-              clickable 
-              variant="outlined"
-              sx={{ 
-                borderColor: '#006D5B',
-                color: '#006D5B',
-                '&:hover': { bgcolor: '#E91E63', color: 'white' }
-              }}
-            />
-          </Stack>
-          
-          {/* Location Display */}
-          <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e0e0e0' }}>
-            {location ? (
-              <Typography variant="body2" sx={{ color: 'black', fontSize: '0.9rem' }}>
-                📍 Current Location: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
-              </Typography>
-            ) : locationError ? (
-              <Typography variant="body2" sx={{ color: '#d32f2f', fontSize: '0.9rem' }}>
-                ❌ {locationError}
-              </Typography>
-            ) : (
-              <Typography variant="body2" sx={{ color: '#666', fontSize: '0.9rem' }}>
-                📍 Getting your location...
-              </Typography>
-            )}
-          </Box>
-        </Paper>
+      <Paper
+  elevation={3}
+  sx={{
+    p: { xs: 2, md: 5 },
+    borderRadius: '20px',
+    bgcolor: '#006D5B',
+    color: 'white',
+    display: 'grid',
+    gridTemplateColumns: { xs: 'auto 1fr', md: '300px 1fr' },
+    alignItems: 'center',
+    gap: { xs: 2, md: 4 },
+    overflow: 'hidden',
+  }}
+>
+  <Box sx={{
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: { xs: 150, sm: 200, md: 250 },
+    position: 'relative',
+  }}>
+    <DrugRotator />
+  </Box>
+  <Box sx={{ pl: { xs: 2, md: 0 } }}>
+  <Typography
+    variant="h3"
+    component="h1"
+    sx={{
+      fontWeight: 700,
+      textAlign: 'left',
+      lineHeight: 1.2,
+      fontSize: { xs: '1rem', sm: '1.5rem', md: '2.5rem' },
+    }}
+  >
+    ensuring that no patient is left untreated because a drug is unavailable, unfindable, or inaccessible.
+  </Typography>
+</Box>
+
+</Paper>
+
       </Container>
+
+
+      {/* Search Bar */}
+<Container maxWidth="lg" sx={{ mt: { xs: 2, md: 3 }, mb: 4 }}>
+  <Paper
+    elevation={3}
+    sx={{
+      p: 3,
+      borderRadius: '16px',
+      bgcolor: '#f8f9fa'
+    }}
+  >
+    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+      <TextField
+        fullWidth
+        placeholder="Search for medicines by proximity, pharmacy, class, or name..."
+        variant="outlined"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onKeyPress={handleSearchKeyPress}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Search sx={{ color: '#006D5B' }} />
+            </InputAdornment>
+          ),
+          sx: {
+            borderRadius: '12px',
+            bgcolor: 'white',
+            '& .MuiOutlinedInput-notchedOutline': {
+              borderColor: '#006D5B',
+            },
+            '&:hover .MuiOutlinedInput-notchedOutline': {
+              borderColor: '#006D5B',
+            },
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+              borderColor: '#006D5B',
+            }
+          }
+        }}
+      />
+      <Button
+        variant="contained"
+        onClick={handleSearch}
+        sx={{
+          bgcolor: '#006D5B',
+          '&:hover': { bgcolor: '#004D40' },
+          px: 4,
+          borderRadius: '12px'
+        }}
+      >
+        Search
+      </Button>
+    </Box>
+    
+    {/* Search Filter Chips */}
+    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+      <Chip 
+        icon={<LocationOn />} 
+        label="Near Me" 
+        clickable 
+        variant="outlined"
+        sx={{ 
+          borderColor: '#006D5B',
+          color: '#006D5B',
+          '&:hover': { bgcolor: '#E91E63', color: 'white' }
+        }}
+      />
+      <Chip 
+        icon={<LocalPharmacy />} 
+        label="By Pharmacy" 
+        clickable 
+        variant="outlined"
+        sx={{ 
+          borderColor: '#006D5B',
+          color: '#006D5B',
+          '&:hover': { bgcolor: '#E91E63', color: 'white' }
+        }}
+      />
+      <Chip 
+        icon={<FilterList />} 
+        label="Drug Class" 
+        clickable 
+        variant="outlined"
+        sx={{ 
+          borderColor: '#006D5B',
+          color: '#006D5B',
+          '&:hover': { bgcolor: '#E91E63', color: 'white' }
+        }}
+      />
+      <Chip 
+        label="Generic" 
+        clickable 
+        variant="outlined"
+        sx={{ 
+          borderColor: '#006D5B',
+          color: '#006D5B',
+          '&:hover': { bgcolor: '#E91E63', color: 'white' }
+        }}
+      />
+      <Chip 
+        label="Brand Name" 
+        clickable 
+        variant="outlined"
+        sx={{ 
+          borderColor: '#006D5B',
+          color: '#006D5B',
+          '&:hover': { bgcolor: '#E91E63', color: 'white' }
+        }}
+      />
+    </Stack>
+    
+    {/* Location Display */}
+    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e0e0e0' }}>
+      {location ? (
+        <Typography variant="body2" sx={{ color: 'black', fontSize: '0.9rem' }}>
+          📍 Current Location: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+        </Typography>
+      ) : locationError ? (
+        <Typography variant="body2" sx={{ color: '#d32f2f', fontSize: '0.9rem' }}>
+          ❌ {locationError}
+        </Typography>
+      ) : (
+        <Typography variant="body2" sx={{ color: '#666', fontSize: '0.9rem' }}>
+          📍 Getting your location...
+        </Typography>
+      )}
+    </Box>
+  </Paper>
+</Container>
+
+    
+    
+
+
 
       {/* Drug Carousel */}
       <Container maxWidth="lg" sx={{ mb: 6 }}>
@@ -600,127 +630,10 @@ export default function Home() {
         <DrugCarousel />
       </Container>
 
-      {/* Drug Classes Section */}
-      <Container maxWidth="lg" sx={{ mb: 6 }}>
-        <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: '#006D5B' }}>
-          Browse by Drug Classes
-        </Typography>
-        
-        {/* Mobile Carousel */}
-        <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1 }}>
-          <IconButton 
-            onClick={() => scrollClasses('left')}
-            disabled={classesScrollPosition === 0}
-            sx={{ 
-              bgcolor: '#006D5B', 
-              color: 'white', 
-              '&:hover': { bgcolor: '#004D40' },
-              '&:disabled': { bgcolor: '#e0e0e0', color: '#999' },
-              minWidth: 40,
-              height: 40
-            }}
-          >
-            <ArrowBackIos />
-          </IconButton>
-          
-          <Box sx={{ flex: 1, overflow: 'hidden' }}>
-            <Box 
-              sx={{ 
-                display: 'flex',
-                gap: 2,
-                transform: `translateX(-${classesScrollPosition * 50}%)`,
-                transition: 'transform 0.3s ease'
-              }}
-            >
-              {drugClasses.map((drugClass, index) => (
-                <Card
-                  key={index}
-                  sx={{
-                    minWidth: 'calc(50% - 8px)',
-                    p: 2,
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    borderRadius: '12px',
-                    border: '1px solid #e0e0e0',
-                    '&:hover': {
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      borderColor: '#006D5B',
-                      transform: 'translateY(-2px)',
-                      transition: 'all 0.2s ease'
-                    }
-                  }}
-                >
-                  <Typography variant="h4" sx={{ mb: 1 }}>
-                    {drugClass.icon}
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '0.9rem', mb: 0.5 }}>
-                    {drugClass.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                    {drugClass.count}
-                  </Typography>
-                </Card>
-              ))}
-            </Box>
-          </Box>
-          
-          <IconButton 
-            onClick={() => scrollClasses('right')}
-            disabled={classesScrollPosition >= drugClasses.length - 2}
-            sx={{ 
-              bgcolor: '#006D5B', 
-              color: 'white', 
-              '&:hover': { bgcolor: '#004D40' },
-              '&:disabled': { bgcolor: '#e0e0e0', color: '#999' },
-              minWidth: 40,
-              height: 40
-            }}
-          >
-            <ArrowForwardIos />
-          </IconButton>
-        </Box>
-
-        {/* Desktop Grid */}
-        <Box sx={{ 
-          display: { xs: 'none', md: 'grid' }, 
-          gridTemplateColumns: 'repeat(4, 1fr)', 
-          gap: 2 
-        }}>
-          {drugClasses.map((drugClass, index) => (
-            <Card
-              key={index}
-              sx={{
-                p: 2,
-                textAlign: 'center',
-                cursor: 'pointer',
-                borderRadius: '12px',
-                border: '1px solid #e0e0e0',
-                '&:hover': {
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  borderColor: '#006D5B',
-                  transform: 'translateY(-2px)',
-                  transition: 'all 0.2s ease'
-                }
-              }}
-            >
-              <Typography variant="h4" sx={{ mb: 1 }}>
-                {drugClass.icon}
-              </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '0.9rem', mb: 0.5 }}>
-                {drugClass.name}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                {drugClass.count}
-              </Typography>
-            </Card>
-          ))}
-        </Box>
-      </Container>
-
                   {/* Partner Pharmacies Section */}
       <Container maxWidth="lg" sx={{ mb: 6 }}>
         <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: '#006D5B' }}>
-          Partner Pharmacies
+          Find Outlets Near You
         </Typography>
         
         {/* Pharmacy Search Bar */}
@@ -770,6 +683,7 @@ export default function Home() {
                     <Box key={pharmacy._id} sx={{ width: '100%', flexShrink: 0, px: 1 }}>
                       <Card component={Link} href={`/pharmacy/${pharmacy.slug}`} sx={{ textDecoration: 'none', borderRadius: '30px 10px', overflow: 'hidden' }}>
 
+
                         <Box sx={{ bgcolor: '#004D40', color: 'white', height: 120, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
                           <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', lineHeight: 1.2 }}>
                             {pharmacy.businessName}
@@ -818,166 +732,133 @@ export default function Home() {
         )}
       </Container>
 
-
-        {/* Pharmacy Search Bar can remain here */}
-        
-        {loadingPharmacies ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
-            <CircularProgress />
-          </Box>
-        ) : partnerPharmacies.length === 0 ? (
-          <Typography sx={{ textAlign: 'center', my: 5, color: 'text.secondary' }}>
-            No verified pharmacies found at the moment.
-          </Typography>
-        ) : (
-          <Box sx={{ display: { xs: 'none', md: 'grid' }, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 3 }}>
-            {partnerPharmacies.map((pharmacy) => (
-              <Card component={Link} href={`/pharmacy/${pharmacy.slug}`} key={pharmacy._id} sx={{ textDecoration: 'none', cursor: 'pointer', borderRadius: '16px', overflow: 'hidden', '&:hover': { boxShadow: '0 8px 24px rgba(0,0,0,0.12)', transform: 'translateY(-4px)', transition: 'all 0.3s ease' } }}>
-                <CardMedia
-                  component="img"
-                  height="140"
-                  // Use a consistent placeholder since businessImage is not available
-                  image={'https://via.placeholder.com/300x150/006D5B/white?text=' + pharmacy.businessName.replace(/ /g, '+')}
-                  alt={pharmacy.businessName}
-                />
-                <CardContent sx={{ p: 2 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, fontSize: '1.1rem' }}>
-                    {pharmacy.businessName}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                    <LocationOn sx={{ fontSize: 16, mr: 0.5, color: '#006D5B' }} />
-                    {pharmacy.businessAddress}
-                  </Typography>
-                  
-                  <Button fullWidth variant="outlined" sx={{ borderColor: '#006D5B', color: '#006D5B', '&:hover': { bgcolor: '#006D5B', color: 'white' } }}>
-                    Visit Store
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </Box>
-        )}
-        {/* You can also add the mobile carousel back here if you need it, using the same logic */}
-      
-
-      
-
-      {/* Newsletter/Blog Section */}
+      {/* Drug Classes Section */}
       <Container maxWidth="lg" sx={{ mb: 6 }}>
         <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: '#006D5B' }}>
-          Health Insights & Updates
+          Browse by Drug Classes
         </Typography>
         
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' }, gap: 4, alignItems: 'start' }}>
-          {/* Featured Articles */}
-          <Box>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-              Latest Articles
-            </Typography>
-            <Stack spacing={2}>
-              {[
-                {
-                  title: "Understanding Generic vs Brand Name Medications",
-                  excerpt: "Learn the differences between generic and brand medications and how they can save you money while maintaining quality...",
-                  date: "November 1, 2025",
-                  readTime: "5 min read"
-                },
-                {
-                  title: "Essential Vitamins for Optimal Health",
-                  excerpt: "Discover which vitamins are crucial for your daily wellness routine and how to choose the right supplements...",
-                  date: "October 28, 2025", 
-                  readTime: "7 min read"
-                }
-              ].map((article, index) => (
-                <Card key={index} sx={{ p: 2, cursor: 'pointer', '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.1)', transform: 'translateY(-2px)', transition: 'all 0.2s ease' } }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, fontSize: '1rem' }}>
-                    {article.title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1, lineHeight: 1.4 }}>
-                    {article.excerpt}
-                  </Typography>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {article.date}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#006D5B', fontWeight: 500 }}>
-                      {article.readTime}
-                    </Typography>
-                  </Box>
-                </Card>
-              ))}
-            </Stack>
-            
-            <Box sx={{ textAlign: 'center', mt: 3 }}>
-              <Button
-                variant="contained"
-                sx={{
-                  bgcolor: '#006D5B',
-                  '&:hover': { bgcolor: '#004D40' },
-                  px: 4,
-                  py: 1.2,
-                  borderRadius: '12px'
-                }}
-              >
-                Read More Articles
-              </Button>
-            </Box>
-          </Box>
+        {/* Mobile Carousel */}
+<Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1 }}>
+  <IconButton 
+    onClick={() => scrollClasses('left')}
+    disabled={classesScrollPosition === 0}
+    sx={{ 
+      bgcolor: '#006D5B', 
+      color: 'white', 
+      '&:hover': { bgcolor: '#004D40' },
+      '&:disabled': { bgcolor: '#e0e0e0', color: '#999' },
+      minWidth: 40,
+      height: 40
+    }}
+  >
+    <ArrowBackIos />
+  </IconButton>
+  
+  <Box sx={{ flex: 1, overflow: 'hidden' }}>
+    <Box 
+      sx={{ 
+        display: 'flex',
+        gap: 2,
+        transform: `translateX(-${classesScrollPosition * 50}%)`,
+        transition: 'transform 0.3s ease'
+      }}
+    >
+      {drugClasses.map((drugClass, index) => (
+        <Card
+          key={index}
+          onClick={handleDrugClassClick} // <-- THIS LINE IS ADDED
+          sx={{
+            minWidth: 'calc(50% - 8px)',
+            p: 2,
+            textAlign: 'center',
+            cursor: 'pointer',
+            borderRadius: '12px',
+            border: '1px solid #e0e0e0',
+            '&:hover': {
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              borderColor: '#006D5B',
+              transform: 'translateY(-2px)',
+              transition: 'all 0.2s ease'
+            }
+          }}
+        >
+          <Typography variant="h4" sx={{ mb: 1 }}>
+            {drugClass.icon}
+          </Typography>
+          <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '0.9rem', mb: 0.5 }}>
+            {drugClass.name}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+            {drugClass.count}
+          </Typography>
+        </Card>
+      ))}
+    </Box>
+  </Box>
+  
+  <IconButton 
+    onClick={() => scrollClasses('right')}
+    disabled={classesScrollPosition >= drugClasses.length - 2}
+    sx={{ 
+      bgcolor: '#006D5B', 
+      color: 'white', 
+      '&:hover': { bgcolor: '#004D40' },
+      '&:disabled': { bgcolor: '#e0e0e0', color: '#999' },
+      minWidth: 40,
+      height: 40
+    }}
+  >
+    <ArrowForwardIos />
+  </IconButton>
+</Box>
 
-          {/* Newsletter Signup */}
-          <Paper 
-            elevation={3}
-            sx={{ 
-              p: 3, 
-              borderRadius: '16px',
-              bgcolor: '#f8f9fa',
-              textAlign: 'center',
-              height: 'fit-content'
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: '#006D5B' }}>
-              Stay Updated
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, lineHeight: 1.4 }}>
-              Get the latest health tips, medication updates, and pharmacy news delivered to your inbox.
-            </Typography>
-            
-            <TextField
-              fullWidth
-              placeholder="Enter your email address"
-              variant="outlined"
-              size="small"
-              sx={{ 
-                mb: 2,
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '8px',
-                  bgcolor: 'white'
-                }
-              }}
-            />
-            
-            <Button
-              fullWidth
-              variant="contained"
-              sx={{
-                bgcolor: '#006D5B',
-                '&:hover': { bgcolor: '#004D40' },
-                borderRadius: '8px',
-                py: 1.2,
-                mb: 2
-              }}
-            >
-              Subscribe to Newsletter
-            </Button>
-            
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-              📧 Weekly updates • 🔒 No spam • ✅ Unsubscribe anytime
-            </Typography>
-          </Paper>
-        </Box>
+
+        {/* Desktop Grid */}
+<Box sx={{ 
+  display: { xs: 'none', md: 'grid' }, 
+  gridTemplateColumns: 'repeat(4, 1fr)', 
+  gap: 2 
+}}>
+  {drugClasses.map((drugClass, index) => (
+    <Card
+      key={index}
+      onClick={handleDrugClassClick} // <-- THIS LINE IS ADDED
+      sx={{
+        p: 2,
+        textAlign: 'center',
+        cursor: 'pointer',
+        borderRadius: '12px',
+        border: '1px solid #e0e0e0',
+        '&:hover': {
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          borderColor: '#006D5B',
+          transform: 'translateY(-2px)',
+          transition: 'all 0.2s ease'
+        }
+      }}
+    >
+      <Typography variant="h4" sx={{ mb: 1 }}>
+        {drugClass.icon}
+      </Typography>
+      <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '0.9rem', mb: 0.5 }}>
+        {drugClass.name}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+        {drugClass.count}
+      </Typography>
+    </Card>
+  ))}
+</Box>
+
       </Container>
 
-      {/* CTA Section */}
+
+        
+
+      
+
+            {/* CTA Section */}
       <Container maxWidth="lg" sx={{ mt: 6, mb: 6 }}>
         <Box sx={{ mt: 8, textAlign: 'center', p: 6, bgcolor: 'grey.50', borderRadius: 3 }}>
           <Typography variant="h4" gutterBottom color="primary">
