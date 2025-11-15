@@ -16,11 +16,11 @@ import {
   CircularProgress,
   IconButton,
   Modal,
-  Grid,
   Snackbar,
   Alert,
   Chip,      
 } from '@mui/material';
+import Grid from '@mui/material/Grid'; 
 import {
   Search,
   LocationOn,
@@ -319,12 +319,12 @@ export default function FindMedicinesPage() {
           {selectedMedicine && (
             <Grid container spacing={3}>
               <IconButton aria-label="close" onClick={handleCloseModal} sx={{ position: 'absolute', right: 8, top: 8, color: (theme) => theme.palette.grey[500] }}><Close /></IconButton>
-              <Grid item xs={12} md={5}>
+              <Grid sx={{ width: { xs: '100%', md: '41.66%' } }}>
                 <Box sx={{ width: '100%', height: {xs: 200, md: '100%'}, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f0f7f4', borderRadius: '12px' }}>
                    <CardMedia component="img" image={selectedMedicine.image} alt={selectedMedicine.name} sx={{ objectFit: 'contain', width: '100%', height: '100%', maxHeight: {xs: 180, md: 250} }}/>
                 </Box>
               </Grid>
-              <Grid item xs={12} md={7}>
+              <Grid sx={{ width: { xs: '100%', md: '58.33%' } }}>
                 <Typography variant="h4" component="h2" sx={{ fontWeight: 700, color: '#006D5B', mb: 2 }}>{selectedMedicine.name}</Typography>
                 <Typography variant="h5" sx={{ fontWeight: 600, my: 2 }}>{selectedMedicine.formattedPrice}</Typography>
                 <Box sx={{ my: 2 }}>
