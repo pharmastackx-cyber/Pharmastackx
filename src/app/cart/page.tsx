@@ -35,9 +35,15 @@ import { usePromo } from '../../contexts/PromoContext';
 import { useOrders } from '../../contexts/OrderContext';
 import { useSession } from '../../context/SessionProvider';
 import { useRouter } from 'next/navigation';
-import PaystackButton from '../../components/PaystackButton';
+import dynamicImport from "next/dynamic";
 
-export const dynamic = 'force-dynamic';
+const PaystackButton = dynamicImport(
+  () => import("../../components/PaystackButton"),
+  { ssr: false }
+);
+
+export const dynamic = "force-dynamic";
+
 
 
 export default function Cart() {
