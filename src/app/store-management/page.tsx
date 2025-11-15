@@ -5,11 +5,13 @@ import {
   Box, Typography, Tabs, Tab, IconButton, TextField, Button,
   Table, TableHead, TableBody, TableRow, TableCell, Paper, useTheme, 
   useMediaQuery, CircularProgress, Tooltip, Select, MenuItem, 
-  FormControl, InputLabel, Divider, Collapse, Checkbox, FormControlLabel
+  FormControl, InputLabel, Divider, Collapse, Checkbox, FormControlLabel,
+  Container, Alert, AlertTitle, Link
 } from '@mui/material';
 import { Storefront, LocationOn, UploadFile, ExpandMore } from '@mui/icons-material';
 import Papa from 'papaparse';
 import WhatsAppButton from '../../components/WhatsAppButton';
+
 
 
 interface StockItem {
@@ -23,6 +25,7 @@ interface StockItem {
   coordinates: string;
   info: string;
   POM: boolean;  
+  slug: string;
 }
 
 interface IBulkUpload {
@@ -98,6 +101,7 @@ export default function StoreManagementPage() {
     coordinates: '',
     info: '',
     POM: false,
+    slug: '',
   });
   
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -105,15 +109,15 @@ export default function StoreManagementPage() {
 
 
 
-  const fetchStockData = useCallback(async (businessName: string | null) => {
-    if (!businessName) {
+  const fetchStockData = useCallback(async (businessName: string | null, isAdmin: boolean = false) => {
+    if (!isAdmin && !businessName) {
       setLoadingStock(false);
       setStockData([]); // Clear stock data if no business name
       return;
     }
     setLoadingStock(true);
     try {
-      const apiUrl = `/api/stock?businessName=${encodeURIComponent(businessName)}`;
+      const apiUrl = isAdmin ? '/api/stock' : `/api/stock?businessName=${encodeURIComponent(businessName!)}`;
       const stockRes = await fetch(apiUrl);
       if (!stockRes.ok) throw new Error('Failed to fetch stock');
       const stockJson = await stockRes.json();
@@ -138,6 +142,7 @@ export default function StoreManagementPage() {
     setLoadingStock(false);
   }, []);
 
+
   const [showIncomplete, setShowIncomplete] = useState(false);
 
   const isItemIncomplete = (item: StockItem) => {
@@ -157,8 +162,8 @@ export default function StoreManagementPage() {
 
 
 
-  const fetchOrders = useCallback(async (businessName: string | null) => {
-    if (!businessName) {
+  const fetchOrders = useCallback(async (businessName: string | null, isAdmin: boolean = false) => {
+    if (!isAdmin && !businessName) {
       setLoadingOrders(false);
       setOrders([]); // Clear orders if no business name is available
       return;
@@ -169,8 +174,11 @@ export default function StoreManagementPage() {
         // Construct URL with both deliveryOption and businessName
         const params = new URLSearchParams({
             deliveryOption: 'express',
-            businessName: businessName,
         });
+
+        if (!isAdmin && businessName) {
+            params.set('businessName', businessName);
+        }
 
         const response = await fetch(`/api/orders?${params.toString()}`);
 
@@ -205,6 +213,7 @@ export default function StoreManagementPage() {
 
 
 
+
   useEffect(() => {
     const fetchInitialData = async () => {
       setLoadingUser(true);
@@ -212,6 +221,8 @@ export default function StoreManagementPage() {
         const userRes = await fetch('/api/user/me');
         if (!userRes.ok) throw new Error('Failed to fetch user');
         const userData = await userRes.json();
+
+        const isAdmin = userData.user?.role === 'admin';
 
         let currentBusinessName: string | null = null;
         let currentCoordinates: string | null = null;
@@ -233,8 +244,8 @@ export default function StoreManagementPage() {
 
         // Fetch both stock and orders data in parallel
         await Promise.all([
-          fetchStockData(currentBusinessName),
-          fetchOrders(currentBusinessName)
+          fetchStockData(currentBusinessName, isAdmin),
+          fetchOrders(currentBusinessName, isAdmin)
 
       ]);
       
@@ -388,10 +399,11 @@ export default function StoreManagementPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-        const newProduct = { 
-            ...formValues, 
+        const newProduct = {
+            ...formValues,
             businessName: userBusinessName,
-            amount: Number(formValues.amount) || 0
+            amount: Number(formValues.amount) || 0,
+            slug: userSlug, // Add this line
         };
         const response = await fetch('/api/stock', {
             method: 'POST',
@@ -416,6 +428,7 @@ export default function StoreManagementPage() {
           coordinates: location || '',
           info: '',        // ✅ fixed line
           POM: false,
+          slug: '' ,
         });
         
         
@@ -493,6 +506,7 @@ export default function StoreManagementPage() {
               POM: normalizedRow.POM || false, // Ensure POM is a boolean
               businessName: userBusinessName || 'N/A',
               coordinates: location || 'N/A',
+              slug: userSlug || '',
           } as StockItem;
         })
         // 🔥 Filter out any accidental garbage line like the one showing in your preview
@@ -709,6 +723,14 @@ export default function StoreManagementPage() {
   };
 
 
+    // --- START: WhatsApp Activation Link ---
+  // Construct the one-click WhatsApp activation link
+  const whatsAppNumber = "14155238886";
+  const whatsAppMessage = "join adult-result";
+  const whatsAppUrl = `https://wa.me/${whatsAppNumber}?text=${encodeURIComponent(whatsAppMessage)}`;
+  // --- END: WhatsApp Activation Link ---
+
+
 
   return (
     <Box sx={{ p: isMobile ? 2 : 4 }}>
@@ -843,9 +865,10 @@ export default function StoreManagementPage() {
                 }
                 label="Prescription-Only Medicine (POM)"
               />
-              <Button type="submit" variant="contained" color="primary" disabled={isSubmitting}>
-                {isSubmitting ? <CircularProgress size={24} /> : 'Submit'}
+              <Button type="submit" variant="contained" color="primary" disabled={isSubmitting || loadingUser}>
+                {isSubmitting || loadingUser ? <CircularProgress size={24} /> : 'Submit'}
               </Button>
+
                <Button variant="outlined" color="secondary" onClick={() => setShowUploadForm(false)} sx={{mt: 1}}>Cancel</Button>
             </Box>
           )}
@@ -886,9 +909,10 @@ export default function StoreManagementPage() {
                 </TableBody>
               </Table>
               {bulkData.length > 5 && <Typography sx={{p: 1, fontSize: 12}}>... and {bulkData.length - 5} more rows.</Typography>}
-              <Button fullWidth variant="contained" color="primary" sx={{ mt: 2 }} onClick={handleConfirmBulkUpload} disabled={isSubmitting}>
-                  {isSubmitting ? <CircularProgress size={24} /> : 'Confirm Upload'}
-              </Button>
+              <Button fullWidth variant="contained" color="primary" sx={{ mt: 2 }} onClick={handleConfirmBulkUpload} disabled={isSubmitting || loadingUser}>
+    {isSubmitting || loadingUser ? <CircularProgress size={24} /> : 'Confirm Upload'}
+</Button>
+
             </Paper>
 
             )}
@@ -1122,6 +1146,24 @@ export default function StoreManagementPage() {
 
       {selectedTab === 3 && (
         <Box sx={{ mt: 3 }}>
+                    {/* --- START: WhatsApp Activation Banner --- */}
+                    <Alert severity="info" sx={{ mb: 3 }} action={
+            <Button 
+              color="inherit" 
+              size="small" 
+              component={Link}
+              href={whatsAppUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ACTIVATE
+            </Button>
+          }>
+            <AlertTitle>Get New Order Alerts on WhatsApp</AlertTitle>
+            Click the activate button to connect your WhatsApp and receive instant notifications for new orders.
+          </Alert>
+          {/* --- END: WhatsApp Activation Banner --- */}
+
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>Recent Orders</Typography>
             <FormControl size="small" sx={{ minWidth: 150 }}>

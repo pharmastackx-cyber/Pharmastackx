@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
       imageUrl, 
       coordinates, 
       info, 
-      POM 
+      POM,
+      slug
     } = body;
 
     if (!itemName || !activeIngredient || !category || !amount || !businessName) {
@@ -54,7 +55,8 @@ export async function POST(req: NextRequest) {
       imageUrl: imageUrl || '', // Provide default if not present
       coordinates: coordinates || '', // Provide default if not present
       info: info || '', // Provide default if not present
-      POM: POM || false // Provide default if not present
+      POM: POM || false, // Provide default if not present
+      slug: slug
     });
 
 

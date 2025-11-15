@@ -1,5 +1,6 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
+
 export interface IProduct extends Document {
   itemName: string;
   activeIngredient: string;
@@ -10,6 +11,7 @@ export interface IProduct extends Document {
   coordinates: string;
   info: string;
   POM: boolean;
+  slug: string;
   bulkUploadId?: mongoose.Types.ObjectId;
 }
 
@@ -23,6 +25,7 @@ const productSchema: Schema<IProduct> = new mongoose.Schema({
   coordinates: { type: String, default: '' },
   info: { type: String, default: '' },
   POM: { type: Boolean, default: false },
+  slug: { type: String, required: false },
   bulkUploadId: { type: mongoose.Schema.Types.ObjectId, ref: 'BulkUpload', default: null },
 });
 

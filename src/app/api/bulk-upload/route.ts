@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
       info: String(p.info || ''),
       // Convert POM to a strict boolean
       POM: ['true', 'yes', '1'].includes(String(p.POM).toLowerCase()),
+      slug: p.slug, 
 
 
 

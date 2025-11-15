@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
+import { sendOrderNotification } from '@/lib/whatsapp';
+
 
 const Order = require('../../../../backend/models/Order');
 const User = require('../../../../backend/models/User');
@@ -52,20 +54,29 @@ async function authorize() {
 }
 
 export async function GET(request) {
+
+  const auth = await authorize();
+  if (auth.error) {
+    return NextResponse.json({ message: auth.error }, { status: auth.status });
+  }
+
   try {
     await dbConnect();
+    const { user } = auth;
     const { searchParams } = new URL(request.url);
     const deliveryOption = searchParams.get('deliveryOption');
     const businessName = searchParams.get('businessName');
 
     const query = {};
-    if (deliveryOption) {
+    if (user.role !== 'admin' && deliveryOption) {
       query.deliveryOption = deliveryOption;
     }
 
-    if (businessName) {
-      query['businesses.name'] = decodeURIComponent(businessName);
-    }
+    if (user.role !== 'admin') {
+      if (!user.businessName) {
+        return NextResponse.json([]); 
+      }
+      query['businesses.name'] = user.businessName; }
 
 
     const orders = await Order.find(query).sort({ createdAt: -1 }).lean();
@@ -143,6 +154,29 @@ export async function POST(request) {
     };
 
     const order = await Order.create(newOrderData);
+    await sendOrderNotification(order);
+
+    if (order.businesses && order.businesses.length > 0) {
+      const businessPhoneNumbers = new Set();
+      for (const business of order.businesses) {
+        // Find the user (pharmacy/vendor) associated with the business name
+        const businessUser = await User.findOne({ businessName: business.name }).lean();
+        // If the user and their phone number exist, add it to our set
+        if (businessUser && businessUser.phoneNumber) {
+          businessPhoneNumbers.add(businessUser.phoneNumber);
+        } else {
+          console.log(`Could not find phone number for business: ${business.name}`);
+        }
+      }
+      // Send a notification to each unique business phone number
+      for (const phoneNumber of businessPhoneNumbers) {
+        // Avoid re-notifying the admin if their number is also a business number
+        if (phoneNumber !== process.env.RECIPIENT_PHONE_NUMBER) {
+             await sendOrderNotification(order, phoneNumber);
+        }
+      }
+    }
+
     return NextResponse.json(order, { status: 201 });
 
   } catch (error) {
@@ -204,7 +238,7 @@ export async function PUT(request) {
 
   } catch (error) {
     console.error("Error updating order:", error);
-    return NextResponse.json({ message: "Failed to update order", error: error.message }, { status: 500 });
+    return NextResponse.json({ message: "Failed to update order", error: message }, { status: 500 });
   }
 }
 
