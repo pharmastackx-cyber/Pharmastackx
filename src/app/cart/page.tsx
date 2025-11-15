@@ -37,6 +37,9 @@ import { useSession } from '../../context/SessionProvider';
 import { useRouter } from 'next/navigation';
 import PaystackButton from '../../components/PaystackButton';
 
+export const dynamic = 'force-dynamic';
+
+
 export default function Cart() {
   const { user } = useSession();
   const { items, updateQuantity, removeFromCart, clearCart } = useCart();
@@ -262,7 +265,7 @@ export default function Cart() {
                   <Typography variant="body2" sx={{ mb: 1, color: '#666', fontSize: '0.85rem', fontWeight: 500 }}>Delivery Option</Typography>
                   <RadioGroup value={deliveryOption} onChange={(e) => setDeliveryOption(e.target.value as 'standard' | 'express')} sx={{ gap: 0 }}>
                     <FormControlLabel value="standard" control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />} label={<Box><Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>Standard - ₦2,000</Typography><Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>Next day delivery</Typography></Box>} sx={{ mr: 0, mb: 0.5 }} />
-                    <FormControlLabel value="express" control={<Radio size="small" sx={{ py: 0.5, '&.Mai-checked': { color: '#006D5B' } }} />} label={<Box><Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>Express - ₦4,000</Typography><Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#E91E63' }}>30mins - 3hrs delivery</Typography></Box>} sx={{ mr: 0 }} />
+                    <FormControlLabel value="express" control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />} label={<Box><Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>Express - ₦4,000</Typography><Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#E91E63' }}>30mins - 3hrs delivery</Typography></Box>} sx={{ mr: 0 }} />
                   </RadioGroup>
                 </Box>
 
