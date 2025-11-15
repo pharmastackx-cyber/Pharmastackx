@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
-import { dbConnect } from '@/lib/mongoConnect'; // FIX: Using your project's existing DB connection utility
-import Post from '@/models/Post';               // FIX: Using path alias
-import User from '@/models/User';                 // FIX: Importing User model for authentication
-import { cookies } from 'next/headers';           // For reading cookies
-import jwt from 'jsonwebtoken';  
-
-const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
+import { dbConnect } from '@/lib/mongoConnect';
+import Post from '@/models/Post';
+import { cookies } from 'next/headers';
+import jwt from 'jsonwebtoken';
 
 // Helper function to create a URL-friendly slug
 const createSlug = (title: string) => {
@@ -15,11 +12,35 @@ const createSlug = (title: string) => {
     .replace(/[^\w-]+/g, '');
 };
 
-export async function POST(request: Request) {
-  const session = await getSession();
+const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
-  // 1. Authentication: Check if the user is an admin
-  if (session?.user?.role !== 'admin') {
+// Helper to get session data from the auth token in the cookie
+async function getSessionData() {
+  const cookieStore = await cookies(); // Add await here
+  const token = cookieStore.get('auth-token')?.value;
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const decoded: any = jwt.verify(token, JWT_SECRET);
+    return { user: decoded };
+  } catch (error) {
+    console.error('Invalid token:', error);
+    return null;
+  }
+}
+
+
+
+export async function POST(request: Request) {
+  // Use 'auth()' to get the session server-side
+  const session = await getSessionData();
+
+
+  // 1. Authentication: Check if the user is an admin and has an ID
+  if (session?.user?.role !== 'admin' || !session.user.id) {
     return new NextResponse(JSON.stringify({ message: 'Unauthorized' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
@@ -36,7 +57,7 @@ export async function POST(request: Request) {
     };
 
     // 2. Validation: Check for required fields
-    if (!title || !content || !category || !author.id) {
+    if (!title || !content || !category) {
       return new NextResponse(JSON.stringify({ message: 'Missing required fields' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
