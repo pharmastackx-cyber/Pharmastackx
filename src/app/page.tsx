@@ -712,7 +712,7 @@ export default function Home() {
               {partnerPharmacies.map((pharmacy) => (
                 <Card component={Link} href="/find-medicines" key={pharmacy._id} sx={{ textDecoration: 'none', cursor: 'pointer', borderRadius: '30px 10px', overflow: 'hidden', '&:hover': { boxShadow: '0 8px 24px rgba(0,0,0,0.12)', transform: 'translateY(-4px)' }, transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column' }}>
 
-                <Box sx={{ bgcolor: '#004D40', color: 'white', height: 140, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
+                <Box sx={{ bgcolor: '#004D40', color: 'white', height: 141, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
                 <Typography variant="h6" sx={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {pharmacy.businessName}
                 </Typography>
