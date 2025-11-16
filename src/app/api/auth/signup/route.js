@@ -9,8 +9,8 @@ export async function POST(req) {
   const body = await req.json();
 
   // Definitive Fix: Prioritize 'role' from the form, with 'userType' as a fallback.
-  const { username, email, password, role: formRole, userType, businessName, businessAddress, state, city, phoneNumber } = body;
-  let role = formRole || userType;
+  const { username, email, password, role: formRole, businessName, businessAddress, state, city, phoneNumber } = body;
+  let role = formRole;
 
   // Definitive safeguard: Correct 'delivery_agent' to 'agent'.
   if (role === 'delivery_agent') {
