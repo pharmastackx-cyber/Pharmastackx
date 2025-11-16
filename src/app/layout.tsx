@@ -9,6 +9,7 @@ import { OrderProvider } from "@/contexts/OrderContext";
 import Script from "next/script";
 import { GA_TRACKING_ID } from "@/lib/gtag";
 import GoogleAnalytics from "@/analytics/GoogleAnalytics";
+import { Suspense } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -45,7 +46,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PromoProvider>
             <OrderProvider>
               <CartProvider>
-                <GoogleAnalytics />
+              <Suspense fallback={null}>
+                  <GoogleAnalytics />
+                </Suspense>
                 {children}
               </CartProvider>
             </OrderProvider>
