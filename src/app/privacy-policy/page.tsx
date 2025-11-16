@@ -16,8 +16,8 @@ export default function PrivacyPolicy() {
       {/* Privacy Policy Content */}
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Paper elevation={1} sx={{ p: 4, borderRadius: '16px' }}>
-          <Typography variant="h3" sx={{ 
-            fontWeight: 700, 
+          <Typography variant="h4" sx={{ 
+            fontWeight: 500, 
             mb: 2, 
             color: '#006D5B',
             textAlign: 'center'
@@ -25,7 +25,7 @@ export default function PrivacyPolicy() {
             PHARMASTACKX PRIVACY POLICY
           </Typography>
           
-          <Typography variant="h6" sx={{ 
+          <Typography variant="body1" sx={{ 
             color: '#666', 
             mb: 4,
             textAlign: 'center',

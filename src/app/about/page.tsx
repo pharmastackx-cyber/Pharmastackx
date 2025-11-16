@@ -18,8 +18,8 @@ export default function About() {
       <Container maxWidth="lg" sx={{ py: 6 }}>
         {/* Hero Section */}
         <Box sx={{ textAlign: 'center', mb: 6 }}>
-          <Typography variant="h2" sx={{ fontWeight: 700, mb: 2, color: '#006D5B' }}>
-            About PharmaStackX: The Fulfillment Engine
+          <Typography variant="h3" sx={{ fontWeight: 500, mb: 2, color: '#006D5B' }}>
+            About PharmaStackX
           </Typography>
           <Typography variant="h5" sx={{ color: '#555', maxWidth: '800px', mx: 'auto' }}>
             Our Mission: Closing Africa's Access Gap

@@ -681,23 +681,24 @@ export default function Home() {
                 <Box sx={{ display: 'flex', transform: `translateX(-${pharmacyScrollPosition * 100}%)`, transition: 'transform 0.4s ease' }}>
                   {partnerPharmacies.map((pharmacy) => (
                     <Box key={pharmacy._id} sx={{ width: '100%', flexShrink: 0, px: 1 }}>
-                      <Card component={Link} href={`/pharmacy/${pharmacy.slug}`} sx={{ textDecoration: 'none', borderRadius: '30px 10px', overflow: 'hidden' }}>
-
-
-                        <Box sx={{ bgcolor: '#004D40', color: 'white', height: 120, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
-                          <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', lineHeight: 1.2 }}>
-                            {pharmacy.businessName}
-                          </Typography>
-                          <Typography variant="caption" sx={{ mt: 0.5, opacity: 0.8 }}>
-                            {pharmacy.businessAddress}
-                          </Typography>
-                        </Box>
-                        <CardContent sx={{ textAlign: 'center' }}>
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}></Typography>
-                          <Button fullWidth variant="outlined" size="small" sx={{ borderColor: '#006D5B', color: '#006D5B' }}>Visit Store</Button>
-                        </CardContent>
-                      </Card>
-                    </Box>
+                    <Card component={Link} href="/find-medicines" sx={{ textDecoration: 'none', borderRadius: '30px 10px', overflow: 'hidden' }}>
+                  
+                  
+                      <Box sx={{ bgcolor: '#004D40', color: 'white', height: 120, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', lineHeight: 1.2 }}>
+                          {pharmacy.businessName}
+                        </Typography>
+                        <Typography variant="caption" sx={{ mt: 0.5, opacity: 0.8 }}>
+                          {pharmacy.businessAddress}
+                        </Typography>
+                      </Box>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}></Typography>
+                        <Button fullWidth variant="outlined" size="small" sx={{ borderColor: '#006D5B', color: '#006D5B' }}>Visit Store</Button>
+                      </CardContent>
+                    </Card>
+                  </Box>
+                  
                   ))}
                 </Box>
               </Box>
@@ -709,23 +710,24 @@ export default function Home() {
             {/* Desktop Grid - New Sleek Design */}
             <Box sx={{ display: { xs: 'none', md: 'grid' }, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 3 }}>
               {partnerPharmacies.map((pharmacy) => (
-                <Card component={Link} href={`/pharmacy/${pharmacy.slug}`} key={pharmacy._id} sx={{ textDecoration: 'none', cursor: 'pointer', borderRadius: '30px 10px', overflow: 'hidden', '&:hover': { boxShadow: '0 8px 24px rgba(0,0,0,0.12)', transform: 'translateY(-4px)' }, transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column' }}>
+                <Card component={Link} href="/find-medicines" key={pharmacy._id} sx={{ textDecoration: 'none', cursor: 'pointer', borderRadius: '30px 10px', overflow: 'hidden', '&:hover': { boxShadow: '0 8px 24px rgba(0,0,0,0.12)', transform: 'translateY(-4px)' }, transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column' }}>
 
-                  <Box sx={{ bgcolor: '#004D40', color: 'white', height: 140, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {pharmacy.businessName}
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-                      {pharmacy.businessAddress}
-                    </Typography>
-                  </Box>
-                  <CardContent sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    
-                    <Button fullWidth variant="outlined" sx={{ borderColor: '#006D5B', color: '#006D5B', '&:hover': { bgcolor: '#006D5B', color: 'white' }, mt: 'auto' }}>
-                      Visit Store
-                    </Button>
-                  </CardContent>
-                </Card>
+                <Box sx={{ bgcolor: '#004D40', color: 'white', height: 140, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
+                <Typography variant="h6" sx={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {pharmacy.businessName}
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+                    {pharmacy.businessAddress}
+                </Typography>
+                </Box>
+                <CardContent sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                
+                <Button fullWidth variant="outlined" sx={{ borderColor: '#006D5B', color: '#006D5B', '&:hover': { bgcolor: '#006D5B', color: 'white' }, mt: 'auto' }}>
+                    Visit Store
+                </Button>
+                </CardContent>
+            </Card>
+            
               ))}
             </Box>
           </>
@@ -868,20 +870,28 @@ export default function Home() {
             Join thousands of customers who trust Pharmastackx for their medication needs
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
-            <Button 
-              variant="contained" 
-              size="large"
-              sx={{
-                bgcolor: '#006D5B',
-                '&:hover': { bgcolor: '#004D40' }
-              }}
-            >
-              Sign Up as Customer
-            </Button>
-            <Button variant="outlined" size="large">
-              Register Your Pharmacy
-            </Button>
-          </Stack>
+    <Button
+      variant="contained"
+      size="large"
+      component={Link}
+      href="/auth"
+      sx={{
+        bgcolor: '#006D5B',
+        '&:hover': { bgcolor: '#004D40' }
+      }}
+    >
+      Sign Up as Customer
+    </Button>
+    <Button
+      variant="outlined"
+      size="large"
+      component={Link}
+      href="/auth"
+    >
+      Register Your Pharmacy
+    </Button>
+</Stack>
+
         </Box>
       </Container>
 
