@@ -144,12 +144,12 @@ export default function Navbar() {
         </ListItem>
 
         {/* Health Insights Link for Mobile Drawer */}
-        <ListItem disablePadding sx={{ mb: 0.5 }}>
+        {/*<ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/health-insights" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/health-insights') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
             <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><Article fontSize="small" /></ListItemIcon>
             <ListItemText primary="Insights" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
-        </ListItem>
+        </ListItem>*/}
 
         {isAdmin && (
             <ListItem disablePadding sx={{ mb: 0.5 }}>

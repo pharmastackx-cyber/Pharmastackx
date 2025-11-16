@@ -255,7 +255,7 @@ export default function FindMedicinesPage() {
 
   return (
     <>
-      <Container maxWidth="lg" sx={{ mt: 0.5, mb: 1, flex: 1 }}>
+      <Container maxWidth="lg" sx={{ mt: 0.5, mb: 1 }}>
         <Box sx={{ mb: 1 }}>
           <TextField
             fullWidth
@@ -303,7 +303,8 @@ export default function FindMedicinesPage() {
         )}
       </Container>
 
-      <Container maxWidth="lg" sx={{ mb: 2 }}>
+      <Container maxWidth="lg" sx={{ mb: 2, flex: 1, overflowY: 'auto' }}>
+
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
           {paginatedMedicines.map((medicine) => (
             <Card key={medicine.id} sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: '20px', border: '2px solid #e0e0e0', bgcolor: 'white', cursor: 'pointer', transition: 'box-shadow 0.3s', '&:hover': { boxShadow: 6 } }} onClick={() => handleOpenModal(medicine)}>
