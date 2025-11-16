@@ -53,6 +53,26 @@ const haversineDistance = (coords1: { lat: number; lon: number }, coords2: { lat
   return d; // returns distance in km
 };
 
+// START: Add this shuffle function
+// --- Fisher-Yates Shuffle Algorithm --- //
+const shuffle = (array: any[]) => {
+  let currentIndex = array.length, randomIndex;
+
+  // While there remain elements to shuffle.
+  while (currentIndex !== 0) {
+    // Pick a remaining element.
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+
+    // And swap it with the current element.
+    [array[currentIndex], array[randomIndex]] = [
+      array[randomIndex], array[currentIndex]];
+  }
+
+  return array;
+};
+
+
 const modalStyle = {
   position: 'absolute' as 'absolute',
   top: '50%',
@@ -76,7 +96,8 @@ export default function FindMedicinesPage() {
   const [error, setError] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('name');
+  const [sortBy, setSortBy] = useState('recommended');
+
   const [filterBy, setFilterBy] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8; // Reduced items per page for shorter scroll
@@ -164,7 +185,8 @@ export default function FindMedicinesPage() {
     setSnackbarOpen(true);
   };
 
-  const filteredMedicines = processedMedicines
+    // Base filtering logic remains the same
+    const baseFilteredMedicines = processedMedicines
     .filter(medicine => {
       const query = searchQuery.toLowerCase();
       const matchesSearch = query === '' || 
@@ -177,18 +199,39 @@ export default function FindMedicinesPage() {
         (medicine.drugClass && medicine.drugClass.toLowerCase().includes(filterBy.toLowerCase()));
       
       return matchesSearch && matchesClass;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'name': return a.name.localeCompare(b.name);
-        case 'price': return a.price - b.price;
-        case 'distance': // Sorting is still by distance (shortest first)
+    });
+
+  // New sorting logic to handle "Recommended"
+  const getSortedMedicines = (medicines: any[]) => {
+    switch (sortBy) {
+      case 'name':
+        return [...medicines].sort((a, b) => a.name.localeCompare(b.name));
+      case 'price':
+        return [...medicines].sort((a, b) => a.price - b.price);
+      case 'distance':
+        return [...medicines].sort((a, b) => {
           if (a.distance === null) return 1;
           if (b.distance === null) return -1;
           return a.distance - b.distance;
-        default: return 0;
-      }
-    });
+        });
+      case 'recommended':
+        // Helper to check for a valid-looking image URL
+        const isImageValid = (image: string | null | undefined) => 
+          typeof image === 'string' && (image.startsWith('http') || image.startsWith('/'));
+
+        const complete = medicines.filter(m => isImageValid(m.image) && m.info);
+        const incomplete = medicines.filter(m => !isImageValid(m.image) || !m.info);
+        
+        // Shuffle both lists and prioritize complete ones
+        return [...shuffle(complete), ...shuffle(incomplete)];
+      default:
+        return medicines;
+    }
+  };
+
+
+  const filteredMedicines = getSortedMedicines(baseFilteredMedicines);
+
 
   const paginatedMedicines = filteredMedicines.slice(
     (currentPage - 1) * itemsPerPage,
@@ -238,13 +281,16 @@ export default function FindMedicinesPage() {
             </Select>
           </FormControl>
 
-          <FormControl size="small" sx={{ minWidth: 100 }}>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
             <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} displayEmpty sx={{ borderRadius: '20px' }}>
+              <MenuItem value="recommended">Recommended</MenuItem>
               <MenuItem value="name">Name</MenuItem>
               <MenuItem value="price">Price</MenuItem>
               <MenuItem value="distance">Distance</MenuItem>
             </Select>
           </FormControl>
+
+
 
           <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
             {filteredMedicines.length} results
