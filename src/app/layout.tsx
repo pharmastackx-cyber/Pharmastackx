@@ -7,8 +7,6 @@ import { CartProvider } from "@/contexts/CartContext";
 import { PromoProvider } from "@/contexts/PromoContext";
 import { OrderProvider } from "@/contexts/OrderContext";
 import Script from "next/script";
-import { GA_TRACKING_ID } from "@/lib/gtag";
-import GoogleAnalytics from "@/analytics/GoogleAnalytics";
 import { Suspense } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -22,10 +20,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        {/* Google Analytics */}
+        {/* Google tag (gtag.js) */}
         <Script
           async
-          src={`https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`}
+          src="https://www.googletagmanager.com/gtag/js?id=G-TBR3LZNH70"
         />
         <Script
           id="google-analytics"
@@ -34,9 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
-              gtag('config', '${GA_TRACKING_ID}', {
-                page_path: window.location.pathname,
-              });
+              gtag('config', 'G-TBR3LZNH70');
             `,
           }}
         />
@@ -46,8 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PromoProvider>
             <OrderProvider>
               <CartProvider>
-              <Suspense fallback={null}>
-                  <GoogleAnalytics />
+                <Suspense fallback={null}>
                 </Suspense>
                 {children}
               </CartProvider>
