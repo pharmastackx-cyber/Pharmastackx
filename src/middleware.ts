@@ -28,6 +28,7 @@ export async function middleware(request: NextRequest) {
     url.pathname = `/find-medicines`;
 
     url.searchParams.set('slug', slug);
+    console.log(`[Middleware] Subdomain rewrite. Host: ${hostname}, Slug: ${slug}, Target URL: ${url.href}`);
     return NextResponse.rewrite(url);
   }
   
