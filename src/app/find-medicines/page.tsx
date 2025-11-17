@@ -8,7 +8,8 @@ import {
 import Navbar from '../../components/Navbar';
 import FindMedicinesPage from './FindMedicinesPage';
 
-export default function FindMedicines() {
+export default function FindMedicines({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+
   return (
     <Box sx={{ 
       minHeight: '100vh', 
@@ -42,7 +43,8 @@ export default function FindMedicines() {
       </Box>
 
       <Suspense fallback={<div>Loading...</div>}>
-        <FindMedicinesPage />
+      <FindMedicinesPage searchParams={searchParams} />
+
       </Suspense>
 
       {/* Floating WhatsApp Button */}

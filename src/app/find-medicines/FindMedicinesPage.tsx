@@ -28,7 +28,7 @@ import {
   Close,
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+
 import { useCart } from '../../contexts/CartContext';
 
 // --- CONFIGURATION --- //
@@ -88,15 +88,18 @@ const modalStyle = {
   overflowY: 'auto',
 };
 
-export default function FindMedicinesPage() {
-  const searchParams = useSearchParams();
-  const slug = searchParams.get('slug');
+export default function FindMedicinesPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+ 
+  const slug = searchParams?.slug as string || '';
+
   const [allMedicines, setAllMedicines] = useState<any[]>([]);
   const [processedMedicines, setProcessedMedicines] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const initialSearch = searchParams?.search as string || '';
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+
   const [sortBy, setSortBy] = useState('recommended');
 
   const [filterBy, setFilterBy] = useState('all');
@@ -170,12 +173,6 @@ export default function FindMedicinesPage() {
     setProcessedMedicines(medicinesToProcess);
 
   }, [userLocation, allMedicines]);
-
-
-  useEffect(() => {
-    const searchParam = searchParams.get('search');
-    if (searchParam) setSearchQuery(searchParam);
-  }, [searchParams]);
 
   const handleOpenModal = (medicine: any) => setSelectedMedicine(medicine);
   const handleCloseModal = () => setSelectedMedicine(null);
