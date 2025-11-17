@@ -3,52 +3,58 @@ import twilio from 'twilio';
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+const adminPhoneNumber = process.env.RECIPIENT_PHONE_NUMBER; // <-- Get the admin number
 
 const client = twilio(accountSid, authToken);
 
+// --- START: FIX for Default Recipient ---
+// The function now intelligently decides the target phone number.
 export async function sendWhatsAppNotification(order, targetPhoneNumber) {
+
+  // If no specific target is given, default to the admin phone number.
+  // Otherwise, use the number that was passed in.
+  const recipient = targetPhoneNumber || adminPhoneNumber;
+
+  if (!recipient) {
+    console.error(
+      'WhatsApp Error: No recipient phone number specified and no default RECIPIENT_PHONE_NUMBER is set.'
+    );
+    return;
+  }
+  // --- END: FIX for Default Recipient ---
+
   if (!accountSid || !authToken || !twilioPhoneNumber) {
     console.error('Twilio environment variables are not fully configured.');
     return;
   }
 
-  if (targetPhoneNumber) {
-    const formattedRecipientNumber = targetPhoneNumber.startsWith('+') 
-      ? targetPhoneNumber 
-      : `+${targetPhoneNumber}`;
+  // Format the number to include the '+' sign if it's missing.
+  const formattedRecipientNumber = recipient.startsWith('+') 
+    ? recipient 
+    : `+${recipient}`;
 
-    try {
-      // --- START: FIX for WhatsApp Template Messaging (Error 63016) ---
-      
-      // 1. Define your Content SID. You get this from the Twilio console
-      //    after your template is approved.
-      const contentSid = 'HX695e77257f329406f7b7d57473dce071'; // <--- IMPORTANT: REPLACE THIS
+  try {
+    const contentSid = 'HX695e77257f329406f7b7d57473dce071';
 
-      // 2. Define the variables for your template. The keys are the numbers
-      //    corresponding to the {{...}} placeholders in your template.
-      const contentVariables = {
-        '1': order._id.toString(),
-        '2': order.user.name,
-        '3': order.totalAmount.toLocaleString(),
-        '4': order.orderType,
-        '5': order.deliveryOption,
-        '6': order.items.map(item => `- ${item.name} (Quantity: ${item.qty})`).join('\n')
-      };
+    const contentVariables = {
+      '1': order._id.toString(),
+      '2': order.user.name,
+      '3': order.totalAmount.toLocaleString(),
+      '4': order.orderType,
+      '5': order.deliveryOption,
+      '6': order.items.map(item => `- ${item.name} (Quantity: ${item.qty})`).join('\n')
+    };
 
-      // 3. Send the message using ContentSid and ContentVariables instead of 'body'.
-      await client.messages.create({
-        contentSid: contentSid,
-        contentVariables: contentVariables,
-        from: `whatsapp:${twilioPhoneNumber}`,
-        to: `whatsapp:${formattedRecipientNumber}`
-      });
+    await client.messages.create({
+      contentSid: contentSid,
+      contentVariables: contentVariables,
+      from: `whatsapp:${twilioPhoneNumber}`,
+      to: `whatsapp:${formattedRecipientNumber}`
+    });
 
-      // --- END: FIX for WhatsApp Template Messaging ---
+    console.log(`WhatsApp template notification sent successfully to ${formattedRecipientNumber} for order: ${order._id}`);
 
-      console.log(`WhatsApp template notification sent successfully to ${formattedRecipientNumber} for order: ${order._id}`);
-
-    } catch (error) {
-      console.error(`Failed to send WhatsApp notification to ${formattedRecipientNumber} for order ${order._id}:`, error);
-    }
+  } catch (error) {
+    console.error(`Failed to send WhatsApp notification to ${formattedRecipientNumber} for order ${order._id}:`, error);
   }
 }
