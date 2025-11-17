@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
-import { sendOrderNotification } from '@/lib/whatsapp';
+import { sendWhatsAppNotification } from '@/lib/whatsapp';
 
 
 const Order = require('../../../../backend/models/Order');
@@ -154,7 +154,7 @@ export async function POST(request) {
     };
 
     const order = await Order.create(newOrderData);
-    await sendOrderNotification(order);
+    await sendWhatsAppNotification(order);
 
     if (order.businesses && order.businesses.length > 0) {
       const businessPhoneNumbers = new Set();
@@ -172,7 +172,7 @@ export async function POST(request) {
       for (const phoneNumber of businessPhoneNumbers) {
         // Avoid re-notifying the admin if their number is also a business number
         if (phoneNumber !== process.env.RECIPIENT_PHONE_NUMBER) {
-             await sendOrderNotification(order, phoneNumber);
+             await sendWhatsAppNotification(order, phoneNumber);
         }
       }
     }
@@ -241,4 +241,3 @@ export async function PUT(request) {
     return NextResponse.json({ message: "Failed to update order", error: message }, { status: 500 });
   }
 }
-
