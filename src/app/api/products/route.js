@@ -14,9 +14,7 @@ const formatPrice = (price) => {
 
 // --- NEW: Helper to parse the coordinate string --- //
 const parseCoordinatesString = (coordString) => {
-  if (typeof coordString !== 'string') {
-    return null;
-  }
+  if (typeof coordString !== 'string') { return null; }
 
   try {
     const latMatch = coordString.match(/Lat: ([\d.-]+)/);
@@ -26,9 +24,8 @@ const parseCoordinatesString = (coordString) => {
       const lat = parseFloat(latMatch[1]);
       const lon = parseFloat(lonMatch[1]);
       
-      if (!isNaN(lat) && !isNaN(lon)) {
-        return { lat, lon };
-      }
+      if (!isNaN(lat) && !isNaN(lon)) { return { lat, lon }; }
+      
     }
     return null;
   } catch (error) {
@@ -41,7 +38,14 @@ export async function GET(req) {
   try {
     await dbConnect();
 
-    const products = await Product.find({}).lean();
+    const slug = req.nextUrl.searchParams.get('slug');
+    const query = {};
+    if (slug) {
+      query.slug = slug;
+    }
+
+    // Find products based on the query (either empty or with a slug)
+    const products = await Product.find(query).lean();
     
     const transformedProducts = products.map(product => {
       try {
@@ -58,10 +62,11 @@ export async function GET(req) {
           price: product.amount,
           formattedPrice: formatPrice(product.amount),
           pharmacy: product.businessName || 'Unknown Pharmacy',
-          // --- FIX: Parse the coordinate string into an object --- //
+          
           pharmacyCoordinates: parseCoordinatesString(product.coordinates),
           POM: product.POM || false,
           info: product.info,
+          slug: product.slug,
           inStock: true, 
         };
       } catch (error) {
@@ -69,9 +74,9 @@ export async function GET(req) {
           productId: product && product._id ? product._id.toString() : 'Unknown', 
           error: error.message 
         });
-        return null; // Exclude malformed products from the final list
+        return null; 
       }
-    }).filter(p => p !== null); // Filter out any nulls from transformation errors
+    }).filter(p => p !== null); 
 
     return NextResponse.json({ 
       success: true, 

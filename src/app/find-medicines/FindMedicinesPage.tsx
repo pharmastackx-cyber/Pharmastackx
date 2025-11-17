@@ -20,7 +20,7 @@ import {
   Alert,
   Chip,      
 } from '@mui/material';
-import Grid from '@mui/material/Grid'; 
+import Grid from '@mui/material/Grid';
 import {
   Search,
   LocationOn,
@@ -104,13 +104,13 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
 
   const [filterBy, setFilterBy] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8; // Reduced items per page for shorter scroll
+  const itemsPerPage = 8; 
   const { addToCart } = useCart();
 
   const [selectedMedicine, setSelectedMedicine] = useState<any | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [snackbarOpen, setSnackbarOpen] = useState(false); // State for Snackbar
+  const [snackbarOpen, setSnackbarOpen] = useState(false); 
 
   const drugClasses = ['all', 'Analgesic', 'Antibiotic', 'Antimalarial', 'Antifungal', 'Vitamin', 'NSAID', 'Antidiabetic'];
 
@@ -138,7 +138,8 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
     const fetchMedicines = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('/api/products');
+        const apiUrl = slug ? `/api/products?slug=${slug}` : '/api/products';
+        const response = await fetch(apiUrl);
         if (!response.ok) throw new Error('Failed to fetch products');
         const data = await response.json();
         if (data.success) {
@@ -153,10 +154,10 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
       }
     };
     fetchMedicines();
-  }, []);
+  }, [slug]);
 
   useEffect(() => {
-    if (allMedicines.length === 0) return;
+    if (allMedicines.length === 0 && isLoading) return;
 
     let medicinesToProcess = allMedicines.map(m => ({ ...m, distance: null, travelTime: null }));
 
@@ -172,7 +173,7 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
     }
     setProcessedMedicines(medicinesToProcess);
 
-  }, [userLocation, allMedicines]);
+  }, [userLocation, allMedicines, isLoading]);
 
   const handleOpenModal = (medicine: any) => setSelectedMedicine(medicine);
   const handleCloseModal = () => setSelectedMedicine(null);
@@ -183,43 +184,25 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
     setSnackbarOpen(true);
   };
 
-       // Final, Corrected Filtering Logic
-       const baseFilteredMedicines = processedMedicines
-       .filter(medicine => {
-         // Handle the data inconsistency between "mantlee" slug and "mantle" pharmacy name
-         let slugToCompare = slug.toLowerCase();
-         if (slugToCompare === 'mantlee') {
-             slugToCompare = 'mantle';
-         }
-   
-         // 1. Slug-based filtering (highest priority)
-         if (slug) {
-           // If a slug is present, the medicine's pharmacy MUST match the corrected slug.
-           if (!medicine.pharmacy || !medicine.pharmacy.toLowerCase().includes(slugToCompare)) {
-             return false;
-           }
-         }
-   
-         const query = searchQuery.toLowerCase();
-   
-         // 2. General search query logic
-         const matchesSearch = query === '' ||
-           (medicine.name && medicine.name.toLowerCase().includes(query)) ||
-           (medicine.activeIngredients && medicine.activeIngredients.toLowerCase().includes(query)) ||
-           (medicine.drugClass && medicine.drugClass.toLowerCase().includes(query)) ||
-           // IMPORTANT: Only search by pharmacy name if NOT on a subdomain page (no slug)
-           (!slug && medicine.pharmacy && medicine.pharmacy.toLowerCase().includes(query));
-   
-         // 3. Drug class filtering
-         const matchesClass = filterBy === 'all' ||
-           (medicine.drugClass && medicine.drugClass.toLowerCase().includes(filterBy.toLowerCase()));
-   
-         return matchesSearch && matchesClass;
-       });
+  const baseFilteredMedicines = processedMedicines
+  .filter(medicine => {
+    const query = searchQuery.toLowerCase();
    
     
 
-  // New sorting logic to handle "Recommended"
+  // 1. General search query logic (for search bar)
+  const matchesSearch = query === '' ||
+  (medicine.name && medicine.name.toLowerCase().includes(query)) ||
+  (medicine.activeIngredients && medicine.activeIngredients.toLowerCase().includes(query)) ||
+  (medicine.drugClass && medicine.drugClass.toLowerCase().includes(query)) ||
+  // Only search by pharmacy name if NOT on a subdomain/slug page
+  (!slug && medicine.pharmacy && medicine.pharmacy.toLowerCase().includes(query));
+// 2. Drug class filtering (for dropdown)
+const matchesClass = filterBy === 'all' ||
+  (medicine.drugClass && medicine.drugClass.toLowerCase().includes(filterBy.toLowerCase()));
+return matchesSearch && matchesClass;
+});
+
   const getSortedMedicines = (medicines: any[]) => {
     switch (sortBy) {
       case 'name':
@@ -233,14 +216,13 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
           return a.distance - b.distance;
         });
       case 'recommended':
-        // Helper to check for a valid-looking image URL
-        const isImageValid = (image: string | null | undefined) => 
+        const isImageValid = (image: string | null | undefined) =>
           typeof image === 'string' && (image.startsWith('http') || image.startsWith('/'));
 
         const complete = medicines.filter(m => isImageValid(m.image) && m.info);
         const incomplete = medicines.filter(m => !isImageValid(m.image) || !m.info);
         
-        // Shuffle both lists and prioritize complete ones
+        
         return [...shuffle(complete), ...shuffle(incomplete)];
       default:
         return medicines;
@@ -258,7 +240,7 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
 
   const totalPages = Math.ceil(filteredMedicines.length / itemsPerPage);
   
-  if (isLoading && processedMedicines.length === 0) {
+  if (isLoading) {
     return <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Container>;
   }
 
@@ -277,7 +259,7 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
         <Box sx={{ mb: 1 }}>
           <TextField
             fullWidth
-            placeholder="Search by medicine, ingredient, class, or pharmacy..."
+            placeholder={slug ? "Search medicines at this pharmacy..." : "Search by medicine, ingredient, or class..."}
             variant="outlined"
             size="small"
             value={searchQuery}
@@ -327,22 +309,22 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
           {paginatedMedicines.map((medicine) => (
             <Card key={medicine.id} sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: '20px', border: '2px solid #e0e0e0', bgcolor: 'white', cursor: 'pointer', transition: 'box-shadow 0.3s', '&:hover': { boxShadow: 6 } }} onClick={() => handleOpenModal(medicine)}>
               <Box sx={{ position: 'relative', height: { xs: '100px', md: '120px' }, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f0f7f4', p: 1 }}>
-  {medicine.POM && (
-      <Chip
-          label="POM"
-          color="error"
-          size="small"
-          sx={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              zIndex: 1,
-              fontWeight: 'bold',
-          }}
-      />
-  )}
-  <CardMedia component="img" image={medicine.image} alt={medicine.name} sx={{ objectFit: 'contain', width: '100%', height: '100%', maxWidth: '80%' }}/>
-</Box>
+              {medicine.POM && (
+                  <Chip
+                      label="POM"
+                      color="error"
+                      size="small"
+                      sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          zIndex: 1,
+                          fontWeight: 'bold',
+                      }}
+                  />
+                )}
+                <CardMedia component="img" image={medicine.image} alt={medicine.name} sx={{ objectFit: 'contain', width: '100%', height: '100%', maxWidth: '80%' }}/>
+              </Box>
 
               <CardContent sx={{ flexGrow: 1, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <Box>
