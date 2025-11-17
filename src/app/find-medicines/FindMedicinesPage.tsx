@@ -183,33 +183,40 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
     setSnackbarOpen(true);
   };
 
-        // Corrected filtering logic
-        const baseFilteredMedicines = processedMedicines
-        .filter(medicine => {
-          // 1. Slug-based filtering (highest priority)
-          if (slug) {
-            // If a slug is present in the URL, the medicine's pharmacy MUST match it.
-            if (!medicine.pharmacy || !medicine.pharmacy.toLowerCase().includes(slug.toLowerCase())) {
-              return false;
-            }
-          }
-    
-          const query = searchQuery.toLowerCase();
-    
-          // 2. General search query logic
-          const matchesSearch = query === '' || 
-            (medicine.name && medicine.name.toLowerCase().includes(query)) ||
-            (medicine.activeIngredients && medicine.activeIngredients.toLowerCase().includes(query)) ||
-            (medicine.drugClass && medicine.drugClass.toLowerCase().includes(query)) ||
-            // IMPORTANT: Only search the pharmacy name if NO slug is in the URL
-            (!slug && medicine.pharmacy && medicine.pharmacy.toLowerCase().includes(query));
-          
-          // 3. Drug class filtering
-          const matchesClass = filterBy === 'all' || 
-            (medicine.drugClass && medicine.drugClass.toLowerCase().includes(filterBy.toLowerCase()));
-          
-          return matchesSearch && matchesClass;
-        });
+       // Final, Corrected Filtering Logic
+       const baseFilteredMedicines = processedMedicines
+       .filter(medicine => {
+         // Handle the data inconsistency between "mantlee" slug and "mantle" pharmacy name
+         let slugToCompare = slug.toLowerCase();
+         if (slugToCompare === 'mantlee') {
+             slugToCompare = 'mantle';
+         }
+   
+         // 1. Slug-based filtering (highest priority)
+         if (slug) {
+           // If a slug is present, the medicine's pharmacy MUST match the corrected slug.
+           if (!medicine.pharmacy || !medicine.pharmacy.toLowerCase().includes(slugToCompare)) {
+             return false;
+           }
+         }
+   
+         const query = searchQuery.toLowerCase();
+   
+         // 2. General search query logic
+         const matchesSearch = query === '' ||
+           (medicine.name && medicine.name.toLowerCase().includes(query)) ||
+           (medicine.activeIngredients && medicine.activeIngredients.toLowerCase().includes(query)) ||
+           (medicine.drugClass && medicine.drugClass.toLowerCase().includes(query)) ||
+           // IMPORTANT: Only search by pharmacy name if NOT on a subdomain page (no slug)
+           (!slug && medicine.pharmacy && medicine.pharmacy.toLowerCase().includes(query));
+   
+         // 3. Drug class filtering
+         const matchesClass = filterBy === 'all' ||
+           (medicine.drugClass && medicine.drugClass.toLowerCase().includes(filterBy.toLowerCase()));
+   
+         return matchesSearch && matchesClass;
+       });
+   
     
 
   // New sorting logic to handle "Recommended"
