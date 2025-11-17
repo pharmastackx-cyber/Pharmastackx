@@ -30,6 +30,8 @@ import {
 import { useState, useEffect } from 'react';
 
 import { useCart } from '../../contexts/CartContext';
+import { useSearchParams } from 'next/navigation';
+
 
 // --- CONFIGURATION --- //
 const AVERAGE_TRAVEL_SPEED_KMH = 15; // km/h (Lowered for more realistic city travel time)
@@ -83,16 +85,19 @@ const modalStyle = {
   overflowY: 'auto',
 };
 
-export default function FindMedicinesPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default function FindMedicinesPage() {
 
-  const slug = searchParams?.slug as string || '';
+  const searchParams = useSearchParams();
+  const slug = searchParams.get('slug') || '';
+
 
   const [allMedicines, setAllMedicines] = useState<any[]>([]);
   const [processedMedicines, setProcessedMedicines] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const initialSearch = searchParams?.search as string || '';
+  const initialSearch = searchParams.get('search') || '';
+
   const [searchQuery, setSearchQuery] = useState(initialSearch);
 
   const [sortBy, setSortBy] = useState('recommended');

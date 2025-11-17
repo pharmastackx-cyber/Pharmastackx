@@ -8,6 +8,7 @@ import {
 import Navbar from '../../components/Navbar';
 import FindMedicinesPage from './FindMedicinesPage';
 
+
 export default function FindMedicines({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
 
   return (
@@ -43,7 +44,8 @@ export default function FindMedicines({ searchParams }: { searchParams: { [key: 
       </Box>
 
       <Suspense fallback={<div>Loading...</div>}>
-      <FindMedicinesPage searchParams={searchParams} />
+      <FindMedicinesPage />
+
 
       </Suspense>
 
