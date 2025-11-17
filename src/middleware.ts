@@ -25,7 +25,8 @@ export async function middleware(request: NextRequest) {
   const slug = hostname.split('.')[0];
   // Check if the request is on a subdomain (and not 'www').
   if (hostname.endsWith(mainDomain) && !hostname.startsWith('www.') && hostname !== mainDomain) {
-    url.pathname = `/findmedicines`;
+    url.pathname = `/find-medicines`;
+
     url.searchParams.set('slug', slug);
     return NextResponse.rewrite(url);
   }
