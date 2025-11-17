@@ -34,25 +34,32 @@ export async function sendWhatsAppNotification(order, targetPhoneNumber) {
     : `+${recipient}`;
 
   try {
-    const contentSid = 'HXe6e07e6f6882db67da2a0f16e90857de';
+    // --- START: MODIFICATION for Free-form Message ---
+    // Instead of using a template, we construct the message body directly.
+    const messageBody = `
+*New Order Notification*
 
-    const contentVariables = {
-      '1': order._id.toString(),
-      '2': order.user.name,
-      '3': order.totalAmount.toLocaleString(),
-      '4': order.orderType,
-      '5': order.deliveryOption,
-      '6': order.items.map(item => `- ${item.name} (Quantity: ${item.qty})`).join('\n')
-    };
+A new order has been placed on Pharmastackx.
+
+*Order ID:* ${order._id.toString()}
+*Customer:* ${order.user.name}
+*Total Amount:* ₦${order.totalAmount.toLocaleString()}
+*Order Type:* ${order.orderType}
+*Delivery Option:* ${order.deliveryOption}
+
+*Items:*
+${order.items.map(item => `- ${item.name} (Quantity: ${item.qty})`).join('\n')}
+    `.trim();
 
     await client.messages.create({
-      contentSid: contentSid,
-      contentVariables: contentVariables,
+      body: messageBody, // <-- Use the 'body' parameter for the message content.
       from: `whatsapp:${twilioPhoneNumber}`,
       to: `whatsapp:${formattedRecipientNumber}`
     });
+    // --- END: MODIFICATION for Free-form Message ---
 
-    console.log(`WhatsApp template notification sent successfully to ${formattedRecipientNumber} for order: ${order._id}`);
+
+    console.log(`WhatsApp notification sent successfully to ${formattedRecipientNumber} for order: ${order._id}`);
 
   } catch (error) {
     console.error(`Failed to send WhatsApp notification to ${formattedRecipientNumber} for order ${order._id}:`, error);
