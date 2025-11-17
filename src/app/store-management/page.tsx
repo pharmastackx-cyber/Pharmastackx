@@ -59,7 +59,9 @@ export default function StoreManagementPage() {
   const [userBusinessName, setUserBusinessName] = useState<string | null>(null);
   const [businessCoordinates, setBusinessCoordinates] = useState<{ latitude?: number; longitude?: number } | null>(null);
   const [loadingUser, setLoadingUser] = useState(false);
+  const [isLocationSet, setIsLocationSet] = useState(false); //  <-- ADD THIS LINE
   const [showUploadForm, setShowUploadForm] = useState(false);
+
   const [showBulkPreview, setShowBulkPreview] = useState(false);
   const [bulkData, setBulkData] = useState<StockItem[]>([]);
   const [stockData, setStockData] = useState<StockItem[]>([]);
@@ -236,11 +238,20 @@ export default function StoreManagementPage() {
 
         if (userData.user?.businessCoordinates) {
           const { latitude, longitude } = userData.user.businessCoordinates;
-          currentCoordinates = `Lat: ${latitude?.toFixed(4)}, Lon: ${longitude?.toFixed(4)}`;
-          setBusinessCoordinates({ latitude, longitude });
-          setLocation(currentCoordinates);
-          setFormValues(prev => ({ ...prev, coordinates: currentCoordinates! }));
+          // Check if coordinates are validly set
+          if (latitude && longitude) {
+            currentCoordinates = `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
+            setBusinessCoordinates({ latitude, longitude });
+            setLocation(currentCoordinates);
+            setFormValues(prev => ({ ...prev, coordinates: currentCoordinates! }));
+            setIsLocationSet(true); // <-- Location is set
+          } else {
+            setIsLocationSet(false); // <-- Location is not set
+          }
+        } else {
+          setIsLocationSet(false); // <-- Location is not set
         }
+
 
         // Fetch both stock and orders data in parallel
         await Promise.all([
@@ -370,8 +381,10 @@ export default function StoreManagementPage() {
           setBusinessCoordinates({ latitude, longitude });
           setLocation(coordsString);
           setFormValues(prev => ({ ...prev, coordinates: coordsString }));
+          setIsLocationSet(true); // <-- ADD THIS LINE
           alert('Location saved!');
         } catch (e) {
+
           console.error('Error:', e);
           alert('Error saving location.');
         }
@@ -735,12 +748,14 @@ export default function StoreManagementPage() {
   return (
     <Box sx={{ p: isMobile ? 2 : 4 }}>
       <Typography variant={isMobile ? 'h5' : 'h4'} gutterBottom>Store Management</Typography>
-      <Tabs value={selectedTab} onChange={handleTabChange} variant={isMobile ? 'scrollable' : 'standard'} scrollButtons="auto">
+      
+            <Tabs value={selectedTab} onChange={handleTabChange} variant={isMobile ? 'scrollable' : 'standard'} scrollButtons="auto">
         <Tab label="Storefront" />
-        <Tab label="Upload" />
-        <Tab label="Stock" />
-        <Tab label="Orders" />
+        <Tab label="Upload" disabled={!isLocationSet} />
+        <Tab label="Stock" disabled={!isLocationSet} />
+        <Tab label="Orders" disabled={!isLocationSet} />
       </Tabs>
+
 
       {selectedTab === 0 && (
         <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
@@ -750,6 +765,14 @@ export default function StoreManagementPage() {
             {loadingUser ? <CircularProgress size={20} color="inherit" /> : <Typography variant="body2">{userBusinessName ? `Name: ${userBusinessName}` : 'Click to fetch info'}</Typography>}
             {userSlug && <Typography variant="caption">Slug: {userSlug}</Typography>}
           </Box>
+
+          {!isLocationSet && (
+            <Alert severity="warning" variant="filled" sx={{ width: '100%', maxWidth: 350, borderRadius: 2 }}>
+              <AlertTitle sx={{ fontWeight: 'bold' }}>Action Required: Set Your Location</AlertTitle>
+              Your store location is not set. Click the <strong>&quot;Click to get your location&quot;</strong> card below to make your business visible to customers and enable other management features.
+            </Alert>
+          )}
+
 
           <Box
             sx={{

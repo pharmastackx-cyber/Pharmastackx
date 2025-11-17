@@ -1,7 +1,9 @@
-"use client";
+'use client';
 import React, { useState } from "react";
 import { TextField, Button, MenuItem, Box, Typography } from "@mui/material";
 import axios from "axios";
+
+import Cookies from 'js-cookie';
 
 export default function SignupForm({ setError, setSuccess }: { setError: (msg: string) => void, setSuccess: (msg: string) => void }) {
   const [form, setForm] = useState({
@@ -19,6 +21,7 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
   const [showProviderStep, setShowProviderStep] = useState(false);
   const [providerType, setProviderType] = useState("");
   const [providerLoading, setProviderLoading] = useState(false);
+ 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -30,22 +33,15 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
     setSuccess("");
     setLoading(true);
     try {
-      await axios.post("/api/auth/signup", { ...form, role: "customer" });
-      setSuccess("Signup successful! You can now log in.");
-      setForm({
-        username: "",
-        email: "",
-        password: "",
-        businessName: "",
-        state: "",
-        city: "",
-        businessAddress: "",
-        phoneNumber: "",
-        license: ""
-      });
+
+      const response = await axios.post("/api/auth/signup", { ...form, role: "customer" });
+      const { token } = response.data;
+      Cookies.set('token', token, { expires: 7 });
+      setSuccess("Signup successful! Redirecting...");
+      window.location.href = '/'; 
+
     } catch (err: any) {
       setError(err.response?.data?.error || "Signup failed");
-    } finally {
       setLoading(false);
     }
   };
@@ -64,25 +60,16 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
     setSuccess("");
     setProviderLoading(true);
     try {
-      await axios.post("/api/auth/signup", { ...form, role: providerType });
-      setSuccess("Service provider signup successful! You can now log in.");
-      setForm({
-        username: "",
-        email: "",
-        password: "",
-        businessName: "",
-        state: "",
-        city: "",
-        businessAddress: "",
-        phoneNumber: "",
-        license: ""
-      });
-      setProviderType("");
-      setShowProviderStep(false);
+
+      const response = await axios.post("/api/auth/signup", { ...form, role: providerType });
+      const { token } = response.data;
+      Cookies.set('token', token, { expires: 7 });
+      setSuccess("Service provider signup successful!");
+      window.location.href = '/store-management';
+
     } catch (err: any) {
       setError(err.response?.data?.error || "Signup failed");
-    } finally {
-      setProviderLoading(false);
+      setProviderLoading(false); 
     }
   };
 

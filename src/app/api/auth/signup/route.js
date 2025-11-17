@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { dbConnect } from '@/lib/mongoConnect';
 import User from '@/models/User';
+import jwt from 'jsonwebtoken'; 
+
+const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
 export async function POST(req) {
   await dbConnect();
@@ -11,6 +14,17 @@ export async function POST(req) {
   // Definitive Fix: Prioritize 'role' from the form, with 'userType' as a fallback.
   const { username, email, password, role: formRole, businessName, businessAddress, state, city, phoneNumber } = body;
   let role = formRole;
+
+  let formattedPhoneNumber = phoneNumber;
+  const serviceProviderRoles = ['pharmacy', 'clinic', 'vendor', 'agent', 'admin'];
+  // Only format the number if it's for a service provider and a number is provided
+  if (serviceProviderRoles.includes(role) && phoneNumber) {
+    const trimmedNumber = phoneNumber.trim();
+    // If the number starts with a '0', replace it with the international code '+234'
+    if (trimmedNumber.startsWith('0')) {
+      formattedPhoneNumber = `+234${trimmedNumber.substring(1)}`;
+    }
+  }
 
   // Definitive safeguard: Correct 'delivery_agent' to 'agent'.
   if (role === 'delivery_agent') {
@@ -54,15 +68,23 @@ export async function POST(req) {
     username,
     email,
     password: hashedPassword,
-    role, // This will now be correct.
+    role, 
     businessName,
     businessAddress,
     state,
     city,
-    phoneNumber,
+    phoneNumber: formattedPhoneNumber,
     slug
   });
   await user.save();
 
-  return NextResponse.json({ message: 'User registered successfully.' }, { status: 201 });
+
+  const token = jwt.sign(
+    { id: user._id, email: user.email, role: user.role, businessName: user.businessName },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  
+  return NextResponse.json({ message: 'User registered successfully.', token }, { status: 201 });
+  
 }
