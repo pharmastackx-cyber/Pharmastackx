@@ -21,18 +21,20 @@ export async function middleware(request: NextRequest) {
   // New Subdomain Logic
   // This handles requests to `slug.pharmastackx.com` and rewrites them.
   // It assumes 'pharmastackx.com' is your main domain.
+  const { pathname } = request.nextUrl;
   const mainDomain = 'pharmastackx.com'; 
   const slug = hostname.split('.')[0];
   // Check if the request is on a subdomain (and not 'www').
-  if (hostname.endsWith(mainDomain) && !hostname.startsWith('www.') && hostname !== mainDomain) {
-    url.pathname = `/find-medicines`;
+  const isSubdomain = hostname.endsWith(mainDomain) && !hostname.startsWith('www.') && hostname !== mainDomain;
 
+  if (isSubdomain && pathname === '/') {
+    console.log(`[Middleware] Subdomain root hit. Redirecting to /find-medicines?slug=${slug}`);
+    url.pathname = '/find-medicines';
     url.searchParams.set('slug', slug);
-    console.log(`[Middleware] Subdomain rewrite. Host: ${hostname}, Slug: ${slug}, Target URL: ${url.href}`);
-    return NextResponse.rewrite(url);
+    return NextResponse.redirect(url);
   }
   
-  const { pathname } = request.nextUrl;
+  
   const sessionToken = request.cookies.get('session_token')?.value;
 
   const protectedRoutes = ['/admin', '/business', '/delivery-agents', '/orders', '/carechat', '/store-management'];
@@ -49,10 +51,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // --- Role-based access control ---
-
-    // ***** START OF DEBUGGING LOG *****
-    console.log(`[Middleware] Path: ${pathname}, User Role: ${payload.role}`);
-    // ***** END OF DEBUGGING LOG *****
+    console.log(`[Middleware] Protected Route: ${pathname}, User Role: ${payload.role}`);
 
     if (pathname.startsWith('/admin') && payload.role !== 'admin') {
       return NextResponse.redirect(new URL('/', request.url));
