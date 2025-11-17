@@ -90,6 +90,7 @@ const modalStyle = {
 
 export default function FindMedicinesPage() {
   const searchParams = useSearchParams();
+  const slug = searchParams.get('slug');
   const [allMedicines, setAllMedicines] = useState<any[]>([]);
   const [processedMedicines, setProcessedMedicines] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -188,6 +189,9 @@ export default function FindMedicinesPage() {
     // Base filtering logic remains the same
     const baseFilteredMedicines = processedMedicines
     .filter(medicine => {
+      if (slug && medicine.slug !== slug) {
+        return false;
+      }
       const query = searchQuery.toLowerCase();
       const matchesSearch = query === '' || 
         (medicine.name && medicine.name.toLowerCase().includes(query)) ||
@@ -397,7 +401,7 @@ export default function FindMedicinesPage() {
                     </Box>
                 )}
 
-                 <IconButton onClick={(e) => { e.stopPropagation(); handleAddToCart({ ...selectedMedicine, price: selectedMedicine.price }); handleCloseModal(); }} sx={{ bgcolor: '#E91E63', color: 'white', borderRadius: '25px', px: 4, py: 1, mt: 2, '&:hover': { bgcolor: '#C2185B' } }}>
+                      <IconButton onClick={(e) => { e.stopPropagation(); handleAddToCart({ ...selectedMedicine, price: selectedMedicine.price }); handleCloseModal(); }} sx={{ bgcolor: '#E91E63', color: 'white', borderRadius: '25px', px: 4, py: 1, mt: 2, '&:hover': { bgcolor: '#C2185B' } }}>
                       <Add sx={{ mr: 1 }}/>
                       <Typography>Add to Cart</Typography>
                     </IconButton>

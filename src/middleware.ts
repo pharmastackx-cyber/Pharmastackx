@@ -15,6 +15,21 @@ async function verifyToken(token: string) {
 }
 
 export async function middleware(request: NextRequest) {
+  
+  const url = request.nextUrl.clone();
+  const hostname = request.headers.get('host') || '';
+  // New Subdomain Logic
+  // This handles requests to `slug.pharmastackx.com` and rewrites them.
+  // It assumes 'pharmastackx.com' is your main domain.
+  const mainDomain = 'pharmastackx.com'; 
+  const slug = hostname.split('.')[0];
+  // Check if the request is on a subdomain (and not 'www').
+  if (hostname.endsWith(mainDomain) && !hostname.startsWith('www.') && hostname !== mainDomain) {
+    url.pathname = `/findmedicines`;
+    url.searchParams.set('slug', slug);
+    return NextResponse.rewrite(url);
+  }
+  
   const { pathname } = request.nextUrl;
   const sessionToken = request.cookies.get('session_token')?.value;
 
@@ -54,11 +69,15 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/admin/:path*',
-    '/business/:path*',
-    '/delivery-agents/:path*',
-    '/orders/:path*',
-    '/carechat/:path*',
-    '/store-management/:path*',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * This is necessary for the middleware to see all requests and check for subdomains.
+     * Your protected routes logic will still work as expected on the main domain.
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 };
