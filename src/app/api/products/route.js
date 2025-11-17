@@ -35,17 +35,20 @@ const parseCoordinatesString = (coordString) => {
 };
 
 export async function GET(req) {
+  console.log('DEBUG [Backend]: API endpoint hit');
   try {
     await dbConnect();
 
     const slug = req.nextUrl.searchParams.get('slug');
+    console.log(`DEBUG [Backend]: Received slug: ${slug}`);
     const query = {};
     if (slug) {
       query.slug = slug;
     }
 
-    // Find products based on the query (either empty or with a slug)
+    console.log('DEBUG [Backend]: MongoDB query:', query);
     const products = await Product.find(query).lean();
+    console.log(`DEBUG [Backend]: Found ${products.length} products`);
     
     const transformedProducts = products.map(product => {
       try {

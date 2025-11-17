@@ -18,7 +18,7 @@ import {
   Modal,
   Snackbar,
   Alert,
-  Chip,      
+  Chip,
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import {
@@ -53,25 +53,20 @@ const haversineDistance = (coords1: { lat: number; lon: number }, coords2: { lat
   return d; // returns distance in km
 };
 
-// START: Add this shuffle function
 // --- Fisher-Yates Shuffle Algorithm --- //
 const shuffle = (array: any[]) => {
   let currentIndex = array.length, randomIndex;
 
-  // While there remain elements to shuffle.
   while (currentIndex !== 0) {
-    // Pick a remaining element.
     randomIndex = Math.floor(Math.random() * currentIndex);
     currentIndex--;
 
-    // And swap it with the current element.
     [array[currentIndex], array[randomIndex]] = [
       array[randomIndex], array[currentIndex]];
   }
 
   return array;
 };
-
 
 const modalStyle = {
   position: 'absolute' as 'absolute',
@@ -89,7 +84,7 @@ const modalStyle = {
 };
 
 export default function FindMedicinesPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
- 
+
   const slug = searchParams?.slug as string || '';
 
   const [allMedicines, setAllMedicines] = useState<any[]>([]);
@@ -104,13 +99,13 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
 
   const [filterBy, setFilterBy] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8; 
+  const itemsPerPage = 8;
   const { addToCart } = useCart();
 
   const [selectedMedicine, setSelectedMedicine] = useState<any | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [snackbarOpen, setSnackbarOpen] = useState(false); 
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   const drugClasses = ['all', 'Analgesic', 'Antibiotic', 'Antimalarial', 'Antifungal', 'Vitamin', 'NSAID', 'Antidiabetic'];
 
@@ -134,20 +129,26 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
     }
   }, []);
 
+  // --- DEBUGGING: Fetching logic with logging --- //
   useEffect(() => {
     const fetchMedicines = async () => {
       try {
         setIsLoading(true);
         const apiUrl = slug ? `/api/products?slug=${slug}` : '/api/products';
+        console.log('DEBUG [Frontend]: Fetching from API URL:', apiUrl);
+
         const response = await fetch(apiUrl);
-        if (!response.ok) throw new Error('Failed to fetch products');
+        if (!response.ok) throw new Error(`Failed to fetch products. Status: ${response.status}`);
+        
         const data = await response.json();
         if (data.success) {
+          console.log('DEBUG [Frontend]: Fetched data:', data.data);
           setAllMedicines(data.data);
         } else {
           throw new Error(data.error || 'An unknown error occurred');
         }
       } catch (err: any) {
+        console.error('DEBUG [Frontend]: Error fetching medicines:', err);
         setError(err.message);
       } finally {
         setIsLoading(false);
@@ -165,7 +166,7 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
       medicinesToProcess = medicinesToProcess.map(medicine => {
         if (medicine.pharmacyCoordinates && typeof medicine.pharmacyCoordinates.lat === 'number' && typeof medicine.pharmacyCoordinates.lon === 'number') {
           const distance = haversineDistance(userLocation, medicine.pharmacyCoordinates);
-          const travelTime = distance ? (distance / AVERAGE_TRAVEL_SPEED_KMH) * 60 : null; // in minutes
+          const travelTime = distance ? (distance / AVERAGE_TRAVEL_SPEED_KMH) * 60 : null;
           return { ...medicine, distance, travelTime };
         }
         return medicine;
@@ -185,23 +186,17 @@ export default function FindMedicinesPage({ searchParams }: { searchParams: { [k
   };
 
   const baseFilteredMedicines = processedMedicines
-  .filter(medicine => {
-    const query = searchQuery.toLowerCase();
-   
-    
-
-  // 1. General search query logic (for search bar)
-  const matchesSearch = query === '' ||
-  (medicine.name && medicine.name.toLowerCase().includes(query)) ||
-  (medicine.activeIngredients && medicine.activeIngredients.toLowerCase().includes(query)) ||
-  (medicine.drugClass && medicine.drugClass.toLowerCase().includes(query)) ||
-  // Only search by pharmacy name if NOT on a subdomain/slug page
-  (!slug && medicine.pharmacy && medicine.pharmacy.toLowerCase().includes(query));
-// 2. Drug class filtering (for dropdown)
-const matchesClass = filterBy === 'all' ||
-  (medicine.drugClass && medicine.drugClass.toLowerCase().includes(filterBy.toLowerCase()));
-return matchesSearch && matchesClass;
-});
+    .filter(medicine => {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = query === '' ||
+        (medicine.name && medicine.name.toLowerCase().includes(query)) ||
+        (medicine.activeIngredients && medicine.activeIngredients.toLowerCase().includes(query)) ||
+        (medicine.drugClass && medicine.drugClass.toLowerCase().includes(query)) ||
+        (!slug && medicine.pharmacy && medicine.pharmacy.toLowerCase().includes(query));
+      const matchesClass = filterBy === 'all' ||
+        (medicine.drugClass && medicine.drugClass.toLowerCase().includes(filterBy.toLowerCase()));
+      return matchesSearch && matchesClass;
+    });
 
   const getSortedMedicines = (medicines: any[]) => {
     switch (sortBy) {
@@ -218,20 +213,15 @@ return matchesSearch && matchesClass;
       case 'recommended':
         const isImageValid = (image: string | null | undefined) =>
           typeof image === 'string' && (image.startsWith('http') || image.startsWith('/'));
-
         const complete = medicines.filter(m => isImageValid(m.image) && m.info);
         const incomplete = medicines.filter(m => !isImageValid(m.image) || !m.info);
-        
-        
         return [...shuffle(complete), ...shuffle(incomplete)];
       default:
         return medicines;
     }
   };
 
-
   const filteredMedicines = getSortedMedicines(baseFilteredMedicines);
-
 
   const paginatedMedicines = filteredMedicines.slice(
     (currentPage - 1) * itemsPerPage,
@@ -239,7 +229,7 @@ return matchesSearch && matchesClass;
   );
 
   const totalPages = Math.ceil(filteredMedicines.length / itemsPerPage);
-  
+
   if (isLoading) {
     return <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Container>;
   }
@@ -290,8 +280,6 @@ return matchesSearch && matchesClass;
             </Select>
           </FormControl>
 
-
-
           <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
             {filteredMedicines.length} results
           </Typography>
@@ -304,12 +292,11 @@ return matchesSearch && matchesClass;
       </Container>
 
       <Container maxWidth="lg" sx={{ mb: 2, flex: 1, overflowY: 'auto' }}>
-
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
           {paginatedMedicines.map((medicine) => (
             <Card key={medicine.id} sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: '20px', border: '2px solid #e0e0e0', bgcolor: 'white', cursor: 'pointer', transition: 'box-shadow 0.3s', '&:hover': { boxShadow: 6 } }} onClick={() => handleOpenModal(medicine)}>
               <Box sx={{ position: 'relative', height: { xs: '100px', md: '120px' }, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f0f7f4', p: 1 }}>
-              {medicine.POM && (
+                {medicine.POM && (
                   <Chip
                       label="POM"
                       color="error"
