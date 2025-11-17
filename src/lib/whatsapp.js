@@ -22,7 +22,7 @@ export async function sendWhatsAppNotification(order, targetPhoneNumber) {
       
       // 1. Define your Content SID. You get this from the Twilio console
       //    after your template is approved.
-      const contentSid = 'YOUR_CONTENT_SID_HERE'; // <--- IMPORTANT: REPLACE THIS
+      const contentSid = 'HX695e77257f329406f7b7d57473dce071'; // <--- IMPORTANT: REPLACE THIS
 
       // 2. Define the variables for your template. The keys are the numbers
       //    corresponding to the {{...}} placeholders in your template.
