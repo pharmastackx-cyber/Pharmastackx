@@ -34,7 +34,7 @@ export async function sendWhatsAppNotification(order, targetPhoneNumber) {
     : `+${recipient}`;
 
   try {
-    const contentSid = 'HX695e77257f329406f7b7d57473dce071';
+    const contentSid = 'HXe6e07e6f6882db67da2a0f16e90857de';
 
     const contentVariables = {
       '1': order._id.toString(),
