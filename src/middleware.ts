@@ -22,10 +22,13 @@ export async function middleware(request: NextRequest) {
   // This handles requests to `slug.pharmastackx.com` and rewrites them.
   // It assumes 'pharmastackx.com' is your main domain.
   const { pathname } = request.nextUrl;
-  const mainDomain = 'pharmastackx.com'; 
+  const mainDomains = ['pharmastackx.com', 'psx.ng']; 
   const slug = hostname.split('.')[0];
   // Check if the request is on a subdomain (and not 'www').
-  const isSubdomain = hostname.endsWith(mainDomain) && !hostname.startsWith('www.') && hostname !== mainDomain;
+  const isSubdomain = mainDomains.some(domain => hostname.endsWith(domain)) &&
+                      !hostname.startsWith('www.') &&
+                      !mainDomains.includes(hostname);
+
 
   if (isSubdomain && pathname === '/') {
     console.log(`[Middleware] Subdomain root hit. Redirecting to /find-medicines?slug=${slug}`);
