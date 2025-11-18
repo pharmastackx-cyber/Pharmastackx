@@ -1,8 +1,7 @@
 'use client';
 import React, { useState } from "react";
-import { TextField, Button, MenuItem, Box, Typography, InputAdornment, IconButton } from "@mui/material"; // Add InputAdornment, IconButton
-import { Visibility, VisibilityOff } from '@mui/icons-material'; // Add this import
-
+import { TextField, Button, MenuItem, Box, Typography, InputAdornment, IconButton } from "@mui/material";
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from "axios";
 
 export default function SignupForm({
@@ -30,16 +29,16 @@ export default function SignupForm({
   const [providerType, setProviderType] = useState("");
   
   const [providerLoading, setProviderLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // Add this state
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleClickShowPassword = () => setShowPassword((show) => !show);
-    const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-    };
+  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,13 +105,14 @@ export default function SignupForm({
           />
           <TextField
             label="Password"
-            type={showPassword ? 'text' : 'password'} // Use showPassword state here
+            name="password"
+            type={showPassword ? 'text' : 'password'}
             value={form.password}
             onChange={handleChange}
             fullWidth
             margin="normal"
             required
-            InputProps={{ // Add InputProps for the adornment
+            InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
                   <IconButton
@@ -141,7 +141,6 @@ export default function SignupForm({
             variant="contained"
             color="primary"
             fullWidth
-            disabled={loading || !form.username || !form.email || !form.password}
             sx={{ mt: 1, bgcolor: "#222", "&:hover": { bgcolor: "#111" } }}
             onClick={() => setShowProviderStep(true)}
           >
@@ -149,25 +148,19 @@ export default function SignupForm({
           </Button>
         </form>
       ) : (
-        <Box>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+        <Box sx={{ px: { xs: 1, sm: 2 } }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, textAlign: 'center' }}>
             Service Provider Registration
           </Typography>
-          <form
-            onSubmit={handleProviderSignup}
-            style={{ maxWidth: 320, margin: "0 auto" }}
-          >
+          <form onSubmit={handleProviderSignup}>
             <TextField
               label="Username"
               name="username"
               value={form.username}
               onChange={handleChange}
               fullWidth
-              margin="none"
-              size="small"
+              margin="normal"
               required
-              disabled
-              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="Email"
@@ -176,25 +169,19 @@ export default function SignupForm({
               value={form.email}
               onChange={handleChange}
               fullWidth
-              margin="none"
-              size="small"
+              margin="normal"
               required
-              disabled
-              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
              <TextField
               label="Password"
               name="password"
-              type={showPassword ? 'text' : 'password'} // Use showPassword state here
+              type={showPassword ? 'text' : 'password'}
               value={form.password}
               onChange={handleChange}
               fullWidth
-              margin="none"
-              size="small"
+              margin="normal"
               required
-              disabled
-              sx={{ mb: 0.5, fontSize: "0.92rem" }}
-              InputProps={{ // Add InputProps for the adornment
+              InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton
@@ -202,7 +189,6 @@ export default function SignupForm({
                       onClick={handleClickShowPassword}
                       onMouseDown={handleMouseDownPassword}
                       edge="end"
-                      disabled={true} // Keep disabled for provider form as the field itself is disabled
                     >
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
@@ -217,10 +203,8 @@ export default function SignupForm({
               value={providerType}
               onChange={(e) => setProviderType(e.target.value)}
               fullWidth
-              margin="none"
+              margin="normal"
               required
-              size="small"
-              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             >
               {providerTypes.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
@@ -234,10 +218,8 @@ export default function SignupForm({
               value={form.businessName || ""}
               onChange={handleChange}
               fullWidth
-              margin="none"
-              size="small"
+              margin="normal"
               required
-              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="State"
@@ -245,10 +227,8 @@ export default function SignupForm({
               value={form.state || ""}
               onChange={handleChange}
               fullWidth
-              margin="none"
-              size="small"
+              margin="normal"
               required
-              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="City"
@@ -256,10 +236,8 @@ export default function SignupForm({
               value={form.city || ""}
               onChange={handleChange}
               fullWidth
-              margin="none"
-              size="small"
+              margin="normal"
               required
-              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="Business Address"
@@ -267,10 +245,8 @@ export default function SignupForm({
               value={form.businessAddress || ""}
               onChange={handleChange}
               fullWidth
-              margin="none"
-              size="small"
+              margin="normal"
               required
-              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="Phone Number"
@@ -278,10 +254,8 @@ export default function SignupForm({
               value={form.phoneNumber || ""}
               onChange={handleChange}
               fullWidth
-              margin="none"
-              size="small"
+              margin="normal"
               required
-              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="License (optional)"
@@ -289,9 +263,7 @@ export default function SignupForm({
               value={form.license || ""}
               onChange={handleChange}
               fullWidth
-              margin="none"
-              size="small"
-              sx={{ mb: 0.5, fontSize: "0.92rem" }}
+              margin="normal"
             />
             <Button
               type="submit"
