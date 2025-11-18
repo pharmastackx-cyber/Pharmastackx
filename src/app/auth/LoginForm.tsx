@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { TextField, Button } from "@mui/material";
+import { TextField, Button, InputAdornment, IconButton } from "@mui/material";
+import { Visibility, VisibilityOff } from '@mui/icons-material'; // Add this import
+
 import axios from "axios";
 import Cookies from "js-cookie"; 
 
@@ -17,6 +19,8 @@ export default function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); 
+
 
   useEffect(() => {
     if (prefilledCredentials?.email) {
@@ -26,6 +30,12 @@ export default function LoginForm({
       setPassword(prefilledCredentials.password);
     }
   }, [prefilledCredentials]);
+
+  const handleClickShowPassword = () => setShowPassword((show) => !show);
+  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
+  event.preventDefault();
+};
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,15 +65,30 @@ export default function LoginForm({
         margin="normal"
         required
       />
-      <TextField
+            <TextField
         label="Password"
-        type="password"
+        type={showPassword ? 'text' : 'password'} // Use showPassword state here
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={e => setPassword(e.target.value)}
         fullWidth
         margin="normal"
         required
+        InputProps={{ // Add InputProps for the adornment
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton
+                aria-label="toggle password visibility"
+                onClick={handleClickShowPassword}
+                onMouseDown={handleMouseDownPassword}
+                edge="end"
+              >
+                {showPassword ? <VisibilityOff /> : <Visibility />}
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}
       />
+
       <Button
         type="submit"
         variant="contained"

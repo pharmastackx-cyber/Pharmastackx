@@ -1,6 +1,8 @@
 'use client';
 import React, { useState } from "react";
-import { TextField, Button, MenuItem, Box, Typography } from "@mui/material";
+import { TextField, Button, MenuItem, Box, Typography, InputAdornment, IconButton } from "@mui/material"; // Add InputAdornment, IconButton
+import { Visibility, VisibilityOff } from '@mui/icons-material'; // Add this import
+
 import axios from "axios";
 
 export default function SignupForm({
@@ -26,11 +28,18 @@ export default function SignupForm({
   const [loading, setLoading] = useState(false);
   const [showProviderStep, setShowProviderStep] = useState(false);
   const [providerType, setProviderType] = useState("");
+  
   const [providerLoading, setProviderLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // Add this state
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
+
+  const handleClickShowPassword = () => setShowPassword((show) => !show);
+    const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+    };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,13 +106,26 @@ export default function SignupForm({
           />
           <TextField
             label="Password"
-            name="password"
-            type="password"
+            type={showPassword ? 'text' : 'password'} // Use showPassword state here
             value={form.password}
             onChange={handleChange}
             fullWidth
             margin="normal"
             required
+            InputProps={{ // Add InputProps for the adornment
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle password visibility"
+                    onClick={handleClickShowPassword}
+                    onMouseDown={handleMouseDownPassword}
+                    edge="end"
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
           <Button
             type="submit"
@@ -160,10 +182,10 @@ export default function SignupForm({
               disabled
               sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
-            <TextField
+             <TextField
               label="Password"
               name="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'} // Use showPassword state here
               value={form.password}
               onChange={handleChange}
               fullWidth
@@ -172,6 +194,21 @@ export default function SignupForm({
               required
               disabled
               sx={{ mb: 0.5, fontSize: "0.92rem" }}
+              InputProps={{ // Add InputProps for the adornment
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={handleClickShowPassword}
+                      onMouseDown={handleMouseDownPassword}
+                      edge="end"
+                      disabled={true} // Keep disabled for provider form as the field itself is disabled
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
             />
             <TextField
               select
