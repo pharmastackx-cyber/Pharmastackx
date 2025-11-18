@@ -6,13 +6,15 @@ import {
   Table, TableHead, TableBody, TableRow, TableCell, Paper, useTheme, 
   useMediaQuery, CircularProgress, Tooltip, Select, MenuItem, 
   FormControl, InputLabel, Divider, Collapse, Checkbox, FormControlLabel,
-  Container, Alert, AlertTitle, Link
+  Container, Alert, AlertTitle, Link, 
 } from '@mui/material';
+
 import { Storefront, LocationOn, UploadFile, ExpandMore } from '@mui/icons-material';
 import Papa from 'papaparse';
 import WhatsAppButton from '../../components/WhatsAppButton';
-
-
+import { ContentCopy, Download, QrCode2 } from '@mui/icons-material';
+import { toPng } from 'html-to-image';
+import { toDataURL as toQRDataURL } from 'qrcode';
 
 interface StockItem {
   _id?: string;
@@ -58,6 +60,13 @@ export default function StoreManagementPage() {
   const [userSlug, setUserSlug] = useState<string | null>(null);
   const [userBusinessName, setUserBusinessName] = useState<string | null>(null);
   const [businessCoordinates, setBusinessCoordinates] = useState<{ latitude?: number; longitude?: number } | null>(null);
+
+  // New state and refs for Store URL and Flyer
+  const [copied, setCopied] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+  const flyerRef = useRef<HTMLDivElement>(null);
+
+
   const [loadingUser, setLoadingUser] = useState(false);
   const [isLocationSet, setIsLocationSet] = useState(false); //  <-- ADD THIS LINE
   const [showUploadForm, setShowUploadForm] = useState(false);
@@ -314,7 +323,15 @@ export default function StoreManagementPage() {
     }
   }, [selectedTab, userBusinessName]); // Re-run if the user/business changes
 
-
+      // Generate QR code when slug is available
+  useEffect(() => {
+    if (userSlug) {
+      const storeUrl = `https://${userSlug}.psx.ng`;
+      toQRDataURL(storeUrl, { width: 150, margin: 2 })
+        .then(url => setQrCodeDataUrl(url))
+        .catch(err => console.error('Failed to generate QR code:', err));
+    }
+  }, [userSlug]);
 
 
   const filteredOrders = orders.filter(order =>
@@ -389,8 +406,15 @@ export default function StoreManagementPage() {
           alert('Error saving location.');
         }
       },
-      err => alert(`Error getting location: ${err.message}`)
+      err => alert(`Error getting location: ${err.message}`),
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000
+      }
     );
+
+    
   };
 
   const handleStoreInfoClick = async () => {
@@ -403,6 +427,7 @@ export default function StoreManagementPage() {
     } catch (e) { console.error('Error fetching user:', e); }
     finally { setLoadingUser(false); }
   };
+
 
   const handleUploadClick = () => setShowUploadForm(true);
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -647,6 +672,53 @@ export default function StoreManagementPage() {
     }
   };
 
+  const handleCopyUrl = () => {
+    if (!userSlug) return;
+    const storeUrl = `${userSlug}.psx.ng`;
+    navigator.clipboard.writeText(storeUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+  };
+
+  const handleDownloadFlyer = async () => {
+    const flyerElement = flyerRef.current; // Define the element at the top
+
+    // Check if the element exists in the DOM
+    if (!flyerElement) {
+      alert('Could not find the flyer component. Please try again.');
+      return;
+    }
+
+    // Check if the data is ready
+    if (!qrCodeDataUrl || !userBusinessName) {
+        alert('Flyer data is still loading. Please wait a moment and try again.');
+        return;
+    }
+
+    // Use a small delay to ensure everything is rendered
+    setTimeout(async () => {
+      try {
+        const dataUrl = await toPng(flyerElement, { // Now it can be used here without error
+          cacheBust: true,
+          backgroundColor: 'white',
+          pixelRatio: 2,
+        });
+
+        const link = document.createElement('a');
+        link.download = `${userSlug}-store-flyer.png`;
+        link.href = dataUrl;
+        link.click();
+      } catch (err) {
+        console.error('Failed to create flyer image:', err);
+        alert('Sorry, there was an error creating your flyer.');
+      }
+    }, 100);
+  };
+
+
+
+
+
   const OrderActionButtons = ({ order }: { order: Order }) => {
     if (order.status === 'pending') {
       return (
@@ -802,7 +874,27 @@ export default function StoreManagementPage() {
               </>
             ) : <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Click to get your location</Typography>}
           </Box>
+
+                      {/* New Store URL Card */}
+          {userSlug && (
+            <Box sx={{ maxWidth: 350, width: '100%', background: 'linear-gradient(90deg, #4CAF50 0%, #2E7D32 100%)', color: 'white', p: 3, borderRadius: 3, textAlign: 'center' }}>
+              <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.2)', mb: 1 }}><Link href={`https://${userSlug}.psx.ng`} target="_blank" sx={{color: 'white'}}><QrCode2 /></Link></IconButton>
+              <Typography variant="h6">Your Store URL</Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace', my: 1, p:1, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.1)' }}>{userSlug}.psx.ng</Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 2 }}>
+                <Button variant="contained" startIcon={<ContentCopy />} onClick={handleCopyUrl} sx={{bgcolor: 'rgba(255,255,255,0.8)', color: 'black', '&:hover': {bgcolor: 'white'}}}>
+                  {copied ? 'Copied!' : 'Copy'}
+                </Button>
+                <Button variant="contained" startIcon={<Download />} onClick={handleDownloadFlyer} sx={{bgcolor: 'rgba(255,255,255,0.8)', color: 'black', '&:hover': {bgcolor: 'white'}}}>
+                  Flyer
+                </Button>
+              </Box>
+            </Box>
+          )}
+
+
         </Box>
+        
       )}
 
       {selectedTab === 1 && (
@@ -975,6 +1067,7 @@ export default function StoreManagementPage() {
   </Paper>
 )}
 
+      
 
 
         </Box>
@@ -1331,6 +1424,44 @@ export default function StoreManagementPage() {
 
         <WhatsAppButton />
 
+            {/* Hidden Flyer for download */}
+            <Box
+        ref={flyerRef}
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          zIndex: -1,
+          opacity: 0,
+          pointerEvents: 'none', // Prevents it from capturing mouse clicks
+          width: '400px',
+          height: '600px',
+          backgroundColor: 'white',
+          p: 4,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 2,
+          color: 'black',
+        }}
+      >
+        <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#800080' }}>
+          {userBusinessName || 'Your Store'}
+        </Typography>
+        <Typography variant="h6">
+          Shop from us online!
+        </Typography>
+        {qrCodeDataUrl && (
+          <img src={qrCodeDataUrl} alt="QR Code for store" style={{ width: '200px', height: '200px', margin: '20px 0' }} />
+        )}
+        <Typography variant="h5" sx={{ fontWeight: 'bold', backgroundColor: '#004d40', color: 'white', padding: '8px 16px', borderRadius: '8px' }}>
+          {userSlug}.psx.ng
+        </Typography>
+        <Typography variant="caption" sx={{ mt: 2, fontStyle: 'italic' }}>
+          Powered by Pharmastackx
+        </Typography>
+      </Box>
 
     </Box>
   );

@@ -335,6 +335,7 @@ export default function Home() {
   const router = useRouter();
   const [partnerPharmacies, setPartnerPharmacies] = useState<IPharmacy[]>([]);
   const [loadingPharmacies, setLoadingPharmacies] = useState(true);
+  const [desktopPharmacyIndex, setDesktopPharmacyIndex] = useState(0);
 
 
   const drugClasses = [
@@ -382,6 +383,18 @@ export default function Home() {
       }
     }
   };
+
+  const scrollDesktopPharmacies = (direction: 'left' | 'right') => {
+    const itemsToScroll = 3; // Show 3 pharmacies at a time
+    const maxIndex = Math.max(0, partnerPharmacies.length - itemsToScroll);
+  
+    if (direction === 'left') {
+      setDesktopPharmacyIndex(prev => Math.max(0, prev - itemsToScroll));
+    } else {
+      setDesktopPharmacyIndex(prev => Math.min(maxIndex, prev + itemsToScroll));
+    }
+  };
+  
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -707,29 +720,54 @@ export default function Home() {
               </IconButton>
             </Box>
 
-            {/* Desktop Grid - New Sleek Design */}
-            <Box sx={{ display: { xs: 'none', md: 'grid' }, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 3 }}>
-              {partnerPharmacies.map((pharmacy) => (
-                <Card component={Link} href="/find-medicines" key={pharmacy._id} sx={{ textDecoration: 'none', cursor: 'pointer', borderRadius: '30px 10px', overflow: 'hidden', '&:hover': { boxShadow: '0 8px 24px rgba(0,0,0,0.12)', transform: 'translateY(-4px)' }, transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column' }}>
+            {/* Desktop Carousel - New Sleek Design */}
+<Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1 }}>
+  <IconButton 
+    onClick={() => scrollDesktopPharmacies('left')}
+    disabled={desktopPharmacyIndex === 0}
+    sx={{ bgcolor: '#006D5B', color: 'white', '&:hover': { bgcolor: '#004D40' }, '&:disabled': { bgcolor: 'grey.300' } }}
+  >
+    <ArrowBackIos />
+  </IconButton>
 
-                <Box sx={{ bgcolor: '#004D40', color: 'white', height: 141, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
-                <Typography variant="h6" sx={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {pharmacy.businessName}
-                </Typography>
-                <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-                    {pharmacy.businessAddress}
-                </Typography>
-                </Box>
-                <CardContent sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                
-                <Button fullWidth variant="outlined" sx={{ borderColor: '#006D5B', color: '#006D5B', '&:hover': { bgcolor: '#006D5B', color: 'white' }, mt: 'auto' }}>
-                    Visit Store
-                </Button>
-                </CardContent>
-            </Card>
-            
-              ))}
+  <Box sx={{ flex: 1, overflow: 'hidden' }}>
+    <Box sx={{ 
+      display: 'flex', 
+      gap: 3,
+      transform: `translateX(-${desktopPharmacyIndex * (100 / 3)}%)`, // Slides by 1/3 for each group
+      transition: 'transform 0.5s ease-in-out' 
+    }}>
+      {partnerPharmacies.map((pharmacy) => (
+        <Box key={pharmacy._id} sx={{ width: 'calc(33.333% - 16px)', flexShrink: 0 }}>
+          <Card component={Link} href={`/${pharmacy.slug}`} sx={{ textDecoration: 'none', cursor: 'pointer', borderRadius: '30px 10px', overflow: 'hidden', '&:hover': { boxShadow: '0 8px 24px rgba(0,0,0,0.12)', transform: 'translateY(-4px)' }, transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box sx={{ bgcolor: '#004D40', color: 'white', height: 141, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {pharmacy.businessName}
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+                {pharmacy.businessAddress}
+              </Typography>
             </Box>
+            <CardContent sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <Button fullWidth variant="outlined" sx={{ borderColor: '#006D5B', color: '#006D5B', '&:hover': { bgcolor: '#006D5B', color: 'white' }, mt: 'auto' }}>
+                Visit Store
+              </Button>
+            </CardContent>
+          </Card>
+        </Box>
+      ))}
+    </Box>
+  </Box>
+
+  <IconButton 
+    onClick={() => scrollDesktopPharmacies('right')}
+    disabled={desktopPharmacyIndex >= partnerPharmacies.length - 3}
+    sx={{ bgcolor: '#006D5B', color: 'white', '&:hover': { bgcolor: '#004D40' }, '&:disabled': { bgcolor: 'grey.300' } }}
+  >
+    <ArrowForwardIos />
+  </IconButton>
+</Box>
+
           </>
         )}
       </Container>
