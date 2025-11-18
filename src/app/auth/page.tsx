@@ -9,6 +9,14 @@ export default function AuthPage() {
   const [tab, setTab] = useState(0);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [prefilledCredentials, setPrefilledCredentials] = useState({ email: '', password: ''});
+
+  const handleSignupSuccess = (email: string, pass: string) => {
+    setSuccess("Signup successful! Please log in.");
+    setPrefilledCredentials({ email, password: pass });
+    setTab(0); // Switch to login tab
+    setError('');
+  };
 
   return (
     <>
@@ -76,9 +84,9 @@ export default function AuthPage() {
       {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
       <Box mt={3}>
         {tab === 0 ? (
-          <LoginForm setError={setError} setSuccess={setSuccess} />
+          <LoginForm setError={setError} setSuccess={setSuccess} prefilledCredentials={prefilledCredentials} />
         ) : (
-          <SignupForm setError={setError} setSuccess={setSuccess} />
+          <SignupForm setError={setError} setSuccess={setSuccess} onSignupSuccess={handleSignupSuccess} />
         )}
       </Box>
     </Box>

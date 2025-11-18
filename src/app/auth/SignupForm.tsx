@@ -3,9 +3,15 @@ import React, { useState } from "react";
 import { TextField, Button, MenuItem, Box, Typography } from "@mui/material";
 import axios from "axios";
 
-import Cookies from 'js-cookie';
-
-export default function SignupForm({ setError, setSuccess }: { setError: (msg: string) => void, setSuccess: (msg: string) => void }) {
+export default function SignupForm({
+  setError,
+  setSuccess,
+  onSignupSuccess,
+}: {
+  setError: (msg: string) => void;
+  setSuccess: (msg: string) => void;
+  onSignupSuccess: (email: string, pass: string) => void;
+}) {
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -15,13 +21,12 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
     city: "",
     businessAddress: "",
     phoneNumber: "",
-    license: ""
+    license: "",
   });
   const [loading, setLoading] = useState(false);
   const [showProviderStep, setShowProviderStep] = useState(false);
   const [providerType, setProviderType] = useState("");
   const [providerLoading, setProviderLoading] = useState(false);
- 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -33,19 +38,14 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
     setSuccess("");
     setLoading(true);
     try {
-
-      const response = await axios.post("/api/auth/signup", { ...form, role: "customer" });
-      const { token } = response.data;
-      Cookies.set('token', token, { expires: 7 });
-      setSuccess("Signup successful! Redirecting...");
-      window.location.href = '/'; 
-
+      await axios.post("/api/auth/signup", { ...form, role: "customer" });
+      onSignupSuccess(form.email, form.password);
     } catch (err: any) {
       setError(err.response?.data?.error || "Signup failed");
+    } finally {
       setLoading(false);
     }
   };
-
 
   const providerTypes = [
     { label: "Pharmacy", value: "pharmacy" },
@@ -60,16 +60,15 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
     setSuccess("");
     setProviderLoading(true);
     try {
-
-      const response = await axios.post("/api/auth/signup", { ...form, role: providerType });
-      const { token } = response.data;
-      Cookies.set('token', token, { expires: 7 });
-      setSuccess("Service provider signup successful!");
-      window.location.href = '/store-management';
-
+      await axios.post("/api/auth/signup", {
+        ...form,
+        role: providerType,
+      });
+      onSignupSuccess(form.email, form.password);
     } catch (err: any) {
       setError(err.response?.data?.error || "Signup failed");
-      setProviderLoading(false); 
+    } finally {
+      setProviderLoading(false);
     }
   };
 
@@ -121,7 +120,7 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
             color="primary"
             fullWidth
             disabled={loading || !form.username || !form.email || !form.password}
-            sx={{ mt: 1, bgcolor: '#222', '&:hover': { bgcolor: '#111' } }}
+            sx={{ mt: 1, bgcolor: "#222", "&:hover": { bgcolor: "#111" } }}
             onClick={() => setShowProviderStep(true)}
           >
             Service Providers
@@ -132,7 +131,10 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
             Service Provider Registration
           </Typography>
-          <form onSubmit={handleProviderSignup} style={{ maxWidth: 320, margin: '0 auto' }}>
+          <form
+            onSubmit={handleProviderSignup}
+            style={{ maxWidth: 320, margin: "0 auto" }}
+          >
             <TextField
               label="Username"
               name="username"
@@ -143,7 +145,7 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
               size="small"
               required
               disabled
-              sx={{ mb: 0.5, fontSize: '0.92rem' }}
+              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="Email"
@@ -156,7 +158,7 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
               size="small"
               required
               disabled
-              sx={{ mb: 0.5, fontSize: '0.92rem' }}
+              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="Password"
@@ -169,21 +171,21 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
               size="small"
               required
               disabled
-              sx={{ mb: 0.5, fontSize: '0.92rem' }}
+              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               select
               label="Provider Type"
               name="providerType"
               value={providerType}
-              onChange={e => setProviderType(e.target.value)}
+              onChange={(e) => setProviderType(e.target.value)}
               fullWidth
               margin="none"
               required
               size="small"
-              sx={{ mb: 0.5, fontSize: '0.92rem' }}
+              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             >
-              {providerTypes.map(option => (
+              {providerTypes.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
                   {option.label}
                 </MenuItem>
@@ -192,67 +194,67 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
             <TextField
               label="Business Name"
               name="businessName"
-              value={form.businessName || ''}
+              value={form.businessName || ""}
               onChange={handleChange}
               fullWidth
               margin="none"
               size="small"
               required
-              sx={{ mb: 0.5, fontSize: '0.92rem' }}
+              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="State"
               name="state"
-              value={form.state || ''}
+              value={form.state || ""}
               onChange={handleChange}
               fullWidth
               margin="none"
               size="small"
               required
-              sx={{ mb: 0.5, fontSize: '0.92rem' }}
+              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="City"
               name="city"
-              value={form.city || ''}
+              value={form.city || ""}
               onChange={handleChange}
               fullWidth
               margin="none"
               size="small"
               required
-              sx={{ mb: 0.5, fontSize: '0.92rem' }}
+              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="Business Address"
               name="businessAddress"
-              value={form.businessAddress || ''}
+              value={form.businessAddress || ""}
               onChange={handleChange}
               fullWidth
               margin="none"
               size="small"
               required
-              sx={{ mb: 0.5, fontSize: '0.92rem' }}
+              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="Phone Number"
               name="phoneNumber"
-              value={form.phoneNumber || ''}
+              value={form.phoneNumber || ""}
               onChange={handleChange}
               fullWidth
               margin="none"
               size="small"
               required
-              sx={{ mb: 0.5, fontSize: '0.92rem' }}
+              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <TextField
               label="License (optional)"
               name="license"
-              value={form.license || ''}
+              value={form.license || ""}
               onChange={handleChange}
               fullWidth
               margin="none"
               size="small"
-              sx={{ mb: 0.5, fontSize: '0.92rem' }}
+              sx={{ mb: 0.5, fontSize: "0.92rem" }}
             />
             <Button
               type="submit"
@@ -260,9 +262,11 @@ export default function SignupForm({ setError, setSuccess }: { setError: (msg: s
               color="primary"
               fullWidth
               disabled={providerLoading || !providerType}
-              sx={{ mt: 2, bgcolor: '#222', '&:hover': { bgcolor: '#111' } }}
+              sx={{ mt: 2, bgcolor: "#222", "&:hover": { bgcolor: "#111" } }}
             >
-              {providerLoading ? `Signing up...` : `Sign Up as Service Provider`}
+              {providerLoading
+                ? `Signing up...`
+                : `Sign Up as Service Provider`}
             </Button>
             <Button
               variant="text"
