@@ -36,6 +36,8 @@ import { useOrders } from '../../contexts/OrderContext';
 import { useSession } from '../../context/SessionProvider';
 import { useRouter } from 'next/navigation';
 import dynamicImport from "next/dynamic";
+import { event } from '../../lib/gtag';
+
 
 const PaystackButton = dynamicImport(
   () => import("../../components/PaystackButton"),
@@ -118,14 +120,23 @@ export default function Cart() {
 
   useEffect(() => {
     if (total === 0 && items.length > 0 && activePromo && !isProcessingFreeOrder && isFormValid && user) {
+      
+      // --- Start of new code ---
+      // Fire the 'begin_checkout' event for free orders
+      event({
+        action: 'begin_checkout',
+        category: 'ecommerce',
+        label: 'Free Checkout', // Differentiate from paid checkouts
+        value: 0 // The value is zero
+      });
+      // --- End of new code ---
+
       setIsProcessingFreeOrder(true);
       
-      // THE FIX IS APPLIED HERE
       const itemsForBackend = items.map(item => ({
-        productId: item.id, // Use item.id as productId
+        productId: item.id,
         qty: item.quantity,
       }));
-
 
       addOrder({
         patientName,
@@ -136,7 +147,7 @@ export default function Cart() {
         deliveryAddress,
         deliveryCity,
         deliveryState,
-        items: itemsForBackend, // Pass the corrected items
+        items: itemsForBackend,
         coupon: activePromo.code,
         deliveryOption,
         orderType: actualOrderType as any,
@@ -149,7 +160,8 @@ export default function Cart() {
         }, 1500);
       });
     }
-  }, [total, items.length, activePromo, isProcessingFreeOrder, isFormValid, user]);
+  }, [total, items.length, activePromo, isProcessingFreeOrder, isFormValid, user, addOrder, actualOrderType, clearCart, deliveryOption, patientAge, patientCondition, patientName, deliveryAddress, deliveryCity, deliveryEmail, deliveryPhone, deliveryState, removePromo, router, uniquePharmacies]);
+
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>

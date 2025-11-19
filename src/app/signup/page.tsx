@@ -2,6 +2,8 @@
 import React, { useState } from "react";
 import { TextField, Button, Typography, Box, MenuItem, Alert } from "@mui/material";
 import axios from "axios";
+import { event } from '../../lib/gtag';
+
 
 const userTypes = [
   { value: "admin", label: "Admin" },
@@ -29,9 +31,15 @@ export default function SignupPage() {
     setSuccess("");
     try {
       await axios.post("/api/auth/signup", form);
+      event({
+        action: 'sign_up',
+        category: 'engagement',
+        label: 'Standard Signup' // Identifies the signup method
+      });
       setSuccess("Signup successful! You can now log in.");
       setForm({ username: "", email: "", password: "", role: "customer" });
     } catch (err: any) {
+
       setError(err.response?.data?.error || "Signup failed");
     } finally {
       setLoading(false);

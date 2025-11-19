@@ -31,6 +31,8 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
+import { event } from '../lib/gtag';
+
 
 // Sample drug data for carousel
 const sampleDrugs = [
@@ -397,11 +399,19 @@ export default function Home() {
   
 
   const handleSearch = () => {
-    if (searchQuery.trim()) {
-      // Navigate to find medicines page with search query as URL parameter
-      router.push(`/find-medicines?search=${encodeURIComponent(searchQuery.trim())}`);
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery) {
+      
+      event({
+        action: 'search',
+        category: 'engagement',
+        label: trimmedQuery,
+      });
+      
+      router.push(`/find-medicines?search=${encodeURIComponent(trimmedQuery)}`);
     }
   };
+
 
   const handleSearchKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

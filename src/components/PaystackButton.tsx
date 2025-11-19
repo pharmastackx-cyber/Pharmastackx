@@ -7,6 +7,8 @@ import { useSession } from '../context/SessionProvider';
 import { useCart } from '../contexts/CartContext';
 import { useOrders } from '../contexts/OrderContext';
 import { useRouter } from 'next/navigation';
+import { event } from '../lib/gtag';
+
 
 interface PaystackButtonProps {
   total: number;
@@ -51,10 +53,8 @@ const PaystackButton: React.FC<PaystackButtonProps> = (props) => {
     }
 
     try {
-
-         // THE FIX IS APPLIED HERE
       const itemsForBackend = items.map(item => ({
-        productId: item.id, // Use item.id as productId
+        productId: item.id,
         qty: item.quantity,
       }));
 
@@ -66,7 +66,7 @@ const PaystackButton: React.FC<PaystackButtonProps> = (props) => {
         deliveryEmail: props.deliveryEmail,
         deliveryPhone: props.deliveryPhone,
         
-        items: itemsForBackend, // Pass the corrected items
+        items: itemsForBackend,
         
         businesses: props.uniquePharmacies,
         orderType: props.orderType,
@@ -92,6 +92,18 @@ const PaystackButton: React.FC<PaystackButtonProps> = (props) => {
     console.log('Payment modal closed');
   };
 
+  const handleCheckout = () => {
+    event({
+      action: 'begin_checkout',
+      category: 'ecommerce',
+      label: 'Paid Checkout',
+      value: props.total,
+    });
+    initializePayment({ onSuccess, onClose });
+  };
+
+  
+
   const getButtonText = () => {
     if (!user) return 'Please log in to check out';
     if (!props.isFormValid) return 'Please fill in delivery info';
@@ -103,7 +115,8 @@ const PaystackButton: React.FC<PaystackButtonProps> = (props) => {
       fullWidth
       variant="contained"
       size="large"
-      onClick={() => initializePayment({ onSuccess, onClose })}
+      onClick={handleCheckout}
+
       disabled={!user || !props.isFormValid}
       sx={{
         background: 'linear-gradient(135deg, #006D5B 0%, #004D40 100%)',

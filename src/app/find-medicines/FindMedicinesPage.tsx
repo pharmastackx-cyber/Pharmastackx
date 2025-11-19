@@ -31,6 +31,8 @@ import { useState, useEffect } from 'react';
 
 import { useCart } from '../../contexts/CartContext';
 import { useSearchParams } from 'next/navigation';
+import { event } from '../../lib/gtag';
+
 
 
 // --- CONFIGURATION --- //
@@ -134,7 +136,7 @@ export default function FindMedicinesPage() {
     }
   }, []);
 
-  // --- DEBUGGING: Fetching logic with logging --- //
+ 
   useEffect(() => {
     const fetchMedicines = async () => {
       try {
@@ -181,11 +183,31 @@ export default function FindMedicinesPage() {
 
   }, [userLocation, allMedicines, isLoading]);
 
-  const handleOpenModal = (medicine: any) => setSelectedMedicine(medicine);
+  const handleOpenModal = (medicine: any) => {
+
+    event({
+      action: 'view_item',
+      category: 'ecommerce',
+      label: medicine.name,  
+      value: medicine.price  
+    });
+
+    setSelectedMedicine(medicine);
+  };
+
+
   const handleCloseModal = () => setSelectedMedicine(null);
   const handleSnackbarClose = () => setSnackbarOpen(false);
 
   const handleAddToCart = (medicine: any) => {
+    
+    event({
+      action: 'add_to_cart',
+      category: 'ecommerce', 
+      label: medicine.name,  
+      value: medicine.price  
+    });
+    
     addToCart(medicine);
     setSnackbarOpen(true);
   };
@@ -247,6 +269,35 @@ export default function FindMedicinesPage() {
       </Container>
     );
   }
+
+  useEffect(() => {
+
+    const handler = setTimeout(() => {
+      const trimmedQuery = searchQuery.trim();
+      if (trimmedQuery) {
+        event({
+          action: 'search',
+          category: 'engagement',
+          label: trimmedQuery,
+        });
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
+
+  useEffect(() => {
+
+    if (slug) {
+      event({
+        action: 'visit_pharmacy_subdomain',
+        category: 'acquisition',
+        label: slug, 
+      });
+    }
+  }, [slug]);
 
   return (
     <>
