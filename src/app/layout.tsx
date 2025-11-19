@@ -1,5 +1,5 @@
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/context/SessionProvider";
@@ -14,6 +14,16 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Pharmastackx",
   description: "Find Medicines Near You",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Pharmastackx",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#006D5B",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
