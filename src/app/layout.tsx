@@ -63,19 +63,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              console.log("PWA Debugger: Script has been loaded.");
               if ('serviceWorker' in navigator) {
-                console.log("PWA Debugger: 'serviceWorker' is in navigator.");
                 window.addEventListener('load', function() {
-                  console.log("PWA Debugger: Window load event fired.");
                   navigator.serviceWorker.register('/sw.js').then(function(registration) {
-                    console.log('PWA service worker registration successful with scope: ', registration.scope);
+                    console.log('PWA service worker registered.');
                   }).catch(function(err) {
                     console.error('PWA service worker registration failed: ', err);
                   });
                 });
-              } else {
-                console.log("PWA Debugger: 'serviceWorker' NOT in navigator.");
               }
             `,
           }}
