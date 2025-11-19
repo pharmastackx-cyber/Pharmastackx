@@ -59,6 +59,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </OrderProvider>
           </PromoProvider>
         </SessionProvider>
+
+        <Script
+          id="pwa-debugger"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                    console.log('PWA service worker registration successful with scope: ', registration.scope);
+                  }, function(err) {
+                    console.error('PWA service worker registration failed: ', err);
+                  });
+                });
+              }
+            `,
+          }}
+        />
+        
       </body>
     </html>
   );
