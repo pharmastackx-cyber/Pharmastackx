@@ -183,6 +183,36 @@ export default function FindMedicinesPage() {
 
   }, [userLocation, allMedicines, isLoading]);
 
+  useEffect(() => {
+
+    const handler = setTimeout(() => {
+      const trimmedQuery = searchQuery.trim();
+      if (trimmedQuery) {
+        event({
+          action: 'search',
+          category: 'engagement',
+          label: trimmedQuery,
+        });
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
+
+  useEffect(() => {
+
+    if (slug) {
+      event({
+        action: 'visit_pharmacy_subdomain',
+        category: 'acquisition',
+        label: slug, 
+      });
+    }
+  }, [slug]);
+
+
   const handleOpenModal = (medicine: any) => {
 
     event({
@@ -269,35 +299,6 @@ export default function FindMedicinesPage() {
       </Container>
     );
   }
-
-  useEffect(() => {
-
-    const handler = setTimeout(() => {
-      const trimmedQuery = searchQuery.trim();
-      if (trimmedQuery) {
-        event({
-          action: 'search',
-          category: 'engagement',
-          label: trimmedQuery,
-        });
-      }
-    }, 500);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [searchQuery]);
-
-  useEffect(() => {
-
-    if (slug) {
-      event({
-        action: 'visit_pharmacy_subdomain',
-        category: 'acquisition',
-        label: slug, 
-      });
-    }
-  }, [slug]);
 
   return (
     <>
