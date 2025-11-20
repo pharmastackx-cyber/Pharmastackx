@@ -1,7 +1,7 @@
-"use client";
+'use client';
 import React, { useState, useEffect } from "react";
 import { TextField, Button, InputAdornment, IconButton } from "@mui/material";
-import { Visibility, VisibilityOff } from '@mui/icons-material'; // Add this import
+import { Visibility, VisibilityOff } from '@mui/icons-material'; 
 
 import axios from "axios";
 import Cookies from "js-cookie"; 
@@ -46,7 +46,13 @@ export default function LoginForm({
       const res = await axios.post("/api/auth/login", { email, password });
       Cookies.set("session_token", res.data.token, { expires: 7 });
       setSuccess("Login successful!");
-      window.location.href = "/";
+      
+      const userRole = res.data.user?.role;
+      if (userRole === 'pharmacy' || userRole === 'vendor') {
+        window.location.href = '/store-management';
+      } else {
+        window.location.href = '/';
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || "Login failed");
     } finally {
@@ -67,13 +73,13 @@ export default function LoginForm({
       />
             <TextField
         label="Password"
-        type={showPassword ? 'text' : 'password'} // Use showPassword state here
+        type={showPassword ? 'text' : 'password'} 
         value={password}
         onChange={e => setPassword(e.target.value)}
         fullWidth
         margin="normal"
         required
-        InputProps={{ // Add InputProps for the adornment
+        InputProps={{ 
           endAdornment: (
             <InputAdornment position="end">
               <IconButton
