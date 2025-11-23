@@ -376,16 +376,24 @@ export default function StoreManagementPage() {
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => setSelectedTab(newValue);
 
   const handleGetLocation = () => {
+    // Ask for confirmation if location is already set
     if (businessCoordinates?.latitude && businessCoordinates?.longitude) {
-      alert('Store location already set. Cannot overwrite.');
+      if (!window.confirm('Are you sure you want to overwrite your existing store location? This action is required for accurate tracking but please ensure you are at your store location.')) {
+        return; // Stop if the user cancels
+      }
+    }
+
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
       return;
     }
-    if (!navigator.geolocation) { alert('Geolocation not supported.'); return; }
+
+    // Inform the user what's happening
+    alert('Getting your location... Please accept the browser prompt.');
 
     navigator.geolocation.getCurrentPosition(
       async pos => {
-        const latitude = pos.coords.latitude;
-        const longitude = pos.coords.longitude;
+        const { latitude, longitude } = pos.coords;
         const coordsString = `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
 
         try {
@@ -394,28 +402,34 @@ export default function StoreManagementPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ coordinates: { latitude, longitude } }),
           });
-          if (!res.ok) throw new Error('Failed to update location');
+
+          if (!res.ok) throw new Error('Failed to update location on the server.');
+
+          // Update state to reflect the change
           setBusinessCoordinates({ latitude, longitude });
           setLocation(coordsString);
           setFormValues(prev => ({ ...prev, coordinates: coordsString }));
-          setIsLocationSet(true); // <-- ADD THIS LINE
-          alert('Location saved!');
-        } catch (e) {
+          setIsLocationSet(true);
 
-          console.error('Error:', e);
-          alert('Error saving location.');
+          alert('Location updated successfully!');
+
+        } catch (e) {
+          console.error('Error saving location:', e);
+          alert('An error occurred while saving your location.');
         }
       },
-      err => alert(`Error getting location: ${err.message}`),
+      err => {
+        console.error('Geolocation error:', err);
+        alert(`Error getting location: ${err.message}. Please ensure you have enabled location services.`);
+      },
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 60000
+        maximumAge: 60000,
       }
     );
-
-    
   };
+
 
   const handleStoreInfoClick = async () => {
     setLoadingUser(true);
@@ -846,34 +860,62 @@ export default function StoreManagementPage() {
           )}
 
 
-          <Box
+<Box
             sx={{
-              maxWidth: 350, 
+              maxWidth: 350,
               width: '100%',
-              height: 120,
-              background: businessCoordinates
-                ? 'linear-gradient(90deg, #9e9e9e 0%, #bdbdbd 100%)'
-                : 'linear-gradient(90deg, #006400 0%, #8b008b 100%)',
+              background: isLocationSet
+                ? 'linear-gradient(90deg, #9e9e9e 0%, #bdbdbd 100%)' // "Dull" background when set
+                : 'linear-gradient(90deg, #006400 0%, #8b008b 100%)', // Vibrant background when not set
               color: 'white',
+              p: 3, // Using padding for a better fit
+              borderRadius: 3,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: 3,
-              cursor: businessCoordinates ? 'default' : 'pointer',
+              textAlign: 'center',
               transition: '0.3s',
-              '&:hover': !businessCoordinates ? { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } : undefined,
+              // Add hover effect and cursor only when the location is NOT set
+              ...(!isLocationSet && {
+                cursor: 'pointer',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.4)',
+                },
+              }),
             }}
-            onClick={!businessCoordinates ? handleGetLocation : undefined}
+            // The whole box is clickable only when location is NOT set
+            onClick={!isLocationSet ? handleGetLocation : undefined}
           >
-            <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.2)', mb: 1 }}><LocationOn sx={{ color: 'white' }} /></IconButton>
-            {businessCoordinates ? (
+            <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.2)', mb: 1 }}>
+              <LocationOn sx={{ color: 'white' }} />
+            </IconButton>
+
+            {isLocationSet ? (
+              // This is the view when location IS set
               <>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Store Location:</Typography>
-                <Typography variant="body2" sx={{ mt: 0.5 }}>{location}</Typography>
+                <Typography variant="body2" sx={{ mt: 0.5, mb: 2 }}>{location}</Typography>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleGetLocation} // Re-uses the existing function with confirmation
+                  sx={{
+                    bgcolor: 'rgba(0,0,0,0.2)',
+                    color: 'white',
+                    '&:hover': { bgcolor: 'rgba(0,0,0,0.4)' }
+                  }}
+                >
+                  Update Location
+                </Button>
               </>
-            ) : <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Click to get your location</Typography>}
+            ) : (
+              // This is the initial view when location is NOT set
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Click to get your location</Typography>
+            )}
           </Box>
+
 
                       {/* New Store URL Card */}
           {userSlug && (
