@@ -2,26 +2,60 @@ import { NextRequest, NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
 import Product from '@/models/Product';
 import { isValidObjectId } from 'mongoose';
+import { cookies } from 'next/headers';
+import jwt from 'jsonwebtoken';
+import User from '@/models/User';
 
+export const dynamic = 'force-dynamic';
+const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
 export async function GET(req: NextRequest) {
+  await dbConnect();
+  const { searchParams } = new URL(req.url);
+  const businessName = searchParams.get('businessName');
+
   try {
-    await dbConnect(); // connect to MongoDB
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get('session_token');
+    let userRole: string | null = null;
 
-    const { searchParams } = new URL(req.url);
-    const businessName = searchParams.get('businessName');
+    if (sessionToken) {
+      try {
+        // If a token exists, verify it to get the user's role
+        const payload = jwt.verify(sessionToken.value, JWT_SECRET) as { userId: string };
+        const user = await User.findById(payload.userId).select('role').lean();
+        if (user) {
+          userRole = user.role;
+        }
+      } catch (e) {
+        // If the token is invalid or expired, treat them as a public user.
+        userRole = null;
+      }
 
-    const query = businessName ? { businessName } : {};
-    // Fetch products based on the query
-    const stock = await Product.find(query);
+      }
 
-    return NextResponse.json({ items: stock });
+      let query: any = {};
+
+      // This is the 3-way logic you correctly described:
+    if (userRole === 'admin') {
+      // 1. If the user is an admin, the query is empty. They see everything.
+    } else if (businessName) {
+      // 2. If a businessName is specified, fetch all items for that business.
+      //    (This covers vendors viewing their own stock).
+      query.businessName = businessName;
+    } else {
+      // 3. If none of the above, it's a public user. They only see published items.
+      query.isPublished = true;
+    }
+    const items = await Product.find(query).sort({ createdAt: -1 });
+    return NextResponse.json({ items });
 
   } catch (error) {
-    console.error('Error fetching stock:', error);
-    return NextResponse.json({ error: 'Failed to fetch stock' }, { status: 500 });
+      console.error('Error fetching stock:', error);
+      return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
+
 
 export async function POST(req: NextRequest) {
   try {

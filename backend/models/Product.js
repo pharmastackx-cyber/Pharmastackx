@@ -11,6 +11,7 @@ const ProductSchema = new mongoose.Schema({
   coordinates: { type: String, default: '' },
   info: { type: String, default: '' },
   POM: { type: Boolean, default: false },
+  isPublished: { type: Boolean, default: false },
   bulkUploadId: { type: mongoose.Schema.Types.ObjectId, ref: 'BulkUpload', default: null },
 }, { timestamps: true });
 

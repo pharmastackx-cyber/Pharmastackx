@@ -6,7 +6,7 @@ import {
   Table, TableHead, TableBody, TableRow, TableCell, Paper, useTheme, 
   useMediaQuery, CircularProgress, Tooltip, Select, MenuItem, 
   FormControl, InputLabel, Divider, Collapse, Checkbox, FormControlLabel,
-  Container, Alert, AlertTitle, Link, 
+  Container, Alert, AlertTitle, Link, Chip 
 } from '@mui/material';
 
 import { Storefront, LocationOn, UploadFile, ExpandMore } from '@mui/icons-material';
@@ -28,6 +28,7 @@ interface StockItem {
   info: string;
   POM: boolean;  
   slug: string;
+  isPublished: boolean;
 }
 
 interface IBulkUpload {
@@ -118,6 +119,7 @@ export default function StoreManagementPage() {
     info: '',
     POM: false,
     slug: '',
+    isPublished: false,
   });
   
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -149,6 +151,7 @@ export default function StoreManagementPage() {
         coordinates: product.coordinates || 'N/A',
         info: product.info || '',
         POM: product.POM || false,
+        isPublished: product.isPublished || false,
       }));
       setStockData(transformedData);
     } catch (error) {
@@ -486,6 +489,7 @@ export default function StoreManagementPage() {
           info: '',        // ✅ fixed line
           POM: false,
           slug: '' ,
+          isPublished: false,
         });
         
         
@@ -648,6 +652,37 @@ export default function StoreManagementPage() {
     }
     setIsSubmitting(false);
   };
+
+  const handlePublish = async (id: string) => {
+    try {
+      const response = await fetch('/api/stock/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to publish item.');
+      }
+
+      const { product: updatedProduct } = result;
+
+      setStockData(prevData =>
+        prevData.map(item =>
+          item._id === id ? { ...item, ...updatedProduct } : item
+        )
+      );
+      
+      alert(`Item "${result.product.itemName}" has been published successfully!`);
+
+    } catch (error) {
+      console.error('Error publishing item:', error);
+      alert((error as Error).message);
+    }
+  };
+
 
 
 
@@ -1237,6 +1272,7 @@ export default function StoreManagementPage() {
         {sortColumn === key && <span style={{ marginLeft: 4, fontSize: 12, color: 'gray' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>}
       </TableCell>
     ))}
+    <TableCell>Status</TableCell>
     <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
   </TableRow>
 </TableHead>
@@ -1341,9 +1377,33 @@ export default function StoreManagementPage() {
             <TableCell>{row.POM ? 'Yes' : 'No'}</TableCell>
             <TableCell>{row.businessName}</TableCell>
             <TableCell>{row.coordinates}</TableCell>
+
+            <TableCell>
+            {row.isPublished ? (
+             <Chip label="Published" color="success" size="small" />
+          ) : (
+              <Chip label="Draft" color="warning" size="small" />
+             )}
+              </TableCell>
+            
+            
+
             <TableCell>
               <Button variant="contained" size="small" sx={{ mr: 1 }} onClick={() => { setEditingRowIndex(globalIndex); setEditingRowData(row); }}>Edit</Button>
               <Button variant="outlined" color="error" size="small" onClick={() => handleDelete(row._id!)}>Delete</Button>
+
+              {!row.isPublished && (
+    <Button
+      variant="contained"
+      color="primary"
+      size="small"
+      onClick={() => handlePublish(row._id!)}
+      sx={{ ml: 1 }}
+    >
+      Publish
+    </Button>
+  )}
+
             </TableCell>
           </>
         )}

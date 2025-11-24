@@ -12,6 +12,7 @@ export interface IProduct extends Document {
   info: string;
   POM: boolean;
   slug: string;
+  isPublished: boolean;
   bulkUploadId?: mongoose.Types.ObjectId;
 }
 
@@ -26,6 +27,7 @@ const productSchema: Schema<IProduct> = new mongoose.Schema({
   info: { type: String, default: '' },
   POM: { type: Boolean, default: false },
   slug: { type: String, required: false },
+  isPublished: { type: Boolean, default: false },
   bulkUploadId: { type: mongoose.Schema.Types.ObjectId, ref: 'BulkUpload', default: null },
 });
 

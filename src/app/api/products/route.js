@@ -44,6 +44,8 @@ export async function GET(req) {
     const query = {};
     if (slug) {
       query.slug = slug;
+    } else {
+      query.isPublished = true; // <-- ADD THIS LINE
     }
 
     console.log('DEBUG [Backend]: MongoDB query:', query);
