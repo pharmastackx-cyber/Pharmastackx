@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { dbConnect } from '@/lib/mongoConnect';
-import User from '@/models/User';
+import User from '../../../../models/User';
 import { cookies } from 'next/headers';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
@@ -10,9 +10,8 @@ export async function POST(req) {
   try {
     await dbConnect();
 
-    // Must await cookies()
-    const cookieStore = await cookies(); // <- ADD await
-    const sessionToken = cookieStore.get('session_token')?.value; // unwrap value
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get('session_token')?.value;
 
     if (!sessionToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -25,23 +24,30 @@ export async function POST(req) {
 
     const body = await req.json();
     const { coordinates } = body;
-    console.log('Incoming coordinates:', coordinates);
-
-
-    if (!coordinates) {
-      return NextResponse.json({ error: 'Coordinates missing' }, { status: 400 });
+    
+    if (!coordinates || typeof coordinates.latitude === 'undefined' || typeof coordinates.longitude === 'undefined') {
+      return NextResponse.json({ error: 'Coordinates object with latitude and longitude are missing' }, { status: 400 });
     }
 
     const user = await User.findByIdAndUpdate(
       payload.userId,
-      { businessCoordinates: coordinates },
+      {
+        
+        $set: {
+          businessCoordinates: {
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+          }
+        }
+      },
       { new: true }
     ).select('slug businessCoordinates');
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
+    
+    
     return NextResponse.json({ success: true, user });
   } catch (error) {
     console.error('API /user/location error:', error);

@@ -46,7 +46,7 @@ export default function Navbar() {
   const isAdmin = user?.role === 'admin';
   const isBusinessUser = user?.role && ['admin', 'pharmacy', 'vendor'].includes(user.role);
   const isAgentOrAdmin = user?.role && ['admin', 'agent'].includes(user.role);
-
+  const isPharmacyOrVendor = user?.role && ['pharmacy', 'vendor'].includes(user.role);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const router = useRouter();
 
@@ -179,6 +179,21 @@ export default function Navbar() {
             <ListItemText primary="Store Management" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
         </ListItem>}
+
+                {/* Cart link for Pharmacy/Vendor in Drawer */}
+                {isPharmacyOrVendor && (
+          <ListItem disablePadding sx={{ mb: 0.5 }}>
+            <ListItemButton component={Link} href="/cart" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/cart') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+              <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}>
+                <Badge badgeContent={getTotalItems()} color="error">
+                  <ShoppingCart fontSize="small" />
+                </Badge>
+              </ListItemIcon>
+              <ListItemText primary="Cart" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
+            </ListItemButton>
+          </ListItem>
+        )}
+
 
         {isAgentOrAdmin && <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/delivery-agents/dashboard" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/delivery-agents') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
@@ -333,17 +348,42 @@ export default function Navbar() {
             )}
           </Box>
 
+                              {/* START: Mobile Right-Side Navigation */}
           <Box sx={{ display: { xs: 'flex', sm: 'none' }, alignItems: 'center', gap: 1, ml: 'auto' }}>
-            <IconButton color="inherit" component={Link} href="/find-medicines">
-              <LocalPharmacy sx={{ color: '#004D40' }} />
-            </IconButton>
-  
-            {/* Add a negative margin to this IconButton */}
-            <IconButton color="inherit" component={Link} href="/cart" sx={{ ml: -0.5 }}>
-              <Badge badgeContent={getTotalItems()} color="error" max={99}>
-                <ShoppingCart />
-              </Badge>
-            </IconButton>
+            {isPharmacyOrVendor && user ? (
+              // If user is Pharmacy/Vendor, show Store Management
+              <Button
+                color="inherit"
+                component={Link}
+                href="/store-management"
+                sx={{
+                  bgcolor: isActive('/store-management') ? 'rgba(0, 0, 0, 0.12)' : 'transparent',
+                  '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.08)' },
+                  borderRadius: '16px',
+                  px: 1.5,
+                  fontWeight: 500,
+                  fontSize: '0.8rem',
+                  textTransform: 'none',
+                }}
+              >
+                Store Management
+              </Button>
+            ) : (
+              // Otherwise, show the default Find Meds and Cart icons
+              <>
+                <IconButton color="inherit" component={Link} href="/find-medicines">
+                  <LocalPharmacy sx={{ color: '#004D40' }} />
+                </IconButton>
+      
+                <IconButton color="inherit" component={Link} href="/cart" sx={{ ml: -0.5 }}>
+                  <Badge badgeContent={getTotalItems()} color="error" max={99}>
+                    <ShoppingCart />
+                  </Badge>
+                </IconButton>
+              </>
+            )}
+
+            {/* Profile/Login Icon (This part is now shown for ALL mobile users) */}
             {isLoading ? (
               <CircularProgress size={24} color="inherit" />
             ) : user ? (
@@ -373,6 +413,9 @@ export default function Navbar() {
               </IconButton>
             )}
           </Box>
+          {/* END: Mobile Right-Side Navigation */}
+
+
         </Toolbar>
       </AppBar>
 

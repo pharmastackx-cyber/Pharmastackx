@@ -1,5 +1,6 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
+// The interface defines the shape of the data
 export interface IUser extends Document {
   username: string;
   email: string;
@@ -12,9 +13,13 @@ export interface IUser extends Document {
   city?: string;
   phoneNumber?: string;
   createdAt: Date;
-  businessCoordinates?: string;
+  businessCoordinates?: {
+    latitude?: number;
+    longitude?: number;
+  };
 }
 
+// The schema defines the blueprint for the database
 const userSchema: Schema<IUser> = new mongoose.Schema({
   username: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true },
@@ -33,15 +38,15 @@ const userSchema: Schema<IUser> = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   businessCoordinates: {
     type: {
-      latitude: { type: Number, required: false },
-      longitude: { type: Number, required: false },
+      latitude: { type: Number },
+      longitude: { type: Number },
     },
-    default: null,
+    required: false,
+    _id: false // <-- THIS IS THE CRITICAL FIX
   },
-  
 });
 
-// Explicitly specify the collection name as the third argument
+// This line creates the model
 const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', userSchema, 'users');
 
 export default User;
