@@ -17,9 +17,9 @@ export interface IProduct extends Document {
 
 const productSchema: Schema<IProduct> = new mongoose.Schema({
   itemName: { type: String, required: true },
-  activeIngredient: { type: String, required: true },
-  category: { type: String, required: true },
-  amount: { type: Number, required: true },
+  activeIngredient: { type: String, required: false, default: 'N/A' },
+  category: { type: String, required: false, default: 'N/A' },
+  amount: { type: Number, required: false, default: 0 },
   imageUrl: { type: String, default: '' },
   businessName: { type: String, required: true },
   coordinates: { type: String, default: '' },

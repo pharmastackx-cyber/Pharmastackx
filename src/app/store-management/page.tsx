@@ -78,6 +78,11 @@ export default function StoreManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bulkUploadHistory, setBulkUploadHistory] = useState<IBulkUpload[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{
+    message: string;
+    warnings: { message: string; item: any }[];
+    errors: { message: string; item: any }[];
+  } | null>(null);
 
 
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
@@ -496,7 +501,7 @@ export default function StoreManagementPage() {
       'item name': 'itemName', 'item': 'itemName', 'product': 'itemName', 'drug': 'itemName', 'medicine name': 'itemName', 'name': 'itemName',
       'active ingredient': 'activeIngredient', 'ingredient': 'activeIngredient', 'compound': 'activeIngredient', 'api': 'activeIngredient', 'substance': 'activeIngredient',
       'category': 'category', 'class': 'category', 'type': 'category', 'drug class': 'category',
-      'amount': 'amount', 'price': 'amount', 'cost': 'amount', 'value': 'amount', '₦': 'amount', 'naira': 'amount',
+      'amount': 'amount', 'price': 'amount', 'cost': 'amount', 'value': 'amount', '₦': 'amount', 'naira': 'amount', 'selling price': 'amount',
       'image': 'imageUrl', 'photo': 'imageUrl', 'picture': 'imageUrl', 'img': 'imageUrl', 'image url': 'imageUrl',
       'info': 'info', 'description': 'info', 'details': 'info', 'pack size': 'info',
       'pom': 'POM', 'prescription': 'POM', 'prescription required': 'POM',
@@ -579,51 +584,71 @@ export default function StoreManagementPage() {
 
 
   const handleConfirmBulkUpload = async () => {
-    if (!bulkData.length) {
-      alert('No data to upload.');
-      return;
-    }
-    if (!userBusinessName) {
-      alert('Cannot upload without a business name. Please ensure your profile is set up.');
+    if (!bulkData.length || !userBusinessName) {
+      alert('No data to upload or business name is missing.');
       return;
     }
 
     setIsSubmitting(true);
+    setUploadResult(null); // Reset previous results
+
     try {
-        const payload = {
-            products: bulkData,
-            fileName: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv',
-            businessName: userBusinessName, // Add businessName to the payload
-        };
+      const payload = {
+        products: bulkData,
+        fileName: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv',
+        businessName: userBusinessName,
+      };
       const response = await fetch('/api/bulk-upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      if (response.ok) {
-        const { savedProducts, bulkUploadRecord } = await response.json();
-        
-        setStockData(prev => [...savedProducts, ...prev]);
+      const resultData = await response.json();
 
-        if (bulkUploadRecord) {
-          setBulkUploadHistory(prev => [bulkUploadRecord, ...prev]);
-        }
-
-        alert('Bulk upload successful!');
-        setShowBulkPreview(false);
-        setBulkData([]);
-        if(fileInputRef.current) fileInputRef.current.value = "";
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Bulk upload failed');
+      if (!response.ok) {
+        throw new Error(resultData.message || 'Bulk upload failed');
       }
+
+      const { savedProducts, warnings, errors, bulkUploadRecord } = resultData;
+
+      // Update the main stock data list with only the successfully saved products
+      if (savedProducts && savedProducts.length > 0) {
+        setStockData(prev => [...savedProducts, ...prev]);
+      }
+
+      // Update the upload history if a record was created/updated
+      if (bulkUploadRecord) {
+        setBulkUploadHistory(prev => [
+            bulkUploadRecord, 
+            ...prev.filter(b => b._id !== bulkUploadRecord._id)
+        ].sort((a,b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()));
+      }
+      
+      // Set the detailed results to be displayed in the new Alert component
+      setUploadResult({
+        message: `${savedProducts.length} out of ${bulkData.length} items were uploaded.`,
+        warnings: warnings || [],
+        errors: errors || [],
+      });
+
+      // Clear the preview and file input
+      setShowBulkPreview(false);
+      setBulkData([]);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+
     } catch (error) {
       console.error('Error during bulk upload:', error);
-      alert(`An unexpected error occurred: ${(error as Error).message}`);
+      // Set a generic error if the API call itself fails
+      setUploadResult({
+          message: "An unexpected error occurred during upload.",
+          warnings: [],
+          errors: [{ message: (error as Error).message, item: 'N/A'}]
+      });
     }
     setIsSubmitting(false);
   };
+
 
 
 
@@ -1074,6 +1099,46 @@ export default function StoreManagementPage() {
 
             )}
           </Box>
+
+          {uploadResult && (
+    <Alert 
+        severity={uploadResult.errors.length > 0 ? "error" : uploadResult.warnings.length > 0 ? "warning" : "success"} 
+        sx={{ mt: 2, width: '100%', maxWidth: 600, maxHeight: 400, overflowY: 'auto' }}
+        onClose={() => setUploadResult(null)}
+    >
+        <AlertTitle>
+            {uploadResult.errors.length > 0 
+                ? "Upload Finished with Errors" 
+                : uploadResult.warnings.length > 0 
+                    ? "Upload Successful with Warnings"
+                    : "Upload Successful"}
+        </AlertTitle>
+
+        {uploadResult.message}
+
+        {uploadResult.errors.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>The following items could not be uploaded:</Typography>
+                <ul style={{ paddingLeft: '20px', margin: 0 }}>
+                    {uploadResult.errors.slice(0, 10).map((err, i) => (
+                        <li key={i}>
+                            <Typography variant="caption">
+                                <strong>{err.item.itemName || `Row ${err.item.row}`}:</strong> {err.message}
+                            </Typography>
+                        </li>
+                    ))}
+                </ul>
+                {uploadResult.errors.length > 10 && <Typography variant="caption">...and {uploadResult.errors.length - 10} more errors.</Typography>}
+            </Box>
+        )}
+        
+        {uploadResult.warnings.length > 0 && uploadResult.errors.length === 0 && (
+             <Typography variant="body2" sx={{ mt: 1 }}>
+                Some items had missing information that was auto-filled. Please go to the <strong>Stock</strong> tab to review and edit them.
+             </Typography>
+        )}
+    </Alert>
+)}
 
           <Divider sx={{ my: 4, width: '80%' }} />
 
