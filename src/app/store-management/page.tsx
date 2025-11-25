@@ -15,6 +15,8 @@ import WhatsAppButton from '../../components/WhatsAppButton';
 import { ContentCopy, Download, QrCode2 } from '@mui/icons-material';
 import { toPng } from 'html-to-image';
 import { toDataURL as toQRDataURL } from 'qrcode';
+import * as XLSX from 'xlsx';
+
 
 interface StockItem {
   _id?: string;
@@ -587,18 +589,19 @@ export default function StoreManagementPage() {
     return value.replace(/\s+/g, ' ').trim();
   };
 
-    const handleBulkFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBulkFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (result) => {
-        const headers = result.meta.fields || [];
+    const processData = (data: any[]) => {
+        if (!data.length) {
+            alert("The uploaded file is empty or could not be read.");
+            return;
+        }
+        const headers = Object.keys(data[0]);
         const headerMapping = normalizeCSVHeaders(headers);
-        
-        const parsedData = result.data.map((row: any) => {
+
+        const parsedData = data.map((row: any) => {
           const normalizedRow: Partial<StockItem> = {};
           for (const header of headers) {
               const mappedKey = headerMapping[header];
@@ -606,24 +609,20 @@ export default function StoreManagementPage() {
                   (normalizedRow as any)[mappedKey] = normalizeValue(mappedKey, row[header]);
               }
           }
-              
-
-          // Return a complete StockItem object with defaults
           return {
               itemName: '',
               activeIngredient: '',
               category: '',
               amount: 0,
               imageUrl: '',
-              ...normalizedRow, // Overwrite defaults with any parsed values
-              info: normalizedRow.info || '', // Ensure info is a string
-              POM: normalizedRow.POM || false, // Ensure POM is a boolean
+              ...normalizedRow,
+              info: normalizedRow.info || '',
+              POM: normalizedRow.POM || false,
               businessName: userBusinessName || 'N/A',
               coordinates: location || 'N/A',
               slug: userSlug || '',
           } as StockItem;
         })
-        // 🔥 Filter out any accidental garbage line like the one showing in your preview
         .filter(item => 
           item.itemName && 
           !item.itemName.toLowerCase().includes('src/app/')
@@ -631,13 +630,49 @@ export default function StoreManagementPage() {
 
         setBulkData(parsedData);
         setShowBulkPreview(true);
-      },
-       error: (error) => {
-        console.error("CSV parsing error:", error);
-        alert("Failed to parse CSV file. Please check the format.");
-      }
-    });
+    };
+
+    const reader = new FileReader();
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+
+    if (fileExtension === 'csv' || fileExtension === 'txt') {
+        reader.onload = (e) => {
+            const text = e.target?.result;
+            if (typeof text === 'string') {
+                Papa.parse(text, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (result) => processData(result.data),
+                    error: (error: any) => {
+
+                        console.error("CSV parsing error:", error);
+                        alert("Failed to parse CSV file. Please check the format.");
+                    }
+                });
+            }
+        };
+        reader.readAsText(file);
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+        reader.onload = (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet);
+                processData(json);
+              } catch (error: any) {
+
+                console.error("Excel parsing error:", error);
+                alert("Failed to parse Excel file. Please make sure it's a valid .xlsx or .xls file.");
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    } else {
+        alert(`Unsupported file type: .${fileExtension}. Please upload a CSV or Excel file.`);
+    }
   };
+
 
 
   const handleConfirmBulkUpload = async () => {
@@ -1193,8 +1228,14 @@ export default function StoreManagementPage() {
             <Typography variant="body2" sx={{ mb: 2 }}>Upload multiple items using a CSV file</Typography>
             <Button variant="contained" component="label" color="secondary">
               Choose CSV
-              <input type="file" accept=".csv" hidden onChange={handleBulkFileUpload} ref={fileInputRef} />
-            </Button>
+              <input 
+  type="file" 
+  accept=".csv,.xlsx,.xls,text/csv,application/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain" 
+  hidden 
+  onChange={handleBulkFileUpload} 
+  ref={fileInputRef} 
+/>
+ </Button>
 
             {showBulkPreview && (
             <Paper sx={{ mt: 3, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black' }}>
