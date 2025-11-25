@@ -17,6 +17,8 @@ export interface IUser extends Document {
     latitude?: number;
     longitude?: number;
   };
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
 }
 
 // The schema defines the blueprint for the database
@@ -42,8 +44,11 @@ const userSchema: Schema<IUser> = new mongoose.Schema({
       longitude: { type: Number },
     },
     required: false,
-    _id: false // <-- THIS IS THE CRITICAL FIX
+    _id: false 
   },
+  passwordResetToken: { type: String },
+  passwordResetExpires: { type: Date },
+
 });
 
 // This line creates the model
