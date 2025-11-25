@@ -179,6 +179,51 @@ export default function StoreManagementPage() {
     return false; // All fields are complete
   };
 
+    // A mapping of field names to the user-friendly, specific error messages.
+    const errorMessages: { [key: string]: string } = {
+      itemName: 'Please provide an item name.',
+      activeIngredient: 'Please include the active ingredient.',
+      category: 'Please include a category.',
+      amount: 'Price must be a number greater than zero.',
+      imageUrl: 'Please upload an image.',
+      info: 'Please add info (e.g., "1 sachet", "100ml bottle").',
+    };
+  
+    /**
+     * Validates a stock item and returns an array of specific error messages.
+     * @param item The StockItem object to validate.
+     * @returns An array of strings, where each string is a detailed error message. An empty array means the item is complete.
+     */
+    const getIncompleteFieldsList = (item: StockItem): string[] => {
+      const errors: string[] = [];
+      
+      // Check for missing, empty, or placeholder string values.
+      if (!item.itemName || item.itemName.trim() === '' || item.itemName === 'N/A') {
+        errors.push(errorMessages.itemName);
+      }
+      if (!item.activeIngredient || item.activeIngredient.trim() === '' || item.activeIngredient === 'N/A') {
+        errors.push(errorMessages.activeIngredient);
+      }
+      if (!item.category || item.category.trim() === '' || item.category === 'N/A') {
+        errors.push(errorMessages.category);
+      }
+      if (!item.imageUrl || item.imageUrl.trim() === '') {
+        errors.push(errorMessages.imageUrl);
+      }
+      if (!item.info || item.info.trim() === '' || item.info === 'N/A') {
+        errors.push(errorMessages.info);
+      }
+  
+      // Specifically check the amount.
+      const amountAsNumber = typeof item.amount === 'string' ? parseFloat(item.amount) : item.amount;
+      if (typeof amountAsNumber !== 'number' || isNaN(amountAsNumber) || amountAsNumber <= 0) {
+        errors.push(errorMessages.amount);
+      }
+  
+      return errors;
+    };
+  
+
 
 
   const fetchOrders = useCallback(async (businessName: string | null, isAdmin: boolean = false) => {
@@ -1392,17 +1437,53 @@ export default function StoreManagementPage() {
               <Button variant="contained" size="small" sx={{ mr: 1 }} onClick={() => { setEditingRowIndex(globalIndex); setEditingRowData(row); }}>Edit</Button>
               <Button variant="outlined" color="error" size="small" onClick={() => handleDelete(row._id!)}>Delete</Button>
 
-              {!row.isPublished && (
-    <Button
-      variant="contained"
-      color="primary"
-      size="small"
-      onClick={() => handlePublish(row._id!)}
-      sx={{ ml: 1 }}
-    >
-      Publish
-    </Button>
-  )}
+              {!row.isPublished && (() => {
+    // First, get the list of what's wrong with the item.
+    const incompleteFields = getIncompleteFieldsList(row);
+    const isItemIncomplete = incompleteFields.length > 0;
+
+    // This is our button. It will be disabled if the item is incomplete.
+    const publishButton = (
+      <Button
+        variant="contained"
+        color="primary"
+        size="small"
+        onClick={() => handlePublish(row._id!)}
+        disabled={isItemIncomplete}
+        sx={{ ml: 1 }}
+      >
+        Publish
+      </Button>
+    );
+
+    // If the item is incomplete, wrap the disabled button in a Tooltip
+    // that explains exactly why it's disabled.
+    if (isItemIncomplete) {
+      return (
+        <Tooltip
+          title={
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                Cannot publish. Please fix:
+              </Typography>
+              <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                {incompleteFields.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </Box>
+          }
+        >
+          {/* The Tooltip needs a child to attach to. A span is perfect for this. */}
+          <span>{publishButton}</span>
+        </Tooltip>
+      );
+    }
+
+    // If the item is complete, just return the regular, enabled button.
+    return publishButton;
+  })()}
+
 
             </TableCell>
           </>

@@ -32,6 +32,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import { event } from '../lib/gtag';
+import PharmacySearch from '../components/home/PharmacySearch';
+
 
 
 // Sample drug data for carousel
@@ -653,134 +655,17 @@ export default function Home() {
         <DrugCarousel />
       </Container>
 
-                  {/* Partner Pharmacies Section */}
+                        {/* Partner Pharmacies Section */}
       <Container maxWidth="lg" sx={{ mb: 6 }}>
         <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: '#006D5B' }}>
           Find Outlets Near You
         </Typography>
         
-        {/* Pharmacy Search Bar */}
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-          <TextField
-            fullWidth
-            placeholder="Search pharmacies near you..."
-            variant="outlined"
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <LocationOn sx={{ color: '#006D5B' }} />
-                </InputAdornment>
-              ),
-              sx: { borderRadius: '12px', bgcolor: 'white' }
-            }}
-          />
-          <Button
-            variant="contained"
-            size="small"
-            sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D40' }, px: 3, borderRadius: '12px' }}
-          >
-            Search
-          </Button>
-        </Box>
+        {/* This is the new, interactive component */}
+        <PharmacySearch />
         
-        {/* Conditional Rendering: Loading, Empty, or Content */}
-        {loadingPharmacies ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
-            <CircularProgress />
-          </Box>
-        ) : partnerPharmacies.length === 0 ? (
-          <Typography sx={{ textAlign: 'center', my: 5, color: 'text.secondary' }}>
-            No pharmacies found at the moment.
-          </Typography>
-        ) : (
-          <>
-            {/* Mobile Carousel - New Sleek Design */}
-            <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1 }}>
-              <IconButton onClick={() => scrollPharmacies('left')} sx={{ bgcolor: '#006D5B', color: 'white', '&:hover': { bgcolor: '#004D40' } }}>
-                <ArrowBackIos />
-              </IconButton>
-              <Box sx={{ flex: 1, overflow: 'hidden' }}>
-                <Box sx={{ display: 'flex', transform: `translateX(-${pharmacyScrollPosition * 100}%)`, transition: 'transform 0.4s ease' }}>
-                  {partnerPharmacies.map((pharmacy) => (
-                    <Box key={pharmacy._id} sx={{ width: '100%', flexShrink: 0, px: 1 }}>
-                    <Card component={Link} href="/find-medicines" sx={{ textDecoration: 'none', borderRadius: '30px 10px', overflow: 'hidden' }}>
-                  
-                  
-                      <Box sx={{ bgcolor: '#004D40', color: 'white', height: 120, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
-                        <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', lineHeight: 1.2 }}>
-                          {pharmacy.businessName}
-                        </Typography>
-                        <Typography variant="caption" sx={{ mt: 0.5, opacity: 0.8 }}>
-                          {pharmacy.businessAddress}
-                        </Typography>
-                      </Box>
-                      <CardContent sx={{ textAlign: 'center' }}>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}></Typography>
-                        <Button fullWidth variant="outlined" size="small" sx={{ borderColor: '#006D5B', color: '#006D5B' }}>Visit Store</Button>
-                      </CardContent>
-                    </Card>
-                  </Box>
-                  
-                  ))}
-                </Box>
-              </Box>
-              <IconButton onClick={() => scrollPharmacies('right')} sx={{ bgcolor: '#006D5B', color: 'white', '&:hover': { bgcolor: '#004D40' } }}>
-                <ArrowForwardIos />
-              </IconButton>
-            </Box>
-
-            {/* Desktop Carousel - New Sleek Design */}
-<Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1 }}>
-  <IconButton 
-    onClick={() => scrollDesktopPharmacies('left')}
-    disabled={desktopPharmacyIndex === 0}
-    sx={{ bgcolor: '#006D5B', color: 'white', '&:hover': { bgcolor: '#004D40' }, '&:disabled': { bgcolor: 'grey.300' } }}
-  >
-    <ArrowBackIos />
-  </IconButton>
-
-  <Box sx={{ flex: 1, overflow: 'hidden' }}>
-    <Box sx={{ 
-      display: 'flex', 
-      gap: 3,
-      transform: `translateX(-${desktopPharmacyIndex * (100 / 3)}%)`, // Slides by 1/3 for each group
-      transition: 'transform 0.5s ease-in-out' 
-    }}>
-      {partnerPharmacies.map((pharmacy) => (
-        <Box key={pharmacy._id} sx={{ width: 'calc(33.333% - 16px)', flexShrink: 0 }}>
-          <Card component={Link} href={`/${pharmacy.slug}`} sx={{ textDecoration: 'none', cursor: 'pointer', borderRadius: '30px 10px', overflow: 'hidden', '&:hover': { boxShadow: '0 8px 24px rgba(0,0,0,0.12)', transform: 'translateY(-4px)' }, transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <Box sx={{ bgcolor: '#004D40', color: 'white', height: 141, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {pharmacy.businessName}
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-                {pharmacy.businessAddress}
-              </Typography>
-            </Box>
-            <CardContent sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <Button fullWidth variant="outlined" sx={{ borderColor: '#006D5B', color: '#006D5B', '&:hover': { bgcolor: '#006D5B', color: 'white' }, mt: 'auto' }}>
-                Visit Store
-              </Button>
-            </CardContent>
-          </Card>
-        </Box>
-      ))}
-    </Box>
-  </Box>
-
-  <IconButton 
-    onClick={() => scrollDesktopPharmacies('right')}
-    disabled={desktopPharmacyIndex >= partnerPharmacies.length - 3}
-    sx={{ bgcolor: '#006D5B', color: 'white', '&:hover': { bgcolor: '#004D40' }, '&:disabled': { bgcolor: 'grey.300' } }}
-  >
-    <ArrowForwardIos />
-  </IconButton>
-</Box>
-
-          </>
-        )}
       </Container>
+
 
       {/* Drug Classes Section */}
       <Container maxWidth="lg" sx={{ mb: 6 }}>
