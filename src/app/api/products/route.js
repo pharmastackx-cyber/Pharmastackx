@@ -41,12 +41,12 @@ export async function GET(req) {
 
     const slug = req.nextUrl.searchParams.get('slug');
     console.log(`DEBUG [Backend]: Received slug: ${slug}`);
-    const query = {};
-    if (slug) {
-      query.slug = slug;
-    } else {
-      query.isPublished = true; // <-- ADD THIS LINE
-    }
+        
+        const query = { isPublished: true };
+        if (slug) {
+          query.slug = slug;
+        }
+    
 
     console.log('DEBUG [Backend]: MongoDB query:', query);
     const products = await Product.find(query).lean();
