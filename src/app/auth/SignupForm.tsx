@@ -4,6 +4,14 @@ import { TextField, Button, MenuItem, Box, Typography, InputAdornment, IconButto
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from "axios";
 
+const nigerianStates = [
+  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+  "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe",
+  "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos",
+  "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto",
+  "Taraba", "Yobe", "Zamfara"
+];
+
 export default function SignupForm({
   setError,
   setSuccess,
@@ -222,14 +230,21 @@ export default function SignupForm({
               required
             />
             <TextField
-              label="State"
-              name="state"
-              value={form.state || ""}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              required
-            />
+               select
+               label="State"
+               name="state"
+               value={form.state || ""}
+               onChange={handleChange}
+               fullWidth
+               margin="normal"
+               required
+           >
+               {nigerianStates.map((state) => (
+                   <MenuItem key={state} value={state}>
+                       {state}
+                   </MenuItem>
+               ))}
+           </TextField>
             <TextField
               label="City"
               name="city"
