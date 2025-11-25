@@ -15,18 +15,14 @@ export async function POST(req) {
   }
 
   const user = await User.findOne({ email });
-
-  // ***** START OF NEW DEBUGGING LOG *****
-  console.log('[Login API] User found in database:', user);
-  // ***** END OF NEW DEBUGGING LOG *****
-
+  
   if (!user) {
-    return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
+    return NextResponse.json({ error: 'No account found with this email.' }, { status: 404 }); 
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
-    return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
+    return NextResponse.json({ error: 'Incorrect password. Please try again.' }, { status: 401 });
   }
 
   const token = jwt.sign(
