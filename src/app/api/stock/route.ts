@@ -102,6 +102,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // Prevent duplicate entries
+    const existingProduct = await Product.findOne({ itemName, businessName });
+    if (existingProduct) {
+      return NextResponse.json({ error: 'Product with this name already exists for this business' }, { status: 409 });
+    }
+
     const newProduct = new Product({
       itemName,
       activeIngredient,

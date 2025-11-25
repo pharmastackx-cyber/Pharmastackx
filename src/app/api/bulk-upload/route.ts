@@ -58,6 +58,16 @@ export async function POST(req: NextRequest) {
         continue; // Skip this product and move to the next one
       }
 
+      // Prevent duplicate entries
+      const existingProduct = await Product.findOne({ itemName: p.itemName, businessName: p.businessName });
+      if (existingProduct) {
+        errors.push({
+          message: `Product with this name already exists for this business.`,
+          item: { ...p, row: index + 2 }
+        });
+        continue;
+      }
+
       // --- 2. Data Normalization & Warning Generation ---
       const productData = {
         itemName: p.itemName,
