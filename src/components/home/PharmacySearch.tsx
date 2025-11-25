@@ -180,7 +180,9 @@ export default function PharmacySearch() {
 const PharmacyCard = ({ pharmacy }: { pharmacy: IPharmacy }) => (
   <Card
     component={Link}
-    href={`/${pharmacy.slug}`}
+    href={`https://${pharmacy.slug}.psx.ng/find-medicines?slug=${pharmacy.slug}`}
+    target="_blank" 
+    rel="noopener noreferrer"
     sx={{
       textDecoration: 'none',
       cursor: 'pointer',
