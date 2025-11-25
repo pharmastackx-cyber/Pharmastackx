@@ -119,11 +119,17 @@ export default function Navbar() {
       background: 'linear-gradient(180deg, #006D5B 0%, #004D40 50%, #00332B 100%)',
       color: 'white'
     }}>
-      <Box sx={{
-        p: 2,
-        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        textAlign: 'center'
-      }}>
+       <Box
+          component={Link}
+          href="https://psx.ng"
+          sx={{
+            p: 2,
+            display: 'block',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            textAlign: 'center',
+            textDecoration: 'none'
+          }}
+        >
         <img
           src="https://i.ibb.co/bM86kxhT/psx-logo-removebg-preview.png"
           alt="Pharmastackx Logo"
@@ -266,7 +272,7 @@ export default function Navbar() {
             <MenuIcon />
           </IconButton>
           <Box sx={{ mr: 2, display: 'flex', alignItems: 'center' }}>
-            <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
+          <Link href="https://psx.ng" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
               <img
                 src="https://i.ibb.co/bM86kxhT/psx-logo-removebg-preview.png"
                 alt="Pharmastackx Logo"
