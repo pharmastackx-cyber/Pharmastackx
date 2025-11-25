@@ -46,6 +46,17 @@ export async function POST(req) {
       finalRole = 'admin';
     }
 
+     // Generate a unique username from the email
+     const baseUsername = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/gi, '');
+     let username = baseUsername;
+     let userExists = await User.findOne({ username });
+     let count = 1;
+     while (userExists) {
+         username = `${baseUsername}${count}`;
+         userExists = await User.findOne({ username });
+         count++;
+     }
+
     let slug = undefined;
     if (['pharmacy', 'clinic', 'vendor', 'agent'].includes(finalRole) && businessName) {
       slug = businessName.trim().split(' ')[0].toLowerCase();
@@ -60,6 +71,7 @@ export async function POST(req) {
     }
 
     const newUser = new User({
+      username,
       email,
       password: hashedPassword,
       role: finalRole,
