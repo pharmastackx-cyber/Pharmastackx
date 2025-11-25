@@ -6,10 +6,10 @@ import {
   Table, TableHead, TableBody, TableRow, TableCell, Paper, useTheme, 
   useMediaQuery, CircularProgress, Tooltip, Select, MenuItem, 
   FormControl, InputLabel, Divider, Collapse, Checkbox, FormControlLabel,
-  Container, Alert, AlertTitle, Link, Chip 
+  Container, Alert, AlertTitle, Link, Chip, Grid
 } from '@mui/material';
 
-import { Storefront, LocationOn, UploadFile, ExpandMore } from '@mui/icons-material';
+import { Storefront, LocationOn, UploadFile, ExpandMore, Inventory, CheckCircle, Warning,  } from '@mui/icons-material';
 import Papa from 'papaparse';
 import WhatsAppButton from '../../components/WhatsAppButton';
 import { ContentCopy, Download, QrCode2 } from '@mui/icons-material';
@@ -29,6 +29,7 @@ interface StockItem {
   POM: boolean;  
   slug: string;
   isPublished: boolean;
+  hasSuggestion?: boolean;
 }
 
 interface IBulkUpload {
@@ -152,6 +153,7 @@ export default function StoreManagementPage() {
         info: product.info || '',
         POM: product.POM || false,
         isPublished: product.isPublished || false,
+        hasSuggestion: product.hasSuggestion || false,
       }));
       setStockData(transformedData);
     } catch (error) {
@@ -223,6 +225,7 @@ export default function StoreManagementPage() {
       return errors;
     };
   
+    const [autoFillingId, setAutoFillingId] = useState<string | null>(null);
 
 
 
@@ -415,6 +418,11 @@ export default function StoreManagementPage() {
       return valB.localeCompare(valA);
     }
   });
+
+  const totalProducts = stockData.length;
+  const publishedItems = stockData.filter(item => item.isPublished).length;
+  const needsAttention = stockData.filter(item => isItemIncomplete(item)).length;
+  
 
 
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -761,6 +769,48 @@ export default function StoreManagementPage() {
     }
   };
 
+  const handleAutoFill = async (item: StockItem) => {
+    if (!item._id || !item.itemName) {
+      alert('Cannot fetch suggestions for an item without a name.');
+      return;
+    }
+
+    setAutoFillingId(item._id); // Start loading indicator for this row
+    try {
+      const response = await fetch(`/api/stock/suggestions?itemName=${encodeURIComponent(item.itemName)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'No suggestions found.');
+      }
+
+      const { suggestion } = await response.json();
+
+      const itemIndex = stockData.findIndex(d => d._id === item._id);
+      if (itemIndex === -1) return;
+
+      // Prepare suggested data, only filling in fields that are missing or 'N/A'
+      const suggestedData: Partial<StockItem> = {
+        activeIngredient: (!item.activeIngredient || item.activeIngredient === 'N/A') ? suggestion.activeIngredient : item.activeIngredient,
+        category: (!item.category || item.category === 'N/A') ? suggestion.category : item.category,
+        imageUrl: !item.imageUrl ? suggestion.imageUrl : item.imageUrl,
+        info: (!item.info || item.info === 'N/A') ? suggestion.info : item.info,
+        POM: item.POM ? item.POM : suggestion.POM,
+      };
+
+      // Put the row into edit mode with the new data
+      setEditingRowIndex(itemIndex);
+      setEditingRowData({ ...item, ...suggestedData });
+      
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+      alert(`Could not find any suggestions for "${item.itemName}". Please fill in the details manually.`);
+    } finally {
+      setAutoFillingId(null); // Stop loading indicator
+    }
+  };
+
+
   const handleUpdateOrderStatus = async (orderId: string, newStatus: 'processing' | 'completed' | 'cancelled' | 'failed') => {
     const confirmationMessage = `Are you sure you want to change the order status to ${newStatus}?`;
     if (!window.confirm(confirmationMessage)) return;
@@ -933,6 +983,8 @@ export default function StoreManagementPage() {
   const whatsAppMessage = "join adult-result";
   const whatsAppUrl = `https://wa.me/${whatsAppNumber}?text=${encodeURIComponent(whatsAppMessage)}`;
   // --- END: WhatsApp Activation Link ---
+
+  
 
 
 
@@ -1262,6 +1314,49 @@ export default function StoreManagementPage() {
 
       {selectedTab === 2 && (
          <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+           
+           {/* --- START: ADD THIS CORRECTED CODE --- */}
+<Box sx={{ width: '100%', maxWidth: 900, mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+  <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'center', flex: 1 }}>
+    <Inventory color="primary" sx={{ fontSize: 40 }} />
+    <Box>
+      <Typography variant="h6">{totalProducts}</Typography>
+      <Typography variant="body2" color="text.secondary">Total Products</Typography>
+    </Box>
+  </Paper>
+  <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'center', flex: 1 }}>
+    <CheckCircle color="success" sx={{ fontSize: 40 }} />
+    <Box>
+      <Typography variant="h6">{publishedItems}</Typography>
+      <Typography variant="body2" color="text.secondary">Published</Typography>
+    </Box>
+  </Paper>
+  <Paper 
+  sx={{ 
+    p: 2, 
+    display: 'flex', 
+    alignItems: 'center', 
+    gap: 2, 
+    justifyContent: 'center', 
+    flex: 1, 
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: 'action.hover'
+    }
+  }}
+  onClick={() => setShowIncomplete(true)}
+>
+    <Warning color="warning" sx={{ fontSize: 40 }} />
+    <Box>
+      <Typography variant="h6">{needsAttention}</Typography>
+      <Typography variant="body2" color="text.secondary">Needs Attention</Typography>
+    </Box>
+</Paper>
+
+</Box>
+{/* --- END: ADD THIS CORRECTED CODE --- */}
+
+           
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Current Stock Catalogue</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2, maxWidth: 900, width: '100%', textAlign: 'center', fontStyle: 'italic' }}>
             These are all medications you have uploaded. A red dot indicates an item with incomplete details that you can edit.
@@ -1436,6 +1531,25 @@ export default function StoreManagementPage() {
             <TableCell>
               <Button variant="contained" size="small" sx={{ mr: 1 }} onClick={() => { setEditingRowIndex(globalIndex); setEditingRowData(row); }}>Edit</Button>
               <Button variant="outlined" color="error" size="small" onClick={() => handleDelete(row._id!)}>Delete</Button>
+              {/* START: Add this code for the Auto-fill button */}
+              {row.hasSuggestion && isItemIncomplete(row) && (
+  <Tooltip title="Automatically find and fill in missing details for this item.">
+    <span> {/* Span is needed for Tooltip when button is disabled */}
+      <Button
+        variant="contained"
+        size="small"
+        onClick={() => handleAutoFill(row)}
+        disabled={autoFillingId === row._id}
+        sx={{ ml: 1, bgcolor: '#ff9800', '&:hover': { bgcolor: '#f57c00' } }}
+        startIcon={autoFillingId === row._id ? <CircularProgress size={14} color="inherit" /> : <>✨</>}
+      >
+        Auto-fill
+      </Button>
+    </span>
+  </Tooltip>
+)}
+
+
 
               {!row.isPublished && (() => {
     // First, get the list of what's wrong with the item.

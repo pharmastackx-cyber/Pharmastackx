@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
 import Product from '@/models/Product';
@@ -8,6 +9,17 @@ import User from '@/models/User';
 
 export const dynamic = 'force-dynamic';
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
+
+// Helper function to check if an item is incomplete
+const isItemIncomplete = (item: any): boolean => {
+    const hasMissingInfo = (
+        !item.activeIngredient || item.activeIngredient === 'N/A' ||
+        !item.category || item.category === 'N/A' ||
+        !item.imageUrl || item.imageUrl.trim() === '' ||
+        !item.info || item.info.trim() === ''
+    );
+    return hasMissingInfo;
+};
 
 export async function GET(req: NextRequest) {
   await dbConnect();
@@ -21,41 +33,52 @@ export async function GET(req: NextRequest) {
 
     if (sessionToken) {
       try {
-        // If a token exists, verify it to get the user's role
         const payload = jwt.verify(sessionToken.value, JWT_SECRET) as { userId: string };
         const user = await User.findById(payload.userId).select('role').lean();
-        if (user) {
-          userRole = user.role;
-        }
+        if (user) userRole = user.role;
       } catch (e) {
-        // If the token is invalid or expired, treat them as a public user.
         userRole = null;
       }
+    }
 
-      }
-
-      let query: any = {};
-
-      // This is the 3-way logic you correctly described:
+    let query: any = {};
     if (userRole === 'admin') {
-      // 1. If the user is an admin, the query is empty. They see everything.
+      // No filter for admin
     } else if (businessName) {
-      // 2. If a businessName is specified, fetch all items for that business.
-      //    (This covers vendors viewing their own stock).
       query.businessName = businessName;
     } else {
-      // 3. If none of the above, it's a public user. They only see published items.
       query.isPublished = true;
     }
-    const items = await Product.find(query).sort({ createdAt: -1 });
-    return NextResponse.json({ items });
+
+    const itemsFromDB = await Product.find(query).sort({ createdAt: -1 }).lean();
+
+    const itemsWithSuggestionFlag = await Promise.all(
+      itemsFromDB.map(async (item) => {
+        if (item.itemName && isItemIncomplete(item)) {
+          const suggestionSource = await Product.findOne({
+            itemName: { $regex: new RegExp(item.itemName, 'i') },
+            _id: { $ne: item._id },
+            isPublished: true,
+            imageUrl: { $ne: null, $nin: [''] },
+            category: { $ne: null, $nin: ['', 'N/A'] },
+            activeIngredient: { $ne: null, $nin: ['', 'N/A'] },
+          }).select('_id').lean();
+
+          if (suggestionSource) {
+            return { ...item, hasSuggestion: true };
+          }
+        }
+        return { ...item, hasSuggestion: false };
+      })
+    );
+
+    return NextResponse.json({ items: itemsWithSuggestionFlag });
 
   } catch (error) {
-      console.error('Error fetching stock:', error);
-      return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+    console.error('Error fetching stock:', error);
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
-
 
 export async function POST(req: NextRequest) {
   try {
@@ -79,20 +102,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Create a new product instance with all fields
     const newProduct = new Product({
       itemName,
       activeIngredient,
       category,
       amount,
       businessName,
-      imageUrl: imageUrl || '', // Provide default if not present
-      coordinates: coordinates || '', // Provide default if not present
-      info: info || '', // Provide default if not present
-      POM: POM || false, // Provide default if not present
+      imageUrl: imageUrl || '',
+      coordinates: coordinates || '',
+      info: info || '',
+      POM: POM || false,
       slug: slug
     });
-
 
     const savedProduct = await newProduct.save();
     
@@ -100,7 +121,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error('Error adding stock:', error);
-    
     
     if (error instanceof Error && error.name === 'ValidationError') {
       return NextResponse.json({ error: error.message }, { status: 400 });
