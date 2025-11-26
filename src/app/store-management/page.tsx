@@ -3,10 +3,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Tabs, Tab, IconButton, TextField, Button,
-  Table, TableHead, TableBody, TableRow, TableCell, Paper, useTheme, 
+  Table, TableHead, TableBody, TableRow, TableCell, TableContainer, Paper, useTheme, 
   useMediaQuery, CircularProgress, Tooltip, Select, MenuItem, 
   FormControl, InputLabel, Divider, Collapse, Checkbox, FormControlLabel,
-  Container, Alert, AlertTitle, Link, Chip, Grid
+  Container, Alert, AlertTitle, Link, Chip, Grid, Stack, Modal,
+  Fade,
+  Backdrop,
+  
 } from '@mui/material';
 
 import { Storefront, LocationOn, UploadFile, ExpandMore, Inventory, CheckCircle, Warning,  } from '@mui/icons-material';
@@ -16,6 +19,11 @@ import { ContentCopy, Download, QrCode2 } from '@mui/icons-material';
 import { toPng } from 'html-to-image';
 import { toDataURL as toQRDataURL } from 'qrcode';
 import * as XLSX from 'xlsx';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+
+
 
 
 interface StockItem {
@@ -41,6 +49,15 @@ interface IBulkUpload {
   uploadedAt: string;
 }
 
+interface UploadHistoryItem {
+  _id: string;
+  name: string; 
+  itemCount: number;
+  uploadedAt: string;
+  type: 'Single' | 'Bulk';
+  status: 'Successful' | 'Partial' | 'Failed';
+  businessName?: string;
+}
 
 
 interface Order {
@@ -60,12 +77,14 @@ interface Order {
 
 export default function StoreManagementPage() {
   const [selectedTab, setSelectedTab] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [historyVersion, setHistoryVersion] = useState(0);
+  
   const [location, setLocation] = useState<string | null>(null);
   const [userSlug, setUserSlug] = useState<string | null>(null);
   const [userBusinessName, setUserBusinessName] = useState<string | null>(null);
   const [businessCoordinates, setBusinessCoordinates] = useState<{ latitude?: number; longitude?: number } | null>(null);
 
-  // New state and refs for Store URL and Flyer
   const [copied, setCopied] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const flyerRef = useRef<HTMLDivElement>(null);
@@ -79,14 +98,18 @@ export default function StoreManagementPage() {
   const [bulkData, setBulkData] = useState<StockItem[]>([]);
   const [stockData, setStockData] = useState<StockItem[]>([]);
   const [loadingStock, setLoadingStock] = useState(true);
+  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bulkUploadHistory, setBulkUploadHistory] = useState<IBulkUpload[]>([]);
+  const [uploadHistory, setUploadHistory] = useState<UploadHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [uploadResult, setUploadResult] = useState<{
     message: string;
     warnings: { message: string; item: any }[];
     errors: { message: string; item: any }[];
   } | null>(null);
+  const [uploadSuccessInfo, setUploadSuccessInfo] = useState<{ count: number } | null>(null);
+
 
 
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
@@ -109,6 +132,7 @@ export default function StoreManagementPage() {
 
   const formRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const successAlertRef = useRef<HTMLDivElement>(null);
 
 
   const [formValues, setFormValues] = useState<Omit<StockItem, '_id'>>({
@@ -228,6 +252,13 @@ export default function StoreManagementPage() {
     };
   
     const [autoFillingId, setAutoFillingId] = useState<string | null>(null);
+    const [selectedProduct, setSelectedProduct] = useState<StockItem | null>(null);
+    const [isEditingTile, setIsEditingTile] = useState(false);
+    const [tileEditData, setTileEditData] = useState<StockItem | null>(null);
+    const [tileImageFile, setTileImageFile] = useState<File | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+
+
 
 
 
@@ -292,6 +323,7 @@ export default function StoreManagementPage() {
         const userData = await userRes.json();
 
         const isAdmin = userData.user?.role === 'admin';
+        setIsAdmin(isAdmin);
 
         let currentBusinessName: string | null = null;
         let currentCoordinates: string | null = null;
@@ -358,28 +390,52 @@ export default function StoreManagementPage() {
   }, [showUploadForm]); // This effect will re-run whenever `showUploadForm` changes
 
   useEffect(() => {
-    const fetchBulkUploadHistory = async () => {
-      // Only fetch if we have a business name to query
-      if (!userBusinessName) return;
+    // Fetches upload history from the database
+    const fetchHistory = async () => {
+      // For non-admins, don't fetch if business name isn't available yet.
+      // For admins, we can fetch immediately.
+      if (!isAdmin && !userBusinessName) {
+        setUploadHistory([]);
+        return;
+      }
 
       setLoadingHistory(true);
       try {
-        const response = await fetch(`/api/bulk-upload?businessName=${encodeURIComponent(userBusinessName)}`);
+        // Admin gets all uploads, vendors get only their own.
+        const apiUrl = isAdmin 
+            ? '/api/bulk-upload' 
+            : `/api/bulk-upload?businessName=${encodeURIComponent(userBusinessName!)}`;
+            
+        const response = await fetch(apiUrl);
         if (!response.ok) throw new Error('Failed to fetch history');
         const data = await response.json();
-        setBulkUploadHistory(data.uploads);
+        
+        // The API response for an admin must include the businessName on each record.
+        const formattedHistory: UploadHistoryItem[] = data.uploads.map((upload: any) => ({
+          _id: upload._id,
+          name: upload.csvName,
+          itemCount: upload.itemCount,
+          uploadedAt: upload.uploadedAt,
+          type: 'Bulk' as 'Bulk',
+          status: 'Successful', // All historical records from DB are successful uploads
+          businessName: upload.businessName || 'N/A', // Get businessName from API response
+        }));
+        
+        setUploadHistory(formattedHistory);
       } catch (error) {
-        console.error('Error fetching bulk upload history:', error);
-        // Avoid alerting on initial load if history is just empty
+        console.error('Error fetching upload history:', error);
+      } finally {
+        setLoadingHistory(false);
       }
-      setLoadingHistory(false);
     };
 
-    // Only fetch history when the "Upload" tab is visible
+    // We only fetch the history when the Upload tab is visible.
     if (selectedTab === 1) {
-      fetchBulkUploadHistory();
+      fetchHistory();
     }
-  }, [selectedTab, userBusinessName]); // Re-run if the user/business changes
+    // Re-run if the tab, user, or admin status changes.
+  }, [selectedTab, userBusinessName, isAdmin]);
+
 
       // Generate QR code when slug is available
   useEffect(() => {
@@ -390,6 +446,14 @@ export default function StoreManagementPage() {
         .catch(err => console.error('Failed to generate QR code:', err));
     }
   }, [userSlug]);
+
+    
+    useEffect(() => {
+      if (uploadSuccessInfo && successAlertRef.current) {
+        successAlertRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, [uploadSuccessInfo]);
+  
 
 
   const filteredOrders = orders.filter(order =>
@@ -514,45 +578,62 @@ export default function StoreManagementPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-        const newProduct = {
-            ...formValues,
-            businessName: userBusinessName,
-            amount: Number(formValues.amount) || 0,
-            slug: userSlug, // Add this line
-        };
-        const response = await fetch('/api/stock', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newProduct),
-        });
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to submit form');
-        }
-        const { product: savedProduct } = await response.json();
-        setStockData(prev => [savedProduct, ...prev]);
-        alert('Item added successfully!');
-        setShowUploadForm(false);
-        setFormValues({
-          itemName: '',
-          activeIngredient: '',
-          category: '',
-          amount: '',
-          imageUrl: '',
-          businessName: userBusinessName || '',
-          coordinates: location || '',
-          info: '',        // ✅ fixed line
-          POM: false,
-          slug: '' ,
-          isPublished: false,
-        });
-        
-        
-    } catch (error) {
-        console.error('Error submitting form:', error);
-        alert(`Error: ${(error as Error).message}`);
-    }
-    setIsSubmitting(false);
+      const newProduct = {
+          ...formValues,
+          businessName: userBusinessName,
+          amount: Number(formValues.amount) || 0,
+          slug: userSlug,
+      };
+      const response = await fetch('/api/stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newProduct),
+      });
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to submit form');
+      }
+      const { product: savedProduct } = await response.json();
+      setStockData(prev => [savedProduct, ...prev]);
+      setUploadSuccessInfo({ count: 1 });
+      setUploadResult(null);
+      setShowUploadForm(false);
+      setFormValues({
+        itemName: '',
+        activeIngredient: '',
+        category: '',
+        amount: '',
+        imageUrl: '',
+        businessName: userBusinessName || '',
+        coordinates: location || '',
+        info: '',
+        POM: false,
+        slug: '' ,
+        isPublished: false,
+      });
+      
+  } catch (error) {
+      console.error('Error submitting form:', error);
+      alert(`Error: ${(error as Error).message}`);
+  } finally {
+      setIsSubmitting(false);
+      // This will trigger the history to reload, including the new item.
+      setHistoryVersion(v => v + 1); 
+  }
+
+            // Add a 'Failed' entry to the history for the single upload attempt
+            const failedHistoryItem: UploadHistoryItem = {
+              _id: `failed-${Date.now()}`, // Create a temporary unique ID
+              name: formValues.itemName || 'Unnamed Item',
+              itemCount: 1,
+              uploadedAt: new Date().toISOString(),
+              type: 'Single',
+              status: 'Failed',
+              businessName: userBusinessName || '',
+            };
+            setUploadHistory(prev => [failedHistoryItem, ...prev]);
+    
+
   };
 
   const normalizeCSVHeaders = (headers: string[]) => {
@@ -682,7 +763,9 @@ export default function StoreManagementPage() {
     }
 
     setIsSubmitting(true);
-    setUploadResult(null); // Reset previous results
+    setUploadResult(null); 
+    setUploadSuccessInfo(null); 
+
 
     try {
       const payload = {
@@ -709,14 +792,37 @@ export default function StoreManagementPage() {
         setStockData(prev => [...savedProducts, ...prev]);
       }
 
-      // Update the upload history if a record was created/updated
+                  // Update the upload history if a record was created/updated
       if (bulkUploadRecord) {
-        setBulkUploadHistory(prev => [
-            bulkUploadRecord, 
-            ...prev.filter(b => b._id !== bulkUploadRecord._id)
-        ].sort((a,b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()));
+        // Determine the status of the upload
+        const status: 'Successful' | 'Partial' | 'Failed' = 
+          savedProducts.length > 0 && errors.length > 0 ? 'Partial' :
+          savedProducts.length > 0 ? 'Successful' :
+          'Failed';
+
+        const newHistoryItem: UploadHistoryItem = {
+          _id: bulkUploadRecord._id,
+          name: bulkUploadRecord.csvName,
+          itemCount: bulkUploadRecord.itemCount, // This is the success count
+          uploadedAt: bulkUploadRecord.uploadedAt,
+          type: 'Bulk',
+          status: status,
+          businessName: userBusinessName || '',
+        };
+        setUploadHistory(prev => 
+            [newHistoryItem, ...prev.filter(h => h._id !== newHistoryItem._id)]
+            .sort((a,b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+        );
       }
+
       
+      
+      // Show the new success message for the successfully saved products
+      if (savedProducts && savedProducts.length > 0) {
+      setUploadSuccessInfo({ count: savedProducts.length });
+}
+
+
       // Set the detailed results to be displayed in the new Alert component
       setUploadResult({
         message: `${savedProducts.length} out of ${bulkData.length} items were uploaded.`,
@@ -737,9 +843,24 @@ export default function StoreManagementPage() {
           warnings: [],
           errors: [{ message: (error as Error).message, item: 'N/A'}]
       });
-    }
-    setIsSubmitting(false);
-  };
+    
+
+          // Add a 'Failed' entry to the history for the bulk upload attempt
+          const failedHistoryItem: UploadHistoryItem = {
+            _id: `failed-bulk-${Date.now()}`, // temporary unique ID
+            name: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv',
+            itemCount: bulkData.length, // The number of items attempted
+            uploadedAt: new Date().toISOString(),
+            type: 'Bulk',
+            status: 'Failed',
+            businessName: userBusinessName || '',
+          };
+          setUploadHistory(prev => [failedHistoryItem, ...prev]);
+        } finally {
+          setIsSubmitting(false);
+          setHistoryVersion(v => v + 1);
+      }
+      };
 
   const handlePublish = async (id: string) => {
     try {
@@ -771,7 +892,41 @@ export default function StoreManagementPage() {
     }
   };
 
+  const handleUnpublish = async (id: string) => {
+    if (!window.confirm('Are you sure you want to withdraw this item? It will be removed from the public storefront.')) return;
+    
+    try {
+      const response = await fetch('/api/stock/unpublish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
 
+      // If the response is NOT okay, then we expect an error message in the JSON body.
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to unpublish item.');
+      }
+
+      // If the response IS okay, we don't need to parse a body.
+      // We'll find the item's name for the alert message.
+      const itemToUpdate = stockData.find(item => item._id === id);
+
+      // Update the item in the local state to reflect the change.
+      setStockData(prevData =>
+        prevData.map(item =>
+          item._id === id ? { ...item, isPublished: false } : item
+        )
+      );
+      
+      alert(`Item "${itemToUpdate?.itemName || 'Item'}" has been unpublished successfully.`);
+
+    } catch (error) {
+      console.error('Error unpublishing item:', error);
+      // This will now correctly show the error message from the server if one was sent.
+      alert((error as Error).message);
+    }
+  };
 
 
 
@@ -1011,6 +1166,87 @@ export default function StoreManagementPage() {
     reader.readAsDataURL(file);
   };
 
+  const handleTileFormChange = (field: keyof StockItem, value: any) => {
+    if (tileEditData) {
+      setTileEditData({ ...tileEditData, [field]: value });
+    }
+  };
+
+  const handleTileImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setTileImageFile(event.target.files[0]);
+      // Show a preview instantly
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          handleTileFormChange('imageUrl', e.target.result as string);
+        }
+      };
+      reader.readAsDataURL(event.target.files[0]);
+    }
+  };
+
+  const handleTileSave = async () => {
+    if (!tileEditData?._id) return;
+    setIsUploading(true);
+
+    let dataToSave = { ...tileEditData };
+
+    try {
+      // Step 1: Upload image if a new one was selected
+      if (tileImageFile) {
+        const formData = new FormData();
+        formData.append('file', tileImageFile);
+        const uploadResponse = await fetch('/api/products/upload', { method: 'POST', body: formData });
+        const uploadResult = await uploadResponse.json();
+        if (!uploadResponse.ok) throw new Error(uploadResult.message || 'Failed to upload image.');
+        dataToSave.imageUrl = uploadResult.url;
+      }
+
+      // Step 2: Save the product data
+      const saveResponse = await fetch(`/api/stock/${dataToSave._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToSave),
+      });
+      const saveResult = await saveResponse.json();
+      if (!saveResponse.ok) throw new Error(saveResult.message || 'Failed to save product.');
+
+      // Step 3: Update local state
+      const updatedStockData = stockData.map(item => item._id === dataToSave._id ? dataToSave : item);
+      setStockData(updatedStockData);
+      setSelectedProduct(dataToSave); // Update the view with the new data
+      
+      alert('Product updated successfully!');
+    } catch (error) {
+      console.error("Save error:", error);
+      alert((error as Error).message);
+    } finally {
+      setIsUploading(false);
+      setIsEditingTile(false); // Exit edit mode
+      setTileImageFile(null); // Clear the selected file
+    }
+  };
+
+  const handleNavigation = (direction: 'next' | 'prev') => {
+    if (!selectedProduct) return;
+
+    // Use the filteredStock array which respects the user's current search/filter
+    const currentIndex = filteredStock.findIndex(item => item._id === selectedProduct._id);
+    if (currentIndex === -1) return; // Exit if the item isn't found for some reason
+
+    const newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+
+    // Check if the new index is within the bounds of the array
+    if (newIndex >= 0 && newIndex < filteredStock.length) {
+      const newProduct = filteredStock[newIndex];
+      setSelectedProduct(newProduct);
+      setTileEditData(newProduct);
+      setIsEditingTile(false); // Always reset to detail view when navigating
+    }
+  };
+
+
 
     // --- START: WhatsApp Activation Link ---
   // Construct the one-click WhatsApp activation link
@@ -1133,6 +1369,39 @@ export default function StoreManagementPage() {
 
       {selectedTab === 1 && (
         <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+
+{uploadSuccessInfo && (
+    <Alert
+      ref={successAlertRef} // Attach the ref here
+      severity="success"
+      onClose={() => setUploadSuccessInfo(null)}
+      sx={{
+        mb: 3,
+        width: '100%',
+        maxWidth: 600,
+        alignItems: 'flex-start',
+        boxShadow: '0 4px 12px rgba(0, 128, 0, 0.4)', // Makes it pop
+        border: '1px solid #4caf50', // Adds a subtle border
+      }}
+    >
+      <AlertTitle sx={{ fontWeight: 'bold' }}>Success!</AlertTitle>
+      <Typography variant="body2" sx={{ mb: 1 }}>
+        <strong>{uploadSuccessInfo.count} {uploadSuccessInfo.count === 1 ? 'product has' : 'products have'} been added to your stock catalogue.</strong>
+      </Typography>
+      <Typography variant="body2">
+        Your items are now in review. Our team normally takes 24–48 hours to verify product details, fill in missing fields, and publish them to the Find Medicines page.
+      </Typography>
+      <Typography variant="body2" sx={{ mt: 1 }}>
+        To speed things up, you can open the{' '}
+        <Link component="button" variant="body2" onClick={() => { setSelectedTab(2); setUploadSuccessInfo(null); }} sx={{ fontWeight: 'bold', textAlign: 'left' }}>
+          Stock Catalogue
+        </Link>
+        , review each item, make corrections, and publish any product immediately.
+      </Typography>
+    </Alert>
+  )}
+
+
 
 <Typography 
       variant="body2" 
@@ -1313,33 +1582,58 @@ export default function StoreManagementPage() {
     </Alert>
 )}
 
-          <Divider sx={{ my: 4, width: '80%' }} />
+        
 
-<Typography variant="h6" sx={{ fontWeight: 600 }}>Bulk Upload History</Typography>
+<Divider sx={{ my: 4, width: '80%' }} />
+
+<Typography variant="h6" sx={{ fontWeight: 600 }}>Upload History</Typography>
 <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: 'italic' }}>
-    Showing your last 20 uploads.
+    Showing your recent single and bulk uploads. Note: Single item history is cleared on page reload.
 </Typography>
 
 {loadingHistory ? <CircularProgress /> : (
-  <Paper sx={{ maxWidth: 600, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black', p: 2, mt: 1 }}>
+  <Paper sx={{ maxWidth: isAdmin ? 800 : 600, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black', p: 2, mt: 1, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
     <Table size="small">
       <TableHead>
         <TableRow>
-          <TableCell sx={{ fontWeight: 'bold' }}>File Name</TableCell>
-          <TableCell sx={{ fontWeight: 'bold' }}>Items Uploaded</TableCell>
+          <TableCell sx={{ fontWeight: 'bold' }}>Name / File</TableCell>
+          {isAdmin && <TableCell sx={{ fontWeight: 'bold' }}>Business Name</TableCell>}
+          <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
+          <TableCell align="center" sx={{ fontWeight: 'bold' }}>Items</TableCell>
+          <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
           <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
-        {bulkUploadHistory.length > 0 ? bulkUploadHistory.map((upload) => (
-          <TableRow key={upload._id}>
-            <TableCell>{upload.csvName}</TableCell>
-            <TableCell>{upload.itemCount}</TableCell>
+        {uploadHistory.length > 0 ? uploadHistory.map((upload) => (
+          <TableRow hover key={upload._id}>
+            <TableCell>{upload.name}</TableCell>
+            {isAdmin && <TableCell>{upload.businessName}</TableCell>}
+            <TableCell>
+                <Chip 
+                    label={upload.type} 
+                    size="small"
+                    variant="outlined"
+                    color={upload.type === 'Bulk' ? 'primary' : 'secondary'}
+                />
+            </TableCell>
+            <TableCell align="center">{upload.itemCount}</TableCell>
+            <TableCell>
+                <Chip 
+                    label={upload.status} 
+                    size="small"
+                    color={
+                        upload.status === 'Successful' ? 'success' :
+                        upload.status === 'Partial' ? 'warning' :
+                        'error'
+                    }
+                />
+            </TableCell>
             <TableCell>{new Date(upload.uploadedAt).toLocaleString()}</TableCell>
           </TableRow>
         )) : (
           <TableRow>
-              <TableCell colSpan={3} sx={{ textAlign: 'center' }}>No recent uploads found.</TableCell>
+              <TableCell colSpan={isAdmin ? 6 : 5} sx={{ textAlign: 'center', p: 3 }}>No recent uploads found.</TableCell>
           </TableRow>
         )}
       </TableBody>
@@ -1347,10 +1641,8 @@ export default function StoreManagementPage() {
   </Paper>
 )}
 
-      
 
-
-        </Box>
+</Box>
       )}
 
       {selectedTab === 2 && (
@@ -1406,260 +1698,72 @@ export default function StoreManagementPage() {
 
              {loadingStock ? <CircularProgress /> :
               <Paper sx={{ maxWidth: 900, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', borderRadius: 2, p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-              <TextField
-              label="Search items"
-              variant="outlined"
-              size="small"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              sx={{ width: isMobile ? '100%' : 300 }}
-              />
-              <FormControlLabel
-              control={
-              <Checkbox
-          checked={showIncomplete}
-          onChange={(e) => setShowIncomplete(e.target.checked)}
-          name="showIncomplete"
-        />
-      }
-      label="Show only incomplete items"
-    />
-</Box>
+              <>
+  <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+    <TextField label="Search items" variant="outlined" size="small" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ width: isMobile ? '100%' : 300 }} />
+    <FormControlLabel control={<Checkbox checked={showIncomplete} onChange={(e) => setShowIncomplete(e.target.checked)} name="showIncomplete" />} label="Show only incomplete items" />
+  </Box>
 
-    
-                <Table size="small">
-                <TableHead>
-  <TableRow>
-    <TableCell sx={{ fontWeight: 600 }}>S/N</TableCell>
-    {(['itemName', 'activeIngredient', 'category', 'amount', 'imageUrl', 'info', 'POM', 'businessName', 'coordinates'] as (keyof StockItem)[]).map(key => (
-      <TableCell
-        key={key}
-        onClick={() => handleSort(key)}
-        sx={{
-          cursor: 'pointer',
-          fontWeight: 600,
-          '&:hover': { color: 'primary.main' },
-          ...(key === 'imageUrl' && {
-            maxWidth: '150px',
-            minWidth: '100px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          })
-        }}
-      >
-        {(key.replace(/([a-z])([A-Z])/g, '$1 $2')).charAt(0).toUpperCase() + (key.replace(/([a-z])([A-Z])/g, '$1 $2')).slice(1)}
-        {sortColumn === key && <span style={{ marginLeft: 4, fontSize: 12, color: 'gray' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>}
-      </TableCell>
-    ))}
-    <TableCell>Status</TableCell>
-    <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-  </TableRow>
-</TableHead>
-
-
-<TableBody>
-  {paginatedStock.map((row, i) => {
-    const globalIndex = stockData.findIndex(item => item._id === row._id);
-    const serialNumber = startIndex + i + 1;
-    return (
-      <TableRow key={row._id}>
-        {editingRowIndex === globalIndex ? (
-          <>
-            <TableCell>{serialNumber}</TableCell>
-            {(['itemName', 'activeIngredient', 'category', 'amount', 'imageUrl', 'info', 'POM', 'businessName', 'coordinates'] as (keyof StockItem)[]).map(field => (
-              <TableCell key={field}>
-                {field === 'POM' ? (
-                  <Checkbox
-                    checked={(editingRowData as any)[field]}
-                    onChange={e => setEditingRowData({ ...(editingRowData as any), [field]: e.target.checked })}
-                  />
-
-                ) : field === 'imageUrl' ? (
-                  <>
-                    <TextField
-                      label="Image URL"
-                      value={(editingRowData as any).imageUrl || ''}
-                      onChange={e => setEditingRowData({ ...(editingRowData as any), imageUrl: e.target.value })}
-                      variant="standard"
-                      fullWidth
-                      multiline
-                      rows={2}
-                      InputProps={{ sx: { fontSize: '0.8rem' } }}
-                    />
-                    <Button 
-                      variant="outlined" 
-                      size="small"
-                      component="label"
-                      fullWidth
-                      sx={{ mt: 1 }}
-                    >
-                      Or Upload from Device
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        hidden 
-                        onChange={handleEditRowImageSelect}
-                      />
-                    </Button>
-                  </>
-
-                ) : (
-                  <TextField
-                    type={field === 'amount' ? 'number' : 'text'}
-                    value={(editingRowData as any)[field] === 'N/A' ? '' : (editingRowData as any)[field]}
-                    onChange={e => setEditingRowData({ ...(editingRowData as any), [field]: field === 'amount' ? Number(e.target.value) : e.target.value })}
-                    multiline={field === 'info'}
-                    rows={field === 'info' ? 2 : 1}
-                    variant="standard"
-                    fullWidth
-                  />
-                )}
-              </TableCell>
-            ))}
-            <TableCell>
-              <Button variant="contained" size="small" color="success" sx={{ mr: 1 }} onClick={() => handleSave(row._id!)}>Save</Button>
-              <Button size="small" onClick={() => setEditingRowIndex(null)}>Cancel</Button>
+  <TableContainer>
+    <Table size="small">
+      <TableHead>
+        <TableRow>
+          <TableCell sx={{ fontWeight: 600 }}>S/N</TableCell>
+          {(['itemName', 'activeIngredient', 'category', 'amount', 'imageUrl', 'info', 'POM', 'businessName', 'coordinates'] as (keyof StockItem)[]).map(key => (
+            <TableCell key={key} onClick={() => handleSort(key)} sx={{ cursor: 'pointer', fontWeight: 600, '&:hover': { color: 'primary.main' } }}>
+              {(key.replace(/([a-z])([A-Z])/g, '$1 $2')).charAt(0).toUpperCase() + (key.replace(/([a-z])([A-Z])/g, '$1 $2')).slice(1)}
+              {sortColumn === key && <span style={{ marginLeft: 4, fontSize: 12, color: 'gray' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>}
             </TableCell>
-          </>
-        ) : (
-          <>
-            <TableCell>
-    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        {isItemIncomplete(row) && (
-            <Tooltip title="This item has incomplete details.">
-                <Box sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    backgroundColor: 'red',
-                    mr: 1,
-                }} />
-            </Tooltip>
-        )}
-        {serialNumber}
-    </Box>
-</TableCell>
-
-            <TableCell>{row.itemName}</TableCell>
-            <TableCell>{row.activeIngredient}</TableCell>
-            <TableCell>{row.category}</TableCell>
-            <TableCell>{typeof row.amount === 'number' ? `₦${row.amount.toFixed(2)}` : row.amount}</TableCell>
-            <TableCell>
-              <img
-                src={row.imageUrl || '/placeholder.png'}
-                alt={row.itemName || 'Product image'}
-                style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }}
-                onError={e => (e.currentTarget.src = '/placeholder.png')}
-              />
-            </TableCell>
-            <TableCell>{row.info}</TableCell>
-            <TableCell>{row.POM ? 'Yes' : 'No'}</TableCell>
-            <TableCell>{row.businessName}</TableCell>
-            <TableCell>{row.coordinates}</TableCell>
-
-            <TableCell>
-            {row.isPublished ? (
-             <Chip label="Published" color="success" size="small" />
-          ) : (
-              <Chip label="Draft" color="warning" size="small" />
-             )}
-              </TableCell>
-            
-            
-
-            <TableCell>
-              <Button variant="contained" size="small" sx={{ mr: 1 }} onClick={() => { setEditingRowIndex(globalIndex); setEditingRowData(row); }}>Edit</Button>
-              <Button variant="outlined" color="error" size="small" onClick={() => handleDelete(row._id!)}>Delete</Button>
-              {/* START: Add this code for the Auto-fill button */}
-              {row.hasSuggestion && isItemIncomplete(row) && (
-  <Tooltip title="Automatically find and fill in missing details for this item.">
-    <span> {/* Span is needed for Tooltip when button is disabled */}
-      <Button
-        variant="contained"
-        size="small"
-        onClick={() => handleAutoFill(row)}
-        disabled={autoFillingId === row._id}
-        sx={{ ml: 1, bgcolor: '#ff9800', '&:hover': { bgcolor: '#f57c00' } }}
-        startIcon={autoFillingId === row._id ? <CircularProgress size={14} color="inherit" /> : <>✨</>}
-      >
-        Auto-fill
-      </Button>
-    </span>
-  </Tooltip>
-)}
-
-
-
-              {!row.isPublished && (() => {
-    // First, get the list of what's wrong with the item.
-    const incompleteFields = getIncompleteFieldsList(row);
-    const isItemIncomplete = incompleteFields.length > 0;
-
-    // This is our button. It will be disabled if the item is incomplete.
-    const publishButton = (
-      <Button
-        variant="contained"
-        color="primary"
-        size="small"
-        onClick={() => handlePublish(row._id!)}
-        disabled={isItemIncomplete}
-        sx={{ ml: 1 }}
-      >
-        Publish
-      </Button>
-    );
-
-    // If the item is incomplete, wrap the disabled button in a Tooltip
-    // that explains exactly why it's disabled.
-    if (isItemIncomplete) {
-      return (
-        <Tooltip
-          title={
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                Cannot publish. Please fix:
-              </Typography>
-              <ul style={{ margin: 0, paddingLeft: '18px' }}>
-                {incompleteFields.map((error, index) => (
-                  <li key={index}>{error}</li>
-                ))}
-              </ul>
-            </Box>
-          }
-        >
-          {/* The Tooltip needs a child to attach to. A span is perfect for this. */}
-          <span>{publishButton}</span>
-        </Tooltip>
-      );
-    }
-
-    // If the item is complete, just return the regular, enabled button.
-    return publishButton;
-  })()}
-
-
-            </TableCell>
-          </>
-        )}
-      </TableRow>
-    );
-  })}
-</TableBody>
-
-
-                </Table>
-    
-                <Box sx={{ display: 'flex', justifyContent: isMobile ? 'center' : 'space-between', alignItems: 'center', mt: 2, width: '100%', flexDirection: isMobile ? 'column' : 'row' }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: isMobile ? 2 : 0 }}>Page {currentPage} of {Math.ceil(filteredStock.length / itemsPerPage)}</Typography>
-                  <Box>
-                    <Button variant="outlined" size="small" disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} sx={{ mr:1 }}>Prev</Button>
-                    <Button variant="outlined" size="small" disabled={currentPage===Math.ceil(filteredStock.length/itemsPerPage)} onClick={()=>setCurrentPage(p=>p+1)}>Next</Button>
-                  </Box>
+          ))}
+          <TableCell>Status</TableCell>
+          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+        </TableRow>
+      </TableHead>
+      
+      <TableBody>
+        {paginatedStock.map((row, i) => {
+          const globalIndex = stockData.findIndex(item => item._id === row._id);
+          const serialNumber = startIndex + i + 1;
+          return (
+            <TableRow key={row._id} onClick={() => { setSelectedProduct(row); setTileEditData(row); }} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}>
+              <TableCell>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  {isItemIncomplete(row) ? <Tooltip title="This item has incomplete details."><Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'red', mr: 1, }} /></Tooltip> : null}
+                  {serialNumber}
                 </Box>
-    
-              </Paper>}
+              </TableCell>
+              <TableCell>{row.itemName}</TableCell>
+              <TableCell>{row.activeIngredient}</TableCell>
+              <TableCell>{row.category}</TableCell>
+              <TableCell>{typeof row.amount === 'number' ? `₦${row.amount.toFixed(2)}` : row.amount}</TableCell>
+              <TableCell><img src={row.imageUrl || '/placeholder.png'} alt={row.itemName || 'Product image'} style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }} onError={e => (e.currentTarget.src = '/placeholder.png')} /></TableCell>
+              <TableCell>{row.info}</TableCell>
+              <TableCell>{row.POM ? 'Yes' : 'No'}</TableCell>
+              <TableCell>{row.businessName}</TableCell>
+              <TableCell>{row.coordinates}</TableCell>
+              <TableCell>{row.isPublished ? (<Chip label="Published" color="success" size="small" />) : (<Chip label="Draft" color="warning" size="small" />)}</TableCell>
+              
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                <Button variant="outlined" color="error" size="small" onClick={() => handleDelete(row._id!)}>Delete</Button>
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  </TableContainer>
+  
+  <Box sx={{ display: 'flex', justifyContent: isMobile ? 'center' : 'space-between', alignItems: 'center', mt: 2, width: '100%', flexDirection: isMobile ? 'column' : 'row' }}>
+    <Typography variant="body2" color="text.secondary" sx={{ mb: isMobile ? 2 : 0 }}>Page {currentPage} of {Math.ceil(filteredStock.length / itemsPerPage)}</Typography>
+    <Box>
+      <Button variant="outlined" size="small" disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} sx={{ mr:1 }}>Prev</Button>
+      <Button variant="outlined" size="small" disabled={currentPage===Math.ceil(filteredStock.length/itemsPerPage)} onClick={()=>setCurrentPage(p=>p+1)}>Next</Button>
+    </Box>
+  </Box>
+</>
+
+            </Paper>
+            }
         </Box>
       )}
 
@@ -1865,6 +1969,149 @@ export default function StoreManagementPage() {
           Powered by Pharmastackx
         </Typography>
       </Box>
+
+       {/* --- EDIT TILE MODAL (FLEXBOX FIX) --- */}
+<Modal
+  open={!!selectedProduct}
+  onClose={() => { setSelectedProduct(null); setIsEditingTile(false); }}
+  closeAfterTransition
+  slots={{ backdrop: Backdrop }}
+  slotProps={{ backdrop: { timeout: 500 } }}
+>
+  <Fade in={!!selectedProduct}>
+    <Box sx={{
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: '90%',
+      maxWidth: 900,
+      bgcolor: 'background.paper',
+      boxShadow: 24,
+      p: 4,
+      borderRadius: 2,
+      maxHeight: '90vh',
+      overflowY: 'auto'
+    }}>
+      {tileEditData && (
+        <>
+          {/* Header */}
+<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+    {isEditingTile ? 'Editing Item' : 'Item Details'}
+  </Typography>
+  {isEditingTile ? (
+    <Box>
+      <Button size="medium" onClick={() => { setIsEditingTile(false); setTileEditData(selectedProduct); }} disabled={isUploading} sx={{ mr: 1 }}>Cancel</Button>
+      <Button variant="contained" color="success" size="medium" onClick={handleTileSave} disabled={isUploading}>
+        {isUploading ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
+      </Button>
+    </Box>
+  ) : (
+    <Button variant="contained" size="medium" onClick={() => setIsEditingTile(true)}>Edit</Button>
+  )}
+</Box>
+
+
+
+          {/* This Box now wraps the body and contains the arrows */}
+<Box sx={{ position: 'relative' }}>
+
+{/* Left Arrow */}
+<IconButton
+  onClick={() => handleNavigation('prev')}
+  disabled={!selectedProduct || filteredStock.findIndex(p => p._id === selectedProduct._id) === 0}
+  sx={{
+    position: 'absolute',
+    left: { xs: -16, md: -50 },
+    top: '50%',
+    transform: 'translateY(-50%)',
+    zIndex: 2,
+    bgcolor: 'background.paper',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    '&:hover': { bgcolor: '#f5f5f5' },
+    '&.Mui-disabled': {
+      opacity: 0.2,
+    }
+  }}
+>
+  <ArrowBackIosNewIcon />
+</IconButton>
+
+{/* Main Content Body */}
+<Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4 }}>
+  {/* Left Column (Image) */}
+  <Box sx={{ width: { xs: '100%', md: '33.33%' } }}>
+    <Box sx={{ position: 'relative', paddingTop: '100%', backgroundColor: '#f0f0f0', borderRadius: 2, overflow: 'hidden' }}>
+      <img src={tileEditData.imageUrl || '/placeholder.png'} alt={tileEditData.itemName || 'Product'} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={e => (e.currentTarget.src = '/placeholder.png')} />
+    </Box>
+    <Button variant="outlined" component="label" fullWidth sx={{ mt: 2 }} disabled={!isEditingTile || isUploading}>
+      Upload Image
+      <input type="file" accept="image/*" hidden onChange={handleTileImageSelect} />
+    </Button>
+  </Box>
+
+  {/* Right Column (Details) */}
+  <Box sx={{ width: { xs: '100%', md: '66.67%' } }}>
+    <Stack spacing={2}>
+      <TextField label="Item Name" value={tileEditData.itemName || ''} onChange={e => handleTileFormChange('itemName', e.target.value)} fullWidth disabled={!isEditingTile} />
+      <TextField label="Amount (₦)" type="number" value={tileEditData.amount || ''} onChange={e => handleTileFormChange('amount', Number(e.target.value))} fullWidth disabled={!isEditingTile} />
+      <TextField label="Info" value={tileEditData.info || ''} onChange={e => handleTileFormChange('info', e.target.value)} fullWidth multiline rows={2} disabled={!isEditingTile} />
+      <TextField label="Active Ingredient" value={tileEditData.activeIngredient || ''} onChange={e => handleTileFormChange('activeIngredient', e.target.value)} fullWidth disabled={!isEditingTile} />
+      <TextField label="Category" value={tileEditData.category || ''} onChange={e => handleTileFormChange('category', e.target.value)} fullWidth disabled={!isEditingTile} />
+      <FormControlLabel control={<Checkbox checked={tileEditData.POM || false} onChange={e => handleTileFormChange('POM', e.target.checked)} disabled={!isEditingTile} />} label="Prescription Only Medicine (POM)" />
+    </Stack>
+    
+    {!isEditingTile ? (
+      <Box sx={{ mt: 3, display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+        <Button variant="outlined" color="error" size="medium" onClick={() => { if(tileEditData?._id) handleDelete(tileEditData._id)}}>Delete Item</Button>
+        {!tileEditData.isPublished ? (
+            (() => {
+              if (!tileEditData?._id) return null;
+              const incompleteFields = getIncompleteFieldsList(tileEditData);
+              const isItemIncomplete = incompleteFields.length > 0;
+              const publishButton = (<Button variant="contained" color="primary" size="medium" onClick={() => handlePublish(tileEditData._id!)} disabled={isItemIncomplete}>Publish</Button>);
+              return isItemIncomplete ? <Tooltip title="Item has incomplete fields"><span>{publishButton}</span></Tooltip> : publishButton;
+            })()
+          ) : null}
+          {tileEditData.isPublished ? (<Button variant="contained" color="warning" size="medium" onClick={() => {if(tileEditData?._id) handleUnpublish(tileEditData._id)}}>Withdraw</Button>) : null}
+      </Box>
+    ) : null}
+  </Box>
+</Box>
+
+{/* Right Arrow */}
+<IconButton
+  onClick={() => handleNavigation('next')}
+  disabled={!selectedProduct || filteredStock.findIndex(p => p._id === selectedProduct._id) === filteredStock.length - 1}
+  sx={{
+    position: 'absolute',
+    right: { xs: -16, md: -50 },
+    top: '50%',
+    transform: 'translateY(-50%)',
+    zIndex: 2,
+    bgcolor: 'background.paper',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    '&:hover': { bgcolor: '#f5f5f5' },
+    '&.Mui-disabled': {
+      opacity: 0.2,
+    }
+  }}
+>
+  <ArrowForwardIosIcon />
+</IconButton>
+
+</Box>
+
+        </>
+      )}
+    </Box>
+  </Fade>
+</Modal>
+
+
+
+
 
     </Box>
   );
