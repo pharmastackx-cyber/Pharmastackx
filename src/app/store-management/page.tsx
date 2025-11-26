@@ -83,6 +83,9 @@ export default function StoreManagementPage() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isStockManager, setIsStockManager] = useState(false);
+
     // For Admin: holds the activity logs
     const [activityLogs, setActivityLogs] = useState<any[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
@@ -325,6 +328,8 @@ export default function StoreManagementPage() {
 
 
   const [showIncomplete, setShowIncomplete] = useState(false);
+  const [showUnpublishedOnly, setShowUnpublishedOnly] = useState(false);
+
 
   const isItemIncomplete = (item: StockItem) => {
     // These fields are allowed to be empty or have default values
@@ -453,13 +458,24 @@ export default function StoreManagementPage() {
         const userRes = await fetch('/api/user/me');
         if (!userRes.ok) throw new Error('Failed to fetch user');
         const userData = await userRes.json();
+        
+        const role = userData.user?.role || 'vendor';
+        const isAdminUser = role === 'admin';
+        const isStockManagerUser = role === 'stockManager';
 
-        const isAdmin = userData.user?.role === 'admin';
-        setIsAdmin(isAdmin);
+        setIsAdmin(isAdminUser);
+        setUserRole(role);
+        setIsStockManager(isStockManagerUser);
+
+        // Treat both 'admin' and 'stockManager' as having admin-level data access
+        const hasAdminDataPermissions = isAdminUser || isStockManagerUser;
+
+        // If the user is a Stock Manager, force their view to the Stock tab.
+        if (isStockManagerUser) {
+          setSelectedTab(2); // The index for the "Stock" tab
+        }
 
         let currentBusinessName: string | null = null;
-        let currentCoordinates: string | null = null;
-
         if (userData.user?.businessName) {
             currentBusinessName = userData.user.businessName;
             setUserBusinessName(currentBusinessName);
@@ -469,29 +485,25 @@ export default function StoreManagementPage() {
 
         if (userData.user?.businessCoordinates) {
           const { latitude, longitude } = userData.user.businessCoordinates;
-          // Check if coordinates are validly set
           if (latitude && longitude) {
-            currentCoordinates = `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
+            const currentCoordinates = `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
             setBusinessCoordinates({ latitude, longitude });
             setLocation(currentCoordinates);
             setFormValues(prev => ({ ...prev, coordinates: currentCoordinates! }));
-            setIsLocationSet(true); // <-- Location is set
+            setIsLocationSet(true);
           } else {
-            setIsLocationSet(false); // <-- Location is not set
+            setIsLocationSet(false);
           }
         } else {
-          setIsLocationSet(false); // <-- Location is not set
+          setIsLocationSet(false);
         }
 
-
-        // Fetch both stock and orders data in parallel
+        // Fetch data using admin permissions if the user is an admin OR a stock manager
         await Promise.all([
-          fetchStockData(currentBusinessName, isAdmin),
-          fetchOrders(currentBusinessName, isAdmin)
-
-      ]);
+          fetchStockData(currentBusinessName, hasAdminDataPermissions),
+          fetchOrders(currentBusinessName, hasAdminDataPermissions)
+        ]);
       
-
       } catch (error) {
         console.error('Error fetching initial data:', error);
       }
@@ -499,6 +511,7 @@ export default function StoreManagementPage() {
     };
     fetchInitialData();
   }, [fetchStockData, fetchOrders]);
+
 
 
   useEffect(() => {
@@ -629,8 +642,10 @@ export default function StoreManagementPage() {
   const filteredStock = stockData.filter(item => {
     const searchMatch = Object.values(item).join(' ').toLowerCase().includes(searchQuery.toLowerCase());
     const incompleteMatch = !showIncomplete || isItemIncomplete(item);
-    return searchMatch && incompleteMatch;
+    const unpublishedMatch = !showUnpublishedOnly || item.isPublished === false;
+    return searchMatch && incompleteMatch && unpublishedMatch;
   });
+
 
   const sortedStock = [...filteredStock].sort((a, b) => {
     const aIncomplete = isItemIncomplete(a);
@@ -1257,28 +1272,32 @@ export default function StoreManagementPage() {
   const handleTileSave = async () => {
     if (!tileEditData?._id) return;
     setIsUploading(true);
+    
+    // The 'tileEditData' object already has the new image as a Base64 URL from the preview.
+    // We can save it directly without calling the broken '/api/products/upload' endpoint.
     let dataToSave = { ...tileEditData };
+
     try {
-      if (tileImageFile) {
-        const formData = new FormData();
-        formData.append('file', tileImageFile);
-        const uploadResponse = await fetch('/api/products/upload', { method: 'POST', body: formData });
-        const uploadResult = await uploadResponse.json();
-        if (!uploadResponse.ok) throw new Error(uploadResult.message || 'Failed to upload image.');
-        dataToSave.imageUrl = uploadResult.url;
-      }
+      // The entire 'if (tileImageFile)' block that caused the error has been removed.
       const saveResponse = await fetch(`/api/stock/${dataToSave._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dataToSave),
       });
+      
       const saveResult = await saveResponse.json();
-      if (!saveResponse.ok) throw new Error(saveResult.message || 'Failed to save product.');
+      if (!saveResponse.ok) {
+        throw new Error(saveResult.message || 'Failed to save product.');
+      }
+      
+      // Update the local state with the exact data we just saved
       const updatedStockData = stockData.map(item => item._id === dataToSave._id ? dataToSave : item);
       setStockData(updatedStockData);
       setSelectedProduct(dataToSave);
+      
       alert('Product updated successfully!');
       logAction('UPDATE_ITEM', 'SUCCESS', `User updated item '${dataToSave.itemName}'.`, { type: 'Product', id: dataToSave._id, name: dataToSave.itemName });
+
     } catch (error) {
       console.error("Save error:", error);
       alert((error as Error).message);
@@ -1286,9 +1305,10 @@ export default function StoreManagementPage() {
     } finally {
       setIsUploading(false);
       setIsEditingTile(false);
-      setTileImageFile(null);
+      setTileImageFile(null); // Clear the selected file state
     }
   };
+
 
 
   const handleNavigation = (direction: 'next' | 'prev') => {
@@ -1389,12 +1409,21 @@ export default function StoreManagementPage() {
       <Typography variant={isMobile ? 'h5' : 'h4'} gutterBottom>Store Management</Typography>
       
       <Tabs value={selectedTab} onChange={handleTabChange} variant={isMobile ? 'scrollable' : 'standard'} scrollButtons="auto">
-        <Tab label="Storefront" />
-        <Tab label="Upload" disabled={!isLocationSet} />
-        <Tab label="Stock" disabled={!isLocationSet} />
-        <Tab label="Orders" disabled={!isLocationSet} />
-        {isAdmin && <Tab label="Activity Log" />}
+        {isStockManager ? (
+          // Stock Manager can only see the Stock tab
+          <Tab label="Stock" value={2} />
+        ) : (
+          // Other users see the normal tabs
+          [
+            <Tab key="storefront" label="Storefront" />,
+            <Tab key="upload" label="Upload" disabled={!isLocationSet} />,
+            <Tab key="stock" label="Stock" disabled={!isLocationSet} />,
+            <Tab key="orders" label="Orders" disabled={!isLocationSet} />,
+            isAdmin && <Tab key="logs" label="Activity Log" />
+          ]
+        )}
       </Tabs>
+
 
 
 
@@ -1858,6 +1887,8 @@ export default function StoreManagementPage() {
   <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
     <TextField label="Search items" variant="outlined" size="small" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ width: isMobile ? '100%' : 300 }} />
     <FormControlLabel control={<Checkbox checked={showIncomplete} onChange={(e) => setShowIncomplete(e.target.checked)} name="showIncomplete" />} label="Show only incomplete items" />
+    <FormControlLabel control={<Checkbox checked={showUnpublishedOnly} onChange={(e) => setShowUnpublishedOnly(e.target.checked)} name="showUnpublishedOnly" />} label="Show only unpublished" />
+
   </Box>
 
   <TableContainer>

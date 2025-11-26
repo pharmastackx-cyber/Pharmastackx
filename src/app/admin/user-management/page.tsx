@@ -19,9 +19,14 @@ import {
   AccordionDetails,
   TextField,
   InputAdornment,
+  Button, 
+  Modal, 
+  Stack, 
+  InputLabel, 
+  Alert,
+  CircularProgress
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import SearchIcon from '@mui/icons-material/Search';
+import { ExpandMore, Search } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { User } from '@/types';
 
@@ -46,53 +51,61 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   },
 }));
 
-const roleMapping: { [key: string]: string } = {
-  customer: 'customer',
-  pharmacy: 'pharmacy',
-  clinic: 'clinic',
-  vendor: 'vendor',
-  agent: 'agent',
-};
-
-const allRoles = ['customer', 'pharmacy', 'clinic', 'vendor', 'agent'];
+const allRoles = ['customer', 'admin', 'pharmacy', 'vendor', 'clinic', 'agent', 'stockManager'];
 
 export default function UserManagementPage() {
+
   const [usersByRole, setUsersByRole] = useState<Record<string, User[]>>({
     customer: [],
+    admin: [],
     pharmacy: [],
-    clinic: [],
     vendor: [],
+    clinic: [],
     agent: [],
+    stockManager: [],
   });
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'customer' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch('/api/admin/users');
+      
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to parse error JSON' }));
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
       const data: User[] = await response.json();
       
       const groupedUsers: Record<string, User[]> = {
         customer: [],
+        admin: [],
         pharmacy: [],
-        clinic: [],
         vendor: [],
+        clinic: [],
         agent: [],
+        stockManager: [],
       };
 
       data.forEach((user) => {
         const role = user.role?.toLowerCase();
-        const mappedRole = Object.keys(roleMapping).find(key => role === key);
-        if (mappedRole) {
-          groupedUsers[mappedRole].push(user);
+        if (role && groupedUsers.hasOwnProperty(role)) {
+          groupedUsers[role].push(user);
+        } else {
+          console.warn('Unrecognized or missing role for user:', user);
         }
       });
 
       setUsersByRole(groupedUsers);
+
     } catch (error) {
       console.error("Failed to fetch and process users:", error);
     } finally {
@@ -109,7 +122,7 @@ export default function UserManagementPage() {
     try {
       const response = await fetch(`/api/admin/users/${userId}`,
         {
-          method: 'PATCH', // Use PATCH instead of PUT
+          method: 'PATCH', 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role: newRole }),
         });
@@ -118,13 +131,52 @@ export default function UserManagementPage() {
         throw new Error('Failed to update role');
       }
 
-      // Re-fetch users to update the UI
-      fetchUsers();
+      await fetchUsers();
 
     } catch (error) {
       console.error('Error updating user role:', error);
     }
   };
+
+  const handleCreateNewUser = () => {
+    setError(null);
+    setNewUser({ email: '', password: '', role: 'customer' });
+    setModalOpen(true);
+  };
+
+  const handleSaveNewUser = async () => {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to create user.');
+      }
+      
+      // Manually add the new user to the state to ensure the UI updates instantly
+      const newUserData = data.user;
+      setUsersByRole(prevUsersByRole => {
+        const updatedRoleList = [...(prevUsersByRole[newUserData.role] || []), newUserData];
+        return {
+          ...prevUsersByRole,
+          [newUserData.role]: updatedRoleList,
+        };
+      });
+
+      alert('User created successfully!');
+      setModalOpen(false);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
   
   const filteredUsersByRole = useMemo(() => {
     if (!searchQuery) {
@@ -143,19 +195,24 @@ export default function UserManagementPage() {
 
   const roleColumns = {
     customer: 'Customers',
+    admin: 'Administrators',
     pharmacy: 'Pharmacies',
-    clinic: 'Clinics',
     vendor: 'Vendors',
+    clinic: 'Clinics',
     agent: 'Delivery Agents',
+    stockManager: 'Stock Managers',
   };
   
   const roleKeys = Object.keys(roleColumns) as (keyof typeof roleColumns)[];
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
-      <Typography variant="h4" sx={{ mb: 4, fontWeight: 600 }}>
-        User Management
-      </Typography>
+       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>User Management</Typography>
+        <Button variant="contained" color="primary" onClick={handleCreateNewUser}>
+            Create New User
+        </Button>
+      </Box>
 
       <Box sx={{ mb: 4, maxWidth: '600px' }}>
         <TextField
@@ -167,7 +224,7 @@ export default function UserManagementPage() {
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchIcon sx={{ color: '#006D5B' }} />
+                <Search sx={{ color: '#006D5B' }} />
               </InputAdornment>
             ),
             sx: {
@@ -183,9 +240,9 @@ export default function UserManagementPage() {
         const roleTitle = roleColumns[roleKey];
         
         return (
-          <Accordion key={roleKey} sx={{ mb: 2, '&.Mui-expanded': { mb: 2 }, boxShadow: '0 8px 24px rgba(0,0,0,0.05)', borderRadius: '16px', '&:before': { display: 'none' } }}>
+          <Accordion key={roleKey} defaultExpanded={roleKey === 'customer'} sx={{ mb: 2, '&.Mui-expanded': { mb: 2 }, boxShadow: '0 8px 24px rgba(0,0,0,0.05)', borderRadius: '16px', '&:before': { display: 'none' } }}>
             <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
+              expandIcon={<ExpandMore />}
               aria-controls={`${roleKey}-content`}
               id={`${roleKey}-header`}
               sx={{ borderRadius: '16px' }}
@@ -213,7 +270,7 @@ export default function UserManagementPage() {
                     ) : users.length === 0 ? (
                       <StyledTableRow>
                         <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                          No {searchQuery ? 'matching' : ''} {roleKey} users found.
+                          No {searchQuery ? 'matching' : ''} {roleKey.replace(/([A-Z])/g, ' $1').toLowerCase()} users found.
                         </TableCell>
                       </StyledTableRow>
                     ) : (
@@ -230,7 +287,7 @@ export default function UserManagementPage() {
                                 displayEmpty
                               >
                                 {allRoles.map(role => (
-                                  <MenuItem key={role} value={role}>{role}</MenuItem>
+                                  <MenuItem key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</MenuItem>
                                 ))}
                               </Select>
                             </FormControl>
@@ -246,6 +303,51 @@ export default function UserManagementPage() {
         );
       })}
 
+    <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
+        <Box sx={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          width: 400, bgcolor: 'background.paper', boxShadow: 24, p: 4, borderRadius: 2
+        }}>
+          <Typography variant="h6" component="h2" sx={{ mb: 2 }}>Create New User</Typography>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          <Stack spacing={2}>
+            <TextField
+              label="Email"
+              type="email"
+              fullWidth
+              value={newUser.email}
+              onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+            />
+            <TextField
+              label="Password"
+              type="password"
+              fullWidth
+              value={newUser.password}
+              onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Role</InputLabel>
+              <Select
+                value={newUser.role}
+                label="Role"
+                onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value }))}
+              >
+                {allRoles.map(role => (
+                    <MenuItem key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Button
+              variant="contained"
+              color="primary"
+              disabled={isSubmitting}
+              onClick={handleSaveNewUser}
+            >
+              {isSubmitting ? <CircularProgress size={24} /> : 'Save User'}
+            </Button>
+          </Stack>
+        </Box>
+    </Modal>
     </Box>
   );
 }

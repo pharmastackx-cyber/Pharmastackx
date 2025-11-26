@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -44,7 +45,7 @@ import axios from 'axios';
 export default function Navbar() {
   const { user, isLoading } = useSession();
   const isAdmin = user?.role === 'admin';
-  const isBusinessUser = user?.role && ['admin', 'pharmacy', 'vendor'].includes(user.role);
+  const isBusinessUser = user?.role && ['admin', 'pharmacy', 'vendor', 'stockManager'].includes(user.role);
   const isAgentOrAdmin = user?.role && ['admin', 'agent'].includes(user.role);
   const isPharmacyOrVendor = user?.role && ['pharmacy', 'vendor'].includes(user.role);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -452,4 +453,3 @@ export default function Navbar() {
     </>
   );
 }
-''

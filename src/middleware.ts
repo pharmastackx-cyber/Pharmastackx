@@ -61,7 +61,7 @@ export async function middleware(request: NextRequest) {
     }
 
     if (pathname.startsWith('/business') || pathname.startsWith('/store-management')) {
-      const allowedRoles = ['pharmacy', 'vendor', 'admin'];
+      const allowedRoles = ['pharmacy', 'vendor', 'admin', 'stockManager'];
       if (!allowedRoles.includes(payload.role)) {
         return NextResponse.redirect(new URL('/', request.url));
       }

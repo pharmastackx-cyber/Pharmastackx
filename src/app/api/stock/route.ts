@@ -42,8 +42,8 @@ export async function GET(req: NextRequest) {
     }
 
     let query: any = {};
-    if (userRole === 'admin') {
-      // No filter for admin
+    if (userRole === 'admin' || userRole === 'stockManager') {
+      // No filter for admin or stockManager
     } else if (businessName) {
       query.businessName = businessName;
     } else {
