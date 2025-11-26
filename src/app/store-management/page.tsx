@@ -1,15 +1,19 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Typography, Tabs, Tab, IconButton, TextField, Button,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer, Paper, useTheme, 
   useMediaQuery, CircularProgress, Tooltip, Select, MenuItem, 
   FormControl, InputLabel, Divider, Collapse, Checkbox, FormControlLabel,
   Container, Alert, AlertTitle, Link, Chip, Grid, Stack, Modal,
+  Card,
+  CardMedia,
+  CardContent,
+  CardActions,
+  InputAdornment,
   Fade,
-  Backdrop,
-  
+  Backdrop,Switch
 } from '@mui/material';
 
 import { Storefront, LocationOn, UploadFile, ExpandMore, Inventory, CheckCircle, Warning,  } from '@mui/icons-material';
@@ -79,7 +83,13 @@ export default function StoreManagementPage() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
-  
+    // For Admin: holds the activity logs
+    const [activityLogs, setActivityLogs] = useState<any[]>([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
+    const [logsError, setLogsError] = useState<string | null>(null);
+    // For the Activity Log Insights feature
+    const [logInsights, setLogInsights] = useState<string[] | null>(null);
+
   const [location, setLocation] = useState<string | null>(null);
   const [userSlug, setUserSlug] = useState<string | null>(null);
   const [userBusinessName, setUserBusinessName] = useState<string | null>(null);
@@ -93,12 +103,44 @@ export default function StoreManagementPage() {
   const [loadingUser, setLoadingUser] = useState(false);
   const [isLocationSet, setIsLocationSet] = useState(false); //  <-- ADD THIS LINE
   const [showUploadForm, setShowUploadForm] = useState(false);
+    // For Admin: holds the business they have selected from the dropdown
+    const [selectedBusinessForUpload, setSelectedBusinessForUpload] = useState<string | null>(null);
+
 
   const [showBulkPreview, setShowBulkPreview] = useState(false);
   const [bulkData, setBulkData] = useState<StockItem[]>([]);
   const [stockData, setStockData] = useState<StockItem[]>([]);
   const [loadingStock, setLoadingStock] = useState(true);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionData, setSuggestionData] = useState<StockItem | null>(null);
+  const [isFetchingSuggestion, setIsFetchingSuggestion] = useState(false);
   
+  const allBusinesses = useMemo(() => {
+    if (!isAdmin || !stockData) return [];
+    
+    // Use a Map to easily store unique businesses with their data
+    const businessesMap = new Map<string, { slug: string; coordinates: string }>();
+    stockData.forEach(item => {
+      // If the businessName exists and is not already in our map, add it
+      if (item.businessName && !businessesMap.has(item.businessName)) {
+        businessesMap.set(item.businessName, { slug: item.slug, coordinates: item.coordinates });
+      }
+    });
+
+    // Convert the Map into an array of objects
+    const businessList = Array.from(businessesMap.entries()).map(([name, data]) => ({
+      businessName: name,
+      slug: data.slug,
+      coordinates: data.coordinates,
+    }));
+    
+    // Return the list sorted alphabetically by business name
+    return businessList.sort((a, b) => a.businessName.localeCompare(b.businessName));
+
+  }, [isAdmin, stockData]);
+
+
+
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadHistory, setUploadHistory] = useState<UploadHistoryItem[]>([]);
@@ -110,7 +152,7 @@ export default function StoreManagementPage() {
   } | null>(null);
   const [uploadSuccessInfo, setUploadSuccessInfo] = useState<{ count: number } | null>(null);
 
-
+  
 
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -152,7 +194,99 @@ export default function StoreManagementPage() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
+  /**
+   * A utility function to send logs to the backend.
+   * This is a "fire-and-forget" function and will not block the UI.
+   * @param action - A short code for the action, e.g., 'CREATE_ITEM'
+   * @param status - 'SUCCESS', 'FAILURE', 'INFO', or 'PARTIAL'
+   * @param details - A human-readable sentence with more context
+   * @param target - The optional entity that was affected
+   */
+  const logAction = useCallback(async (
+    action: string,
+    status: 'SUCCESS' | 'FAILURE' | 'INFO' | 'PARTIAL',
+    details: string,
+    target?: { type: string; id?: string; name?: string }
+  ) => {
+    try {
+      // We don't need to wait for the response, just send it.
+      fetch('/api/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, status, details, target }),
+      });
+    } catch (error) {
+      // This should not happen, but if it does, log it to the console for debugging.
+      // We don't want to interrupt the user's workflow for a logging failure.
+      console.error('Failed to send log to server:', error);
+    }
+  }, []); // This function has no dependencies and will not cause re-renders.
 
+      // --- START: FINAL CORRECTED LOG INSIGHTS HANDLERS ---
+  const handleGenerateUserActivity = () => {
+    if (!activityLogs.length) {
+      setLogInsights(['No logs available to analyze.']);
+      return;
+    }
+    const userActivity = activityLogs.reduce((acc, log) => {
+      const userName = log.actor?.name || 'Unknown User';
+      acc[userName] = (acc[userName] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // THE FIX: Explicitly cast the result of Object.entries to the correct type.
+    const insights = (Object.entries(userActivity) as [string, number][])
+      .sort(([, countA], [, countB]) => countB - countA)
+      .map(([name, count]) => `${name}: ${count} actions`);
+    
+    setLogInsights(['--- User Activity ---', ...insights]);
+  };
+
+  const handleGenerateActionCounts = () => {
+    if (!activityLogs.length) {
+      setLogInsights(['No logs available to analyze.']);
+      return;
+    }
+    const actionCounts = activityLogs.reduce((acc, log) => {
+      const actionName = log.action || 'UNKNOWN_ACTION';
+      acc[actionName] = (acc[actionName] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // THE FIX: Explicitly cast the result of Object.entries here as well.
+    const insights = (Object.entries(actionCounts) as [string, number][])
+      .sort(([, countA], [, countB]) => countB - countA)
+      .map(([name, count]) => `${name}: ${count} times`);
+      
+    setLogInsights(['--- Action Counts ---', ...insights]);
+  };
+
+  const handleGenerateStatusSummary = () => {
+    if (!activityLogs.length) {
+      setLogInsights(['No logs available to analyze.']);
+      return;
+    }
+    const statusCounts = activityLogs.reduce((acc, log) => {
+      const status = log.status || 'UNKNOWN';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const total = activityLogs.length;
+    // THE FIX: And finally, cast the result here too.
+    const insights = (Object.entries(statusCounts) as [string, number][])
+      .map(([name, count]) => {
+          const percentage = ((count / total) * 100).toFixed(1);
+          return `${name}: ${count} (${percentage}%)`;
+      });
+      
+    setLogInsights(['--- Status Summary ---', `Total Actions: ${total}`, ...insights]);
+  };
+  // --- END: FINAL CORRECTED LOG INSIGHTS HANDLERS ---
+
+  
+
+  
 
   const fetchStockData = useCallback(async (businessName: string | null, isAdmin: boolean = false) => {
     if (!isAdmin && !businessName) {
@@ -203,9 +337,7 @@ export default function StoreManagementPage() {
         if (value === null || value === undefined || value === '' || value === 'N/A' || (typeof value === 'number' && value === 0)) {
             return true; // Found an incomplete field
         }
-    }
-    return false; // All fields are complete
-  };
+    }  };
 
     // A mapping of field names to the user-friendly, specific error messages.
     const errorMessages: { [key: string]: string } = {
@@ -454,6 +586,40 @@ export default function StoreManagementPage() {
       }
     }, [uploadSuccessInfo]);
   
+      // This effect fetches logs when an admin selects the Activity Log tab.
+  useEffect(() => {
+    const fetchLogs = async () => {
+      if (!isAdmin) return; // Should not run for non-admins
+      setLoadingLogs(true);
+      setLogsError(null);
+      try {
+        const response = await fetch('/api/logs');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to fetch activity logs.');
+        }
+        const data = await response.json();
+        setActivityLogs(data);
+      } catch (error) {
+        setLogsError((error as Error).message);
+      } finally {
+        setLoadingLogs(false);
+      }
+    };
+
+    // The new tab is at index 4
+    if (selectedTab === 4) {
+      fetchLogs();
+    }
+  }, [selectedTab, isAdmin]);
+
+  useEffect(() => {
+    // Log the initial page view once user information is available.
+    if (userBusinessName || (isAdmin && userBusinessName !== null)) {
+        logAction('PAGE_VIEW', 'INFO', 'User viewed the Store Management page.');
+    }
+  }, [logAction, userBusinessName, isAdmin]);
+
 
 
   const filteredOrders = orders.filter(order =>
@@ -503,59 +669,50 @@ export default function StoreManagementPage() {
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => setSelectedTab(newValue);
 
   const handleGetLocation = () => {
-    // Ask for confirmation if location is already set
     if (businessCoordinates?.latitude && businessCoordinates?.longitude) {
       if (!window.confirm('Are you sure you want to overwrite your existing store location? This action is required for accurate tracking but please ensure you are at your store location.')) {
-        return; // Stop if the user cancels
+        logAction('UPDATE_LOCATION', 'INFO', 'User cancelled overwriting their location.');
+        return;
       }
     }
-
     if (!navigator.geolocation) {
+      logAction('UPDATE_LOCATION', 'FAILURE', 'User attempted to get location, but Geolocation is not supported by their browser.');
       alert('Geolocation is not supported by your browser.');
       return;
     }
-
-    // Inform the user what's happening
     alert('Getting your location... Please accept the browser prompt.');
-
     navigator.geolocation.getCurrentPosition(
       async pos => {
         const { latitude, longitude } = pos.coords;
         const coordsString = `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
-
         try {
           const res = await fetch('/api/user/location', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ coordinates: { latitude, longitude } }),
           });
-
           if (!res.ok) throw new Error('Failed to update location on the server.');
-
-          // Update state to reflect the change
           setBusinessCoordinates({ latitude, longitude });
           setLocation(coordsString);
           setFormValues(prev => ({ ...prev, coordinates: coordsString }));
           setIsLocationSet(true);
-
           alert('Location updated successfully!');
-
+          logAction('UPDATE_LOCATION', 'SUCCESS', `User updated their location to: ${coordsString}`);
         } catch (e) {
           console.error('Error saving location:', e);
           alert('An error occurred while saving your location.');
+          logAction('UPDATE_LOCATION', 'FAILURE', `Failed to save new location. Error: ${(e as Error).message}`);
         }
       },
       err => {
         console.error('Geolocation error:', err);
         alert(`Error getting location: ${err.message}. Please ensure you have enabled location services.`);
+        logAction('UPDATE_LOCATION', 'FAILURE', `User denied geolocation permission or an error occurred: ${err.message}`);
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
-      }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   };
+
 
 
   const handleStoreInfoClick = async () => {
@@ -577,13 +734,32 @@ export default function StoreManagementPage() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    let targetBusinessName = userBusinessName;
     try {
+      let targetSlug = userSlug;
+      let targetCoordinates = location;
+
+      if (isAdmin && selectedBusinessForUpload) {
+        const selectedBiz = allBusinesses.find(b => b.businessName === selectedBusinessForUpload);
+        if (selectedBiz) {
+          targetBusinessName = selectedBiz.businessName;
+          targetSlug = selectedBiz.slug;
+          targetCoordinates = selectedBiz.coordinates;
+        } else {
+            targetBusinessName = selectedBusinessForUpload;
+            targetSlug = '';
+            targetCoordinates = '';
+        }
+      }
+
       const newProduct = {
           ...formValues,
-          businessName: userBusinessName,
+          businessName: targetBusinessName,
+          coordinates: targetCoordinates,
           amount: Number(formValues.amount) || 0,
-          slug: userSlug,
+          slug: targetSlug,
       };
+
       const response = await fetch('/api/stock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -598,43 +774,26 @@ export default function StoreManagementPage() {
       setUploadSuccessInfo({ count: 1 });
       setUploadResult(null);
       setShowUploadForm(false);
-      setFormValues({
-        itemName: '',
-        activeIngredient: '',
-        category: '',
-        amount: '',
-        imageUrl: '',
-        businessName: userBusinessName || '',
-        coordinates: location || '',
-        info: '',
-        POM: false,
-        slug: '' ,
-        isPublished: false,
-      });
+      
+      const logDetails = isAdmin && selectedBusinessForUpload 
+        ? `Admin created item '${savedProduct.itemName}' for business '${targetBusinessName}'.`
+        : `User created item '${savedProduct.itemName}'.`;
+      logAction('CREATE_ITEM', 'SUCCESS', logDetails, { type: 'Product', id: savedProduct._id, name: savedProduct.itemName });
+
+      setFormValues({ itemName: '', activeIngredient: '', category: '', amount: '', imageUrl: '', businessName: userBusinessName || '', coordinates: location || '', info: '', POM: false, slug: '' , isPublished: false });
       
   } catch (error) {
       console.error('Error submitting form:', error);
       alert(`Error: ${(error as Error).message}`);
+      const logDetails = isAdmin && selectedBusinessForUpload
+        ? `Admin failed to create item '${formValues.itemName}' for business '${targetBusinessName}'. Error: ${(error as Error).message}`
+        : `User failed to create item '${formValues.itemName}'. Error: ${(error as Error).message}`;
+      logAction('CREATE_ITEM', 'FAILURE', logDetails, { type: 'Product', name: formValues.itemName });
   } finally {
       setIsSubmitting(false);
-      // This will trigger the history to reload, including the new item.
-      setHistoryVersion(v => v + 1); 
   }
-
-            // Add a 'Failed' entry to the history for the single upload attempt
-            const failedHistoryItem: UploadHistoryItem = {
-              _id: `failed-${Date.now()}`, // Create a temporary unique ID
-              name: formValues.itemName || 'Unnamed Item',
-              itemCount: 1,
-              uploadedAt: new Date().toISOString(),
-              type: 'Single',
-              status: 'Failed',
-              businessName: userBusinessName || '',
-            };
-            setUploadHistory(prev => [failedHistoryItem, ...prev]);
-    
-
   };
+
 
   const normalizeCSVHeaders = (headers: string[]) => {
     const headerMap: Record<string, keyof StockItem> = {
@@ -757,176 +916,96 @@ export default function StoreManagementPage() {
 
 
   const handleConfirmBulkUpload = async () => {
-    if (!bulkData.length || !userBusinessName) {
-      alert('No data to upload or business name is missing.');
+    const targetBusiness = (isAdmin && selectedBusinessForUpload) ? selectedBusinessForUpload : userBusinessName;
+
+    if (!bulkData.length || !targetBusiness) {
+      alert('No data to upload or the target business is not specified.');
       return;
     }
-
     setIsSubmitting(true);
-    setUploadResult(null); 
-    setUploadSuccessInfo(null); 
-
-
+    setUploadResult(null);
+    setUploadSuccessInfo(null);
     try {
       const payload = {
-        products: bulkData,
+        products: bulkData.map(item => ({...item, businessName: targetBusiness })),
         fileName: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv',
-        businessName: userBusinessName,
+        businessName: targetBusiness,
       };
       const response = await fetch('/api/bulk-upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       const resultData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(resultData.message || 'Bulk upload failed');
-      }
-
-      const { savedProducts, warnings, errors, bulkUploadRecord } = resultData;
-
-      // Update the main stock data list with only the successfully saved products
+      if (!response.ok) throw new Error(resultData.message || 'Bulk upload failed');
+      const { savedProducts, warnings, errors } = resultData;
       if (savedProducts && savedProducts.length > 0) {
         setStockData(prev => [...savedProducts, ...prev]);
+        setUploadSuccessInfo({ count: savedProducts.length });
       }
-
-                  // Update the upload history if a record was created/updated
-      if (bulkUploadRecord) {
-        // Determine the status of the upload
-        const status: 'Successful' | 'Partial' | 'Failed' = 
-          savedProducts.length > 0 && errors.length > 0 ? 'Partial' :
-          savedProducts.length > 0 ? 'Successful' :
-          'Failed';
-
-        const newHistoryItem: UploadHistoryItem = {
-          _id: bulkUploadRecord._id,
-          name: bulkUploadRecord.csvName,
-          itemCount: bulkUploadRecord.itemCount, // This is the success count
-          uploadedAt: bulkUploadRecord.uploadedAt,
-          type: 'Bulk',
-          status: status,
-          businessName: userBusinessName || '',
-        };
-        setUploadHistory(prev => 
-            [newHistoryItem, ...prev.filter(h => h._id !== newHistoryItem._id)]
-            .sort((a,b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
-        );
-      }
-
+      setUploadResult({ message: `${savedProducts.length} out of ${bulkData.length} items were uploaded.`, warnings: warnings || [], errors: errors || [] });
       
-      
-      // Show the new success message for the successfully saved products
-      if (savedProducts && savedProducts.length > 0) {
-      setUploadSuccessInfo({ count: savedProducts.length });
-}
+      const status = errors.length > 0 ? (savedProducts.length > 0 ? 'PARTIAL' : 'FAILURE') : 'SUCCESS';
+      const logDetails = isAdmin && selectedBusinessForUpload
+        ? `Admin performed bulk upload for '${targetBusiness}'. Result: ${savedProducts.length} saved, ${warnings.length} warnings, ${errors.length} errors.`
+        : `User performed bulk upload. Result: ${savedProducts.length} saved, ${warnings.length} warnings, ${errors.length} errors.`;
+      logAction('BULK_UPLOAD', status, logDetails, { type: 'Business', name: targetBusiness });
 
-
-      // Set the detailed results to be displayed in the new Alert component
-      setUploadResult({
-        message: `${savedProducts.length} out of ${bulkData.length} items were uploaded.`,
-        warnings: warnings || [],
-        errors: errors || [],
-      });
-
-      // Clear the preview and file input
       setShowBulkPreview(false);
       setBulkData([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
-
     } catch (error) {
       console.error('Error during bulk upload:', error);
-      // Set a generic error if the API call itself fails
-      setUploadResult({
-          message: "An unexpected error occurred during upload.",
-          warnings: [],
-          errors: [{ message: (error as Error).message, item: 'N/A'}]
-      });
-    
+      setUploadResult({ message: "An unexpected error occurred during upload.", warnings: [], errors: [{ message: (error as Error).message, item: 'N/A'}] });
+      const logDetails = isAdmin && selectedBusinessForUpload
+        ? `Admin bulk upload for '${targetBusiness}' failed entirely. Error: ${(error as Error).message}`
+        : `User bulk upload failed entirely. Error: ${(error as Error).message}`;
+      logAction('BULK_UPLOAD', 'FAILURE', logDetails, { type: 'Business', name: targetBusiness });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-          // Add a 'Failed' entry to the history for the bulk upload attempt
-          const failedHistoryItem: UploadHistoryItem = {
-            _id: `failed-bulk-${Date.now()}`, // temporary unique ID
-            name: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv',
-            itemCount: bulkData.length, // The number of items attempted
-            uploadedAt: new Date().toISOString(),
-            type: 'Bulk',
-            status: 'Failed',
-            businessName: userBusinessName || '',
-          };
-          setUploadHistory(prev => [failedHistoryItem, ...prev]);
-        } finally {
-          setIsSubmitting(false);
-          setHistoryVersion(v => v + 1);
-      }
-      };
 
   const handlePublish = async (id: string) => {
     try {
-      const response = await fetch('/api/stock/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-
+      const response = await fetch('/api/stock/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
       const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to publish item.');
-      }
-
+      if (!response.ok) throw new Error(result.message || 'Failed to publish item.');
       const { product: updatedProduct } = result;
-
-      setStockData(prevData =>
-        prevData.map(item =>
-          item._id === id ? { ...item, ...updatedProduct } : item
-        )
-      );
-      
+      setStockData(prevData => prevData.map(item => item._id === id ? { ...item, ...updatedProduct } : item));
       alert(`Item "${result.product.itemName}" has been published successfully!`);
-
+      logAction('PUBLISH_ITEM', 'SUCCESS', `User published item '${result.product.itemName}'.`, { type: 'Product', id, name: result.product.itemName });
     } catch (error) {
+      const item = stockData.find(i => i._id === id);
       console.error('Error publishing item:', error);
       alert((error as Error).message);
+      logAction('PUBLISH_ITEM', 'FAILURE', `User failed to publish item '${item?.itemName || 'Unknown'}'. Error: ${(error as Error).message}`, { type: 'Product', id, name: item?.itemName });
     }
   };
 
   const handleUnpublish = async (id: string) => {
-    if (!window.confirm('Are you sure you want to withdraw this item? It will be removed from the public storefront.')) return;
-    
+    const itemToUpdate = stockData.find(item => item._id === id);
+    if (!window.confirm('Are you sure you want to withdraw this item? It will be removed from the public storefront.')) {
+      logAction('UNPUBLISH_ITEM', 'INFO', `User cancelled unpublishing item '${itemToUpdate?.itemName || 'Unknown'}'.`, { type: 'Product', id, name: itemToUpdate?.itemName });
+      return;
+    }
     try {
-      const response = await fetch('/api/stock/unpublish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-
-      // If the response is NOT okay, then we expect an error message in the JSON body.
+      const response = await fetch('/api/stock/unpublish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to unpublish item.');
       }
-
-      // If the response IS okay, we don't need to parse a body.
-      // We'll find the item's name for the alert message.
-      const itemToUpdate = stockData.find(item => item._id === id);
-
-      // Update the item in the local state to reflect the change.
-      setStockData(prevData =>
-        prevData.map(item =>
-          item._id === id ? { ...item, isPublished: false } : item
-        )
-      );
-      
+      setStockData(prevData => prevData.map(item => item._id === id ? { ...item, isPublished: false } : item));
       alert(`Item "${itemToUpdate?.itemName || 'Item'}" has been unpublished successfully.`);
-
+      logAction('UNPUBLISH_ITEM', 'SUCCESS', `User unpublished item '${itemToUpdate?.itemName || 'Item'}'.`, { type: 'Product', id, name: itemToUpdate?.itemName });
     } catch (error) {
       console.error('Error unpublishing item:', error);
-      // This will now correctly show the error message from the server if one was sent.
       alert((error as Error).message);
+      logAction('UNPUBLISH_ITEM', 'FAILURE', `User failed to unpublish item '${itemToUpdate?.itemName || 'Item'}'. Error: ${(error as Error).message}`, { type: 'Product', id, name: itemToUpdate?.itemName });
     }
   };
+
 
 
 
@@ -1003,76 +1082,65 @@ export default function StoreManagementPage() {
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: 'processing' | 'completed' | 'cancelled' | 'failed') => {
     const confirmationMessage = `Are you sure you want to change the order status to ${newStatus}?`;
-    if (!window.confirm(confirmationMessage)) return;
-
+    const order = orders.find(o => o._id === orderId);
+    if (!window.confirm(confirmationMessage)) {
+      logAction('UPDATE_ORDER_STATUS', 'INFO', `User cancelled updating order status to '${newStatus}'.`, { type: 'Order', id: orderId, name: `Order for ${order?.customerName}` });
+      return;
+    }
     try {
-      const res = await fetch('/api/orders', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, status: newStatus }),
-      });
-
+      const res = await fetch('/api/orders', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId, status: newStatus }) });
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || `Failed to update status to ${newStatus}`);
       }
-
       const updatedOrder = await res.json();
-
-      // Update the order in the local state to reflect the change instantly
-      setOrders(prevOrders =>
-        prevOrders.map(o => (o._id === orderId ? { ...o, status: updatedOrder.status.toLowerCase() } : o))
-      );
-
+      setOrders(prevOrders => prevOrders.map(o => (o._id === orderId ? { ...o, status: updatedOrder.status.toLowerCase() } : o)));
       alert(`Order status updated to ${updatedOrder.status}`);
+      logAction('UPDATE_ORDER_STATUS', 'SUCCESS', `User updated order status to '${newStatus}'.`, { type: 'Order', id: orderId, name: `Order for ${order?.customerName}` });
     } catch (error) {
       console.error('Error updating order status:', error);
       alert(`Error: ${(error as Error).message}`);
+      logAction('UPDATE_ORDER_STATUS', 'FAILURE', `User failed to update order status to '${newStatus}'. Error: ${(error as Error).message}`, { type: 'Order', id: orderId, name: `Order for ${order?.customerName}` });
     }
   };
+
 
   const handleCopyUrl = () => {
     if (!userSlug) return;
     const storeUrl = `${userSlug}.psx.ng`;
     navigator.clipboard.writeText(storeUrl);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+    logAction('COPY_URL', 'INFO', `User copied their store URL: ${storeUrl}`);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownloadFlyer = async () => {
-    const flyerElement = flyerRef.current; // Define the element at the top
-
-    // Check if the element exists in the DOM
+    const flyerElement = flyerRef.current;
     if (!flyerElement) {
       alert('Could not find the flyer component. Please try again.');
       return;
     }
-
-    // Check if the data is ready
     if (!qrCodeDataUrl || !userBusinessName) {
         alert('Flyer data is still loading. Please wait a moment and try again.');
         return;
     }
-
-    // Use a small delay to ensure everything is rendered
+    logAction('DOWNLOAD_FLYER', 'INFO', 'User initiated flyer download.');
     setTimeout(async () => {
       try {
-        const dataUrl = await toPng(flyerElement, { // Now it can be used here without error
-          cacheBust: true,
-          backgroundColor: 'white',
-          pixelRatio: 2,
-        });
-
+        const dataUrl = await toPng(flyerElement, { cacheBust: true, backgroundColor: 'white', pixelRatio: 2 });
         const link = document.createElement('a');
         link.download = `${userSlug}-store-flyer.png`;
         link.href = dataUrl;
         link.click();
+        logAction('DOWNLOAD_FLYER', 'SUCCESS', 'User successfully downloaded their store flyer.');
       } catch (err) {
         console.error('Failed to create flyer image:', err);
         alert('Sorry, there was an error creating your flyer.');
+        logAction('DOWNLOAD_FLYER', 'FAILURE', `Flyer download failed. Error: ${(err as Error).message}`);
       }
     }, 100);
   };
+
 
 
 
@@ -1189,11 +1257,8 @@ export default function StoreManagementPage() {
   const handleTileSave = async () => {
     if (!tileEditData?._id) return;
     setIsUploading(true);
-
     let dataToSave = { ...tileEditData };
-
     try {
-      // Step 1: Upload image if a new one was selected
       if (tileImageFile) {
         const formData = new FormData();
         formData.append('file', tileImageFile);
@@ -1202,8 +1267,6 @@ export default function StoreManagementPage() {
         if (!uploadResponse.ok) throw new Error(uploadResult.message || 'Failed to upload image.');
         dataToSave.imageUrl = uploadResult.url;
       }
-
-      // Step 2: Save the product data
       const saveResponse = await fetch(`/api/stock/${dataToSave._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -1211,22 +1274,22 @@ export default function StoreManagementPage() {
       });
       const saveResult = await saveResponse.json();
       if (!saveResponse.ok) throw new Error(saveResult.message || 'Failed to save product.');
-
-      // Step 3: Update local state
       const updatedStockData = stockData.map(item => item._id === dataToSave._id ? dataToSave : item);
       setStockData(updatedStockData);
-      setSelectedProduct(dataToSave); // Update the view with the new data
-      
+      setSelectedProduct(dataToSave);
       alert('Product updated successfully!');
+      logAction('UPDATE_ITEM', 'SUCCESS', `User updated item '${dataToSave.itemName}'.`, { type: 'Product', id: dataToSave._id, name: dataToSave.itemName });
     } catch (error) {
       console.error("Save error:", error);
       alert((error as Error).message);
+      logAction('UPDATE_ITEM', 'FAILURE', `User failed to update item '${dataToSave.itemName}'. Error: ${(error as Error).message}`, { type: 'Product', id: dataToSave._id, name: dataToSave.itemName });
     } finally {
       setIsUploading(false);
-      setIsEditingTile(false); // Exit edit mode
-      setTileImageFile(null); // Clear the selected file
+      setIsEditingTile(false);
+      setTileImageFile(null);
     }
   };
+
 
   const handleNavigation = (direction: 'next' | 'prev') => {
     if (!selectedProduct) return;
@@ -1247,6 +1310,68 @@ export default function StoreManagementPage() {
   };
 
 
+  const handleFetchSuggestion = async () => {
+    if (!tileEditData?.itemName || !tileEditData._id) {
+      console.log("Cannot fetch suggestion without an item name.");
+      return;
+    }
+
+    setIsFetchingSuggestion(true);
+    setSuggestionData(null); 
+
+    try {
+      const response = await fetch('/api/stock/suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemName: tileEditData.itemName,
+          currentItemId: tileEditData._id
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSuggestionData(data);
+      } else {
+        console.log("No close match found.");
+      }
+    } catch (error) {
+      console.error("Failed to fetch suggestion:", error);
+    } finally {
+      setIsFetchingSuggestion(false);
+    }
+  };
+
+  const handleToggleSuggestions = () => {
+    const turningOn = !showSuggestions;
+    setShowSuggestions(turningOn);
+
+    if (turningOn && !suggestionData) {
+      handleFetchSuggestion();
+    } else if (!turningOn) {
+      setSuggestionData(null); 
+    }
+  };
+
+  const handleAcceptField = (field: keyof StockItem, value: any) => {
+    if (value === undefined || value === null) return;
+    setTileEditData(prev => ({ ...prev!, [field]: value }));
+  };
+
+  const handleAcceptAll = () => {
+    if (!suggestionData) return;
+    
+    const updatedData = { ...tileEditData };
+    (Object.keys(suggestionData) as (keyof StockItem)[]).forEach(key => {
+        const value = suggestionData[key];
+        if (value !== null && value !== undefined && key !== '_id' && key !== 'businessName' && key !== 'coordinates') {
+            (updatedData as any)[key] = value;
+        }
+    });
+
+    setTileEditData(updatedData as StockItem);
+  };
+
 
     // --- START: WhatsApp Activation Link ---
   // Construct the one-click WhatsApp activation link
@@ -1263,12 +1388,14 @@ export default function StoreManagementPage() {
     <Box sx={{ p: isMobile ? 2 : 4 }}>
       <Typography variant={isMobile ? 'h5' : 'h4'} gutterBottom>Store Management</Typography>
       
-            <Tabs value={selectedTab} onChange={handleTabChange} variant={isMobile ? 'scrollable' : 'standard'} scrollButtons="auto">
+      <Tabs value={selectedTab} onChange={handleTabChange} variant={isMobile ? 'scrollable' : 'standard'} scrollButtons="auto">
         <Tab label="Storefront" />
         <Tab label="Upload" disabled={!isLocationSet} />
         <Tab label="Stock" disabled={!isLocationSet} />
         <Tab label="Orders" disabled={!isLocationSet} />
+        {isAdmin && <Tab label="Activity Log" />}
       </Tabs>
+
 
 
       {selectedTab === 0 && (
@@ -1369,6 +1496,35 @@ export default function StoreManagementPage() {
 
       {selectedTab === 1 && (
         <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+          
+          {isAdmin && (
+            <Paper sx={{ p: 2, mb: 2, width: '100%', maxWidth: 350, bgcolor: 'secondary.main', color: 'white' }}>
+              <FormControl fullWidth>
+                <InputLabel id="business-select-label" sx={{color: 'white'}}>Upload For Business</InputLabel>
+                <Select
+                  labelId="business-select-label"
+                  value={selectedBusinessForUpload || ''}
+                  label="Upload For Business"
+                  onChange={(e) => setSelectedBusinessForUpload(e.target.value as string)}
+                  sx={{ color: 'white', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.7)' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' }, '.MuiSvgIcon-root': { color: 'white' } }}
+                >
+                  <MenuItem value="">
+                    <em>Upload for Myself (Admin)</em>
+                  </MenuItem>
+                  {allBusinesses.map((biz) => (
+                    <MenuItem key={biz.businessName} value={biz.businessName}>
+                      {biz.businessName}
+                    </MenuItem>
+                  ))}
+
+
+                </Select>
+              </FormControl>
+              <Typography variant="caption" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+                Select a business to perform an upload on their behalf.
+              </Typography>
+            </Paper>
+          )}
 
 {uploadSuccessInfo && (
     <Alert
@@ -1929,6 +2085,89 @@ export default function StoreManagementPage() {
         
       )}
 
+           {/* --- START: ADD THIS NEW CODE FOR THE LOG TAB --- */}
+{selectedTab === 4 && isAdmin && (
+  <Box sx={{ mt: 3 }}>
+    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Admin Activity Log</Typography>
+
+
+              {/* --- START: LOG INSIGHTS UI --- */}
+              <Paper sx={{ p: 2, mb: 3, bgcolor: 'grey.100', borderRadius: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>Log Insights</Typography>
+              <Stack direction="row" spacing={1.5} sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                  <Button variant="contained" onClick={handleGenerateUserActivity} size="small">User Activity</Button>
+                  <Button variant="contained" onClick={handleGenerateActionCounts} size="small">Action Counts</Button>
+                  <Button variant="contained" onClick={handleGenerateStatusSummary} size="small">Status Summary</Button>
+                  <Button variant="outlined" color="secondary" onClick={() => setLogInsights(null)} size="small">Clear Insights</Button>
+              </Stack>
+              <Collapse in={!!logInsights}>
+                {logInsights && (
+                    <Paper variant="outlined" sx={{ p: 2, maxHeight: 200, overflowY: 'auto', bgcolor: '#f5f5f5' }}>
+                        <Typography component="pre" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                            {logInsights.join('\n')}
+                        </Typography>
+                    </Paper>
+                )}
+              </Collapse>
+          </Paper>
+          {/* --- END: LOG INSIGHTS UI --- */}
+
+
+    <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: 'italic' }}>
+      Showing the 200 most recent actions taken across the platform.
+    </Typography>
+    {loadingLogs ? (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
+    ) : logsError ? (
+      <Alert severity="error">{logsError}</Alert>
+    ) : (
+      <Paper sx={{ width: '100%', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+        <TableContainer sx={{ maxHeight: 600 }}>
+          <Table stickyHeader aria-label="activity log table">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>Timestamp</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Actor</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Action</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Target</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Details</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {activityLogs.map((log) => (
+                <TableRow hover key={log._id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                  <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
+                  <TableCell>{log.actor?.name}</TableCell>
+                  <TableCell><Chip label={log.action} size="small" variant="outlined" /></TableCell>
+                  <TableCell>{log.target?.name || 'N/A'}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={log.status}
+                      size="small"
+                      color={
+                        log.status === 'SUCCESS' ? 'success' :
+                        log.status === 'FAILURE' ? 'error' :
+                        log.status === 'PARTIAL' ? 'warning' :
+                        'default'
+                      }
+                    />
+                  </TableCell>
+                  <TableCell sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>{log.details}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+    )}
+  </Box>
+)}
+{/* --- END: ADD THIS NEW CODE --- */}
+
+  <WhatsAppButton />
+
+
         <WhatsAppButton />
 
             {/* Hidden Flyer for download */}
@@ -1970,144 +2209,174 @@ export default function StoreManagementPage() {
         </Typography>
       </Box>
 
-       {/* --- EDIT TILE MODAL (FLEXBOX FIX) --- */}
+       {/* --- EDIT TILE MODAL (with Suggestions) --- */}
 <Modal
   open={!!selectedProduct}
-  onClose={() => { setSelectedProduct(null); setIsEditingTile(false); }}
+  onClose={() => {
+    setSelectedProduct(null);
+    setIsEditingTile(false);
+    setShowSuggestions(false); // Reset suggestion view on close
+    setSuggestionData(null);
+  }}
   closeAfterTransition
   slots={{ backdrop: Backdrop }}
   slotProps={{ backdrop: { timeout: 500 } }}
 >
   <Fade in={!!selectedProduct}>
     <Box sx={{
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
+      position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
       width: '90%',
-      maxWidth: 900,
-      bgcolor: 'background.paper',
-      boxShadow: 24,
-      p: 4,
-      borderRadius: 2,
-      maxHeight: '90vh',
-      overflowY: 'auto'
+      // Make modal wider when suggestions are active
+      maxWidth: showSuggestions ? 1200 : 900,
+      bgcolor: 'background.paper', boxShadow: 24, p: { xs: 2, md: 4 }, borderRadius: 2,
+      maxHeight: '90vh', overflowY: 'auto',
+      transition: 'max-width 0.3s ease-in-out', // Smooth transition for width change
     }}>
       {tileEditData && (
         <>
-          {/* Header */}
-<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-    {isEditingTile ? 'Editing Item' : 'Item Details'}
-  </Typography>
-  {isEditingTile ? (
-    <Box>
-      <Button size="medium" onClick={() => { setIsEditingTile(false); setTileEditData(selectedProduct); }} disabled={isUploading} sx={{ mr: 1 }}>Cancel</Button>
-      <Button variant="contained" color="success" size="medium" onClick={handleTileSave} disabled={isUploading}>
-        {isUploading ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
-      </Button>
-    </Box>
-  ) : (
-    <Button variant="contained" size="medium" onClick={() => setIsEditingTile(true)}>Edit</Button>
-  )}
-</Box>
+          {/* --- Header --- */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+            <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{isEditingTile ? 'Editing Item' : 'Item Details'}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <FormControlLabel
+                control={<Switch checked={showSuggestions} onChange={handleToggleSuggestions} />}
+                label="Suggest"
+                disabled={!isEditingTile}
+              />
+              {isEditingTile ? (
+                <Box>
+                  <Button size="medium" onClick={() => { setIsEditingTile(false); setTileEditData(selectedProduct); }} disabled={isUploading} sx={{ mr: 1 }}>Cancel</Button>
+                  <Button variant="contained" color="success" size="medium" onClick={handleTileSave} disabled={isUploading}>
+                    {isUploading ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
+                  </Button>
+                </Box>
+              ) : (
+                <Button variant="contained" size="medium" onClick={() => setIsEditingTile(true)}>Edit</Button>
+              )}
+            </Box>
+          </Box>
 
-
-
-          {/* This Box now wraps the body and contains the arrows */}
-<Box sx={{ position: 'relative' }}>
-
-{/* Left Arrow */}
-<IconButton
-  onClick={() => handleNavigation('prev')}
-  disabled={!selectedProduct || filteredStock.findIndex(p => p._id === selectedProduct._id) === 0}
-  sx={{
-    position: 'absolute',
-    left: { xs: -16, md: -50 },
-    top: '50%',
-    transform: 'translateY(-50%)',
-    zIndex: 2,
-    bgcolor: 'background.paper',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-    '&:hover': { bgcolor: '#f5f5f5' },
-    '&.Mui-disabled': {
-      opacity: 0.2,
-    }
-  }}
->
-  <ArrowBackIosNewIcon />
+          {/* --- Body (with side-by-side suggestions) --- */}
+          <Box sx={{ position: 'relative' }}>
+            
+            {/* --- Navigation Arrows --- */}
+<IconButton onClick={() => handleNavigation('prev')} disabled={!selectedProduct || filteredStock.findIndex(p => p._id === selectedProduct._id) === 0} sx={{ position: 'absolute', left: { xs: -16, md: -50 }, top: '50%', transform: 'translateY(-50%)', zIndex: 1301, bgcolor: 'background.paper', boxShadow: 3, '&:hover': { bgcolor: '#f5f5f5' } }}>
+    <ArrowBackIosNewIcon />
+</IconButton>
+<IconButton onClick={() => handleNavigation('next')} disabled={!selectedProduct || filteredStock.findIndex(p => p._id === selectedProduct._id) === filteredStock.length - 1} sx={{ position: 'absolute', right: { xs: -16, md: -50 }, top: '50%', transform: 'translateY(-50%)', zIndex: 1301, bgcolor: 'background.paper', boxShadow: 3, '&:hover': { bgcolor: '#f5f5f5' } }}>
+    <ArrowForwardIosIcon />
 </IconButton>
 
-{/* Main Content Body */}
-<Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4 }}>
-  {/* Left Column (Image) */}
-  <Box sx={{ width: { xs: '100%', md: '33.33%' } }}>
-    <Box sx={{ position: 'relative', paddingTop: '100%', backgroundColor: '#f0f0f0', borderRadius: 2, overflow: 'hidden' }}>
-      <img src={tileEditData.imageUrl || '/placeholder.png'} alt={tileEditData.itemName || 'Product'} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={e => (e.currentTarget.src = '/placeholder.png')} />
-    </Box>
-    <Button variant="outlined" component="label" fullWidth sx={{ mt: 2 }} disabled={!isEditingTile || isUploading}>
-      Upload Image
-      <input type="file" accept="image/*" hidden onChange={handleTileImageSelect} />
+
+            {/* --- Main Content Layout --- */}
+            <Box sx={{ display: 'flex', gap: 3, flexDirection: showSuggestions ? 'row' : { xs: 'column', md: 'row' } }}>
+
+              {/* --- CURRENT ITEM COLUMN --- */}
+              <Box sx={{ width: showSuggestions ? '50%' : { xs: '100%', md: '33.33%' }, transition: 'width 0.3s ease-in-out' }}>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>Current Item</Typography>
+                <Box sx={{ position: 'relative', paddingTop: '100%', backgroundColor: '#f0f0f0', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
+                  <img src={tileEditData.imageUrl || '/placeholder.png'} alt="Current" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={e => (e.currentTarget.src = '/placeholder.png')} />
+                </Box>
+                <Button variant="outlined" component="label" fullWidth disabled={!isEditingTile || isUploading}>
+                  Upload Image <input type="file" accept="image/*" hidden onChange={handleTileImageSelect} />
+                </Button>
+                
+                <Stack spacing={2} sx={{ mt: 2 }}>
+                  <TextField label="Item Name" value={tileEditData.itemName || ''} onChange={e => handleTileFormChange('itemName', e.target.value)} fullWidth disabled={!isEditingTile} />
+                  <TextField label="Amount (₦)" type="number" value={tileEditData.amount || ''} onChange={e => handleTileFormChange('amount', Number(e.target.value))} fullWidth disabled={!isEditingTile} />
+                  <TextField label="Info" value={tileEditData.info || ''} onChange={e => handleTileFormChange('info', e.target.value)} fullWidth multiline rows={2} disabled={!isEditingTile} />
+                  <TextField label="Active Ingredient" value={tileEditData.activeIngredient || ''} onChange={e => handleTileFormChange('activeIngredient', e.target.value)} fullWidth disabled={!isEditingTile} />
+                  <TextField label="Category" value={tileEditData.category || ''} onChange={e => handleTileFormChange('category', e.target.value)} fullWidth disabled={!isEditingTile} />
+                  <FormControlLabel control={<Checkbox checked={tileEditData.POM || false} onChange={e => handleTileFormChange('POM', e.target.checked)} disabled={!isEditingTile} />} label="Prescription Only" />
+                </Stack>
+              </Box>
+
+              {/* --- SUGGESTION COLUMN (Conditional) --- */}
+              {showSuggestions && (
+                <Box sx={{ width: '50%', borderLeft: '1px solid #ddd', pl: 3 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+    <Button 
+        size="small" 
+        variant="outlined" 
+        startIcon={<ArrowBackIosNewIcon />} 
+        onClick={() => setShowSuggestions(false)}
+    >
+        Back to Editor
     </Button>
-  </Box>
-
-  {/* Right Column (Details) */}
-  <Box sx={{ width: { xs: '100%', md: '66.67%' } }}>
-    <Stack spacing={2}>
-      <TextField label="Item Name" value={tileEditData.itemName || ''} onChange={e => handleTileFormChange('itemName', e.target.value)} fullWidth disabled={!isEditingTile} />
-      <TextField label="Amount (₦)" type="number" value={tileEditData.amount || ''} onChange={e => handleTileFormChange('amount', Number(e.target.value))} fullWidth disabled={!isEditingTile} />
-      <TextField label="Info" value={tileEditData.info || ''} onChange={e => handleTileFormChange('info', e.target.value)} fullWidth multiline rows={2} disabled={!isEditingTile} />
-      <TextField label="Active Ingredient" value={tileEditData.activeIngredient || ''} onChange={e => handleTileFormChange('activeIngredient', e.target.value)} fullWidth disabled={!isEditingTile} />
-      <TextField label="Category" value={tileEditData.category || ''} onChange={e => handleTileFormChange('category', e.target.value)} fullWidth disabled={!isEditingTile} />
-      <FormControlLabel control={<Checkbox checked={tileEditData.POM || false} onChange={e => handleTileFormChange('POM', e.target.checked)} disabled={!isEditingTile} />} label="Prescription Only Medicine (POM)" />
-    </Stack>
-    
-    {!isEditingTile ? (
-      <Box sx={{ mt: 3, display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-        <Button variant="outlined" color="error" size="medium" onClick={() => { if(tileEditData?._id) handleDelete(tileEditData._id)}}>Delete Item</Button>
-        {!tileEditData.isPublished ? (
-            (() => {
-              if (!tileEditData?._id) return null;
-              const incompleteFields = getIncompleteFieldsList(tileEditData);
-              const isItemIncomplete = incompleteFields.length > 0;
-              const publishButton = (<Button variant="contained" color="primary" size="medium" onClick={() => handlePublish(tileEditData._id!)} disabled={isItemIncomplete}>Publish</Button>);
-              return isItemIncomplete ? <Tooltip title="Item has incomplete fields"><span>{publishButton}</span></Tooltip> : publishButton;
-            })()
-          ) : null}
-          {tileEditData.isPublished ? (<Button variant="contained" color="warning" size="medium" onClick={() => {if(tileEditData?._id) handleUnpublish(tileEditData._id)}}>Withdraw</Button>) : null}
-      </Box>
-    ) : null}
-  </Box>
+    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>Suggestion</Typography>
 </Box>
 
-{/* Right Arrow */}
-<IconButton
-  onClick={() => handleNavigation('next')}
-  disabled={!selectedProduct || filteredStock.findIndex(p => p._id === selectedProduct._id) === filteredStock.length - 1}
-  sx={{
-    position: 'absolute',
-    right: { xs: -16, md: -50 },
-    top: '50%',
-    transform: 'translateY(-50%)',
-    zIndex: 2,
-    bgcolor: 'background.paper',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-    '&:hover': { bgcolor: '#f5f5f5' },
-    '&.Mui-disabled': {
-      opacity: 0.2,
-    }
-  }}
->
-  <ArrowForwardIosIcon />
-</IconButton>
+                    <Button size="small" variant="contained" onClick={handleAcceptAll} disabled={!suggestionData || !isEditingTile}>Accept All</Button>
+                  </Box>
+                  
+                  {isFetchingSuggestion && <Box sx={{display: 'flex', justifyContent: 'center', pt: 4}}><CircularProgress /></Box>}
+                  {!isFetchingSuggestion && !suggestionData && <Typography sx={{pt: 4, textAlign: 'center'}} color="text.secondary">No close match found.</Typography>}
 
-</Box>
+                  {suggestionData && (
+                    <>
+                      <Box sx={{ position: 'relative', paddingTop: '100%', backgroundColor: '#f0f0f0', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
+                        <img src={suggestionData.imageUrl || '/placeholder.png'} alt="Suggestion" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={e => (e.currentTarget.src = '/placeholder.png')} />
+                      </Box>
+                      <Button variant="outlined" fullWidth onClick={() => handleAcceptField('imageUrl', suggestionData.imageUrl)} disabled={!isEditingTile}>Accept Image</Button>
+                      
+                      <Stack spacing={1.5} sx={{ mt: 2 }}>
+                        {(['itemName', 'amount', 'info', 'activeIngredient', 'category'] as (keyof StockItem)[]).map(key => (
+                          <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TextField 
+                               label={key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
+                               value={suggestionData[key] || ''} 
+                               fullWidth 
+                               disabled 
+                               InputProps={{ readOnly: true }} 
+                               variant="filled" 
+                               size="small"
+                             />
+                            <Tooltip title={`Accept ${key}`}>
+                                <IconButton size="small" onClick={() => handleAcceptField(key, suggestionData[key])} disabled={!isEditingTile}>
+                                    <ArrowBackIcon fontSize="inherit" />
+                                </IconButton>
+                            </Tooltip>
+                          </Box>
+                        ))}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <FormControlLabel control={<Checkbox checked={suggestionData.POM || false} disabled />} label="Prescription Only" sx={{flexGrow: 1}}/>
+                            <Tooltip title="Accept Prescription status">
+                                <IconButton size="small" onClick={() => handleAcceptField('POM', suggestionData.POM)} disabled={!isEditingTile}>
+                                    <ArrowBackIcon fontSize="inherit" />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                      </Stack>
+                    </>
+                  )}
+                </Box>
+              )}
+            </Box>
 
+            {/* --- ACTION BUTTONS (for non-edit mode) --- */}
+            {!isEditingTile && (
+              <Box sx={{ mt: 4, display: 'flex', flexWrap: 'wrap', gap: 1.5, borderTop: '1px solid #eee', pt: 3 }}>
+                <Button variant="outlined" color="error" size="medium" onClick={() => { if(tileEditData?._id) handleDelete(tileEditData._id)}}>Delete Item</Button>
+                {!tileEditData.isPublished ? (
+                  (() => {
+                    if (!tileEditData?._id) return null;
+                    const isItemIncomplete = getIncompleteFieldsList(tileEditData).length > 0;
+                    const publishButton = (<Button variant="contained" color="primary" size="medium" onClick={() => handlePublish(tileEditData._id!)} disabled={isItemIncomplete}>Publish</Button>);
+                    return isItemIncomplete ? <Tooltip title={getIncompleteFieldsList(tileEditData).join(', ')}><span>{publishButton}</span></Tooltip> : publishButton;
+                  })()
+                ) : null}
+                {tileEditData.isPublished ? (<Button variant="contained" color="warning" size="medium" onClick={() => {if(tileEditData?._id) handleUnpublish(tileEditData._id)}}>Withdraw</Button>) : null}
+              </Box>
+            )}
+          </Box>
         </>
       )}
     </Box>
   </Fade>
 </Modal>
+
+
 
 
 
