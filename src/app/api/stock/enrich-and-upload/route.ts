@@ -7,6 +7,21 @@ import Product from '@/models/Product';
 // --- Initialize the AI Model ---
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
+// --- Helper function to find a value by searching for possible keys case-insensitively ---
+const findValueByKey = (obj: any, possibleKeys: string[]): any => {
+  const lowerCaseKeys = possibleKeys.map(k => k.toLowerCase());
+  for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          const lowerCaseKey = key.trim().toLowerCase();
+          if (lowerCaseKeys.includes(lowerCaseKey)) {
+              return obj[key];
+          }
+      }
+  }
+  return undefined;
+};
+
+
 // --- The Master Prompt for the AI ---
 const masterPrompt = `
 You are an expert pharmaceutical data analyst. Your task is to process raw, messy inventory data and enrich it into a clean, structured JSON format. Follow these rules strictly:
@@ -68,10 +83,18 @@ export async function POST(req: Request) {
     // Model for creating the vector embeddings
     const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
 
-    const processingResults = await Promise.allSettled(rawProducts.map(async (rawItem: any) => {
+    const processingResults = await Promise.allSettled(rawProducts.map(async (rawItem: any, index: number) => {
       try {
-        // --- Vector Search Implementation ---
-        const itemName = (rawItem['item name'] || rawItem['product']).trim();
+        // --- FIX: Robustly find item name by checking multiple possible keys case-insensitively ---
+        const itemNameValue = findValueByKey(rawItem, ['item name', 'product', 'name', 'item']);
+        
+        if (!itemNameValue || String(itemNameValue).trim() === '') {
+             // Throw a specific, useful error instead of crashing.
+             throw new Error(`Item Name is missing in one of the rows (check near row ${index + 2}). The column must be named 'Item Name', 'Product', or 'Name'.`);
+        }
+        
+        const itemName = String(itemNameValue).trim();
+        // --- END OF FIX ---
         const queryVector = (await embeddingModel.embedContent(itemName)).embedding.values;
 
         const similarProducts = await Product.aggregate([
