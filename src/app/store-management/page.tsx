@@ -112,6 +112,8 @@ export default function StoreManagementPage() {
 
   const [showBulkPreview, setShowBulkPreview] = useState(false);
   const [bulkData, setBulkData] = useState<StockItem[]>([]);
+  const [rawBulkData, setRawBulkData] = useState<any[]>([]);
+
   const [stockData, setStockData] = useState<StockItem[]>([]);
   const [loadingStock, setLoadingStock] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -853,6 +855,9 @@ export default function StoreManagementPage() {
             alert("The uploaded file is empty or could not be read.");
             return;
         }
+
+        setRawBulkData(data);
+
         const headers = Object.keys(data[0]);
         const headerMapping = normalizeCSVHeaders(headers);
 
@@ -933,53 +938,74 @@ export default function StoreManagementPage() {
   const handleConfirmBulkUpload = async () => {
     const targetBusiness = (isAdmin && selectedBusinessForUpload) ? selectedBusinessForUpload : userBusinessName;
 
-    if (!bulkData.length || !targetBusiness) {
+    // Use the raw data for validation
+    if (!rawBulkData.length || !targetBusiness) {
       alert('No data to upload or the target business is not specified.');
       return;
     }
+
     setIsSubmitting(true);
     setUploadResult(null);
     setUploadSuccessInfo(null);
+
     try {
       const payload = {
-        products: bulkData.map(item => ({...item, businessName: targetBusiness })),
+        products: rawBulkData, // Send the raw, unprocessed data
         fileName: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv',
         businessName: targetBusiness,
       };
-      const response = await fetch('/api/bulk-upload', {
+
+      // Call the new AI enrichment endpoint
+      const response = await fetch('/api/stock/enrich-and-upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
       const resultData = await response.json();
-      if (!response.ok) throw new Error(resultData.message || 'Bulk upload failed');
+      if (!response.ok) {
+        throw new Error(resultData.message || 'AI enrichment process failed');
+      }
+
+      // The new endpoint might return a 202 Accepted status for long processing.
+      // For now, we'll handle the immediate response.
       const { savedProducts, warnings, errors } = resultData;
+
       if (savedProducts && savedProducts.length > 0) {
+        // The AI service will return fully structured data.
         setStockData(prev => [...savedProducts, ...prev]);
         setUploadSuccessInfo({ count: savedProducts.length });
       }
-      setUploadResult({ message: `${savedProducts.length} out of ${bulkData.length} items were uploaded.`, warnings: warnings || [], errors: errors || [] });
+
+      setUploadResult({ 
+        message: `${savedProducts.length} out of ${rawBulkData.length} items were processed.`, 
+        warnings: warnings || [], 
+        errors: errors || [] 
+      });
       
-      const status = errors.length > 0 ? (savedProducts.length > 0 ? 'PARTIAL' : 'FAILURE') : 'SUCCESS';
-      const logDetails = isAdmin && selectedBusinessForUpload
-        ? `Admin performed bulk upload for '${targetBusiness}'. Result: ${savedProducts.length} saved, ${warnings.length} warnings, ${errors.length} errors.`
-        : `User performed bulk upload. Result: ${savedProducts.length} saved, ${warnings.length} warnings, ${errors.length} errors.`;
-      logAction('BULK_UPLOAD', status, logDetails, { type: 'Business', name: targetBusiness });
+      const status = (errors?.length || 0) > 0 ? ((savedProducts?.length || 0) > 0 ? 'PARTIAL' : 'FAILURE') : 'SUCCESS';
+      const logDetails = `User initiated AI bulk enrichment. Result: ${savedProducts?.length || 0} saved, ${warnings?.length || 0} warnings, ${errors?.length || 0} errors.`;
+      logAction('BULK_ENRICH', status, logDetails, { type: 'Business', name: targetBusiness });
 
       setShowBulkPreview(false);
       setBulkData([]);
+      setRawBulkData([]); // Clear the raw data state
       if (fileInputRef.current) fileInputRef.current.value = "";
+
     } catch (error) {
-      console.error('Error during bulk upload:', error);
-      setUploadResult({ message: "An unexpected error occurred during upload.", warnings: [], errors: [{ message: (error as Error).message, item: 'N/A'}] });
-      const logDetails = isAdmin && selectedBusinessForUpload
-        ? `Admin bulk upload for '${targetBusiness}' failed entirely. Error: ${(error as Error).message}`
-        : `User bulk upload failed entirely. Error: ${(error as Error).message}`;
-      logAction('BULK_UPLOAD', 'FAILURE', logDetails, { type: 'Business', name: targetBusiness });
+      console.error('Error during AI bulk enrichment:', error);
+      setUploadResult({ 
+        message: "An unexpected error occurred during AI enrichment.", 
+        warnings: [], 
+        errors: [{ message: (error as Error).message, item: 'N/A'}] 
+      });
+      const logDetails = `User AI enrichment failed entirely. Error: ${(error as Error).message}`;
+      logAction('BULK_ENRICH', 'FAILURE', logDetails, { type: 'Business', name: targetBusiness });
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
 
   const handlePublish = async (id: string) => {

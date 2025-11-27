@@ -14,10 +14,12 @@ export interface IProduct extends Document {
   slug: string;
   isPublished: boolean;
   bulkUploadId?: mongoose.Types.ObjectId;
+  itemNameVector?: number[]; // Stores the vector representation of the item name
 }
 
 const productSchema: Schema<IProduct> = new mongoose.Schema({
   itemName: { type: String, required: true },
+  itemNameVector: { type: [Number], required: false }, // Added for vector search
   activeIngredient: { type: String, required: false, default: 'N/A' },
   category: { type: String, required: false, default: 'N/A' },
   amount: { type: Number, required: false, default: 0 },
