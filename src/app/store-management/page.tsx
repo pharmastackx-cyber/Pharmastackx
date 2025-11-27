@@ -156,7 +156,8 @@ export default function StoreManagementPage() {
     warnings: { message: string; item: any }[];
     errors: { message: string; item: any }[];
   } | null>(null);
-  const [uploadSuccessInfo, setUploadSuccessInfo] = useState<{ count: number } | null>(null);
+  const [uploadSuccessInfo, setUploadSuccessInfo] = useState<{ totalSaved: number; publishedCount: number; } | null>(null);
+
 
   
 
@@ -829,7 +830,8 @@ export default function StoreManagementPage() {
       }
       const { product: savedProduct } = await response.json();
       setStockData(prev => [savedProduct, ...prev]);
-      setUploadSuccessInfo({ count: 1 });
+      setUploadSuccessInfo({ totalSaved: 1, publishedCount: 0 });
+
       setUploadResult(null);
       setShowUploadForm(false);
       
@@ -1022,7 +1024,8 @@ export default function StoreManagementPage() {
 
       if (savedProducts && savedProducts.length > 0) {
         setStockData(prev => [...savedProducts, ...prev]);
-        setUploadSuccessInfo({ count: savedProducts.length });
+        setUploadSuccessInfo({ totalSaved: savedProducts.length, publishedCount: resultData.publishedCount || 0 });
+
       }
 
       setUploadResult({
@@ -1820,34 +1823,34 @@ export default function StoreManagementPage() {
 
 {uploadSuccessInfo && (
     <Alert
-      ref={successAlertRef} // Attach the ref here
+      ref={successAlertRef}
       severity="success"
       onClose={() => setUploadSuccessInfo(null)}
-      sx={{
-        mb: 3,
-        width: '100%',
-        maxWidth: 600,
-        alignItems: 'flex-start',
-        boxShadow: '0 4px 12px rgba(0, 128, 0, 0.4)', // Makes it pop
-        border: '1px solid #4caf50', // Adds a subtle border
-      }}
+      sx={{ mb: 3, width: '100%', maxWidth: 600, boxShadow: '0 4px 12px rgba(0, 128, 0, 0.4)', border: '1px solid #4caf50' }}
     >
-      <AlertTitle sx={{ fontWeight: 'bold' }}>Success!</AlertTitle>
+      <AlertTitle sx={{ fontWeight: 'bold' }}>Upload Complete!</AlertTitle>
       <Typography variant="body2" sx={{ mb: 1 }}>
-        <strong>{uploadSuccessInfo.count} {uploadSuccessInfo.count === 1 ? 'product has' : 'products have'} been added to your stock catalogue.</strong>
+        All <strong>{uploadSuccessInfo.totalSaved}</strong> products have been added to your Stock Catalogue.
       </Typography>
-      <Typography variant="body2">
-        Your items are now in review. Our team normally takes 24–48 hours to verify product details, fill in missing fields, and publish them to the Find Medicines page.
-      </Typography>
-      <Typography variant="body2" sx={{ mt: 1 }}>
-        To speed things up, you can open the{' '}
-        <Link component="button" variant="body2" onClick={() => { setSelectedTab(2); setUploadSuccessInfo(null); }} sx={{ fontWeight: 'bold', textAlign: 'left' }}>
-          Stock Catalogue
-        </Link>
-        , review each item, make corrections, and publish any product immediately.
-      </Typography>
+      
+      {/* Details about publishing */}
+      <Box component="ul" sx={{ p: 0, pl: 2, m: 0, listStyleType: 'disc' }}>
+        {uploadSuccessInfo.publishedCount > 0 && (
+          <Typography component="li" variant="body2">
+            <strong>{uploadSuccessInfo.publishedCount}</strong> {uploadSuccessInfo.publishedCount === 1 ? 'product was' : 'products were'} published directly to the Find Medicines page.
+          </Typography>
+        )}
+        <Typography component="li" variant="body2">
+            <strong>{uploadSuccessInfo.totalSaved - uploadSuccessInfo.publishedCount}</strong> {uploadSuccessInfo.totalSaved - uploadSuccessInfo.publishedCount === 1 ? 'product requires' : 'products require'} your review in the{' '}
+            <Link component="button" variant="body2" onClick={() => { setSelectedTab(2); setUploadSuccessInfo(null); }} sx={{ fontWeight: 'bold', textAlign: 'left' }}>
+              Stock Catalogue
+            </Link> before going live.
+        </Typography>
+      </Box>
+
     </Alert>
-  )}
+)}
+
 
 
 
