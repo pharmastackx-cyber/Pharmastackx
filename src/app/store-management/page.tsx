@@ -877,7 +877,11 @@ export default function StoreManagementPage() {
   
   const normalizeValue = (key: keyof StockItem, rawValue: any) => {
     if (rawValue === null || rawValue === undefined) return '';
+    
+    // Convert to string and perform initial trim.
     const value = String(rawValue).trim();
+
+    // Handle special cases first.
     if (key === 'amount') {
       const numeric = value.replace(/[₦$,]/g, '').replace(/k/i, '000').match(/\d+(\.\d+)?/);
       return numeric ? parseFloat(numeric[0]) : 0;
@@ -886,95 +890,92 @@ export default function StoreManagementPage() {
         const lowerCaseValue = value.toLowerCase();
         return ['true', 'yes', 'y', '1', 'pom'].includes(lowerCaseValue);
     }
-    return value.replace(/\s+/g, ' ').trim();
+
+    // For all other text fields, remove any character that is NOT a letter, number, whitespace, or a decimal point.
+    const cleanedValue = value.replace(/[^a-zA-Z0-9\\s.]/g, '');
+    
+    // Finally, replace multiple spaces with a single space and trim the result.
+    return cleanedValue.replace(/\\s+/g, ' ').trim();
   };
+
+
 
   const handleBulkFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // This nested function processes the data *after* it's parsed.
     const processData = (data: any[]) => {
-        if (!data.length) {
-            alert("The uploaded file is empty or could not be read.");
-            return;
-        }
-
-        setRawBulkData(data);
-
-        const headers = Object.keys(data[0]);
-        const headerMapping = normalizeCSVHeaders(headers);
-
-        const parsedData = data.map((row: any) => {
-          const normalizedRow: Partial<StockItem> = {};
-          for (const header of headers) {
-              const mappedKey = headerMapping[header];
-              if (mappedKey) {
-                  (normalizedRow as any)[mappedKey] = normalizeValue(mappedKey, row[header]);
-              }
+      if (!data.length || (data.length === 1 && Object.values(data[0]).every(v => v === ""))) {
+        alert("The uploaded file appears to be empty or could not be read properly. Please check the file format and content.");
+        return;
+      }
+      setRawBulkData(data);
+      const headers = Object.keys(data[0]);
+      const headerMapping = normalizeCSVHeaders(headers);
+      const parsedData = data.map((row: any) => {
+        const normalizedRow: Partial<StockItem> = {};
+        for (const header of headers) {
+          const mappedKey = headerMapping[header];
+          if (mappedKey) {
+            (normalizedRow as any)[mappedKey] = normalizeValue(mappedKey, row[header]);
           }
-          return {
-              itemName: '',
-              activeIngredient: '',
-              category: '',
-              amount: 0,
-              imageUrl: '',
-              ...normalizedRow,
-              info: normalizedRow.info || '',
-              POM: normalizedRow.POM || false,
-              businessName: userBusinessName || 'N/A',
-              coordinates: location || 'N/A',
-              slug: userSlug || '',
-          } as StockItem;
-        })
-        .filter(item => 
-          item.itemName && 
-          !item.itemName.toLowerCase().includes('src/app/')
-        );
-
-        setBulkData(parsedData);
-        setShowBulkPreview(true);
+        }
+        return {
+          itemName: '',
+          activeIngredient: '',
+          category: '',
+          amount: 0,
+          imageUrl: '',
+          ...normalizedRow,
+          info: normalizedRow.info || '',
+          POM: normalizedRow.POM || false,
+          businessName: userBusinessName || 'N/A',
+          coordinates: location || 'N/A',
+          slug: userSlug || '',
+        } as StockItem;
+      }).filter(item => item.itemName && !item.itemName.toLowerCase().includes('src/app/'));
+      setBulkData(parsedData);
+      setShowBulkPreview(true);
     };
 
-    const reader = new FileReader();
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
+    // --- FIX: This logic replaces the old FileReader method ---
     if (fileExtension === 'csv' || fileExtension === 'txt') {
-        reader.onload = (e) => {
-            const text = e.target?.result;
-            if (typeof text === 'string') {
-                Papa.parse(text, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: (result) => processData(result.data),
-                    error: (error: any) => {
-
-                        console.error("CSV parsing error:", error);
-                        alert("Failed to parse CSV file. Please check the format.");
-                    }
-                });
-            }
-        };
-        reader.readAsText(file);
+      // Pass the file object directly to PapaParse.
+      // It handles encoding detection much better than FileReader.
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (result) => processData(result.data),
+        error: (error: any) => {
+          console.error("CSV parsing error:", error);
+          alert("Failed to parse CSV file. Please check the file for formatting issues.");
+        }
+      });
     } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-        reader.onload = (e) => {
-            try {
-                const data = e.target?.result;
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet);
-                processData(json);
-              } catch (error: any) {
-
-                console.error("Excel parsing error:", error);
-                alert("Failed to parse Excel file. Please make sure it's a valid .xlsx or .xls file.");
-            }
-        };
-        reader.readAsArrayBuffer(file);
+      // This part for Excel remains the same, as it's already robust.
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const json = XLSX.utils.sheet_to_json(worksheet);
+          processData(json);
+        } catch (error: any) {
+          console.error("Excel parsing error:", error);
+          alert("Failed to parse Excel file. It might be corrupted or in an unsupported format.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
     } else {
-        alert(`Unsupported file type: .${fileExtension}. Please upload a CSV or Excel file.`);
+      alert(`Unsupported file type: .${fileExtension}. Please upload a CSV or Excel file.`);
     }
   };
+
 
 
 
