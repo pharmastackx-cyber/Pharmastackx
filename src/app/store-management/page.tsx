@@ -2678,10 +2678,52 @@ export default function StoreManagementPage() {
 )}
 {/* --- END: ADD THIS NEW CODE --- */}
 
-  <WhatsAppButton />
+              {/* --- START: Contextual Support Button --- */}
+      <Box sx={{
+        position: 'fixed',
+        bottom: { xs: 16, md: 24 },
+        right: { xs: 16, md: 24 },
+        zIndex: 1400,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center', // This is the main alignment fix
+        gap: 1.5
+      }}>
+              {/* --- START: Contextual Support Button --- */}
+
+      {/* The message bubble, positioned independently and conditionally */}
+      <Collapse in={selectedTab === 1}>
+        <Paper
+          elevation={5}
+          sx={{
+            position: 'fixed',
+            // Position it directly above the known location of the WhatsApp FAB.
+            // FAB bottom (24px) + FAB height (56px) + gap (8px) = 88px
+            bottom: { xs: 80, md: 88 }, 
+            right: { xs: 16, md: 24 },
+            zIndex: 1399, 
+            p: 1.5,
+            bgcolor: 'rgba(0, 0, 0, 0.75)',
+            color: 'white',
+            borderRadius: '12px',
+            maxWidth: '240px',
+          }}
+        >
+          <Typography variant="body2" sx={{ textAlign: 'center' }}>
+            Having troubles uploading? Click live support and send the document on WhatsApp.
+          </Typography>
+        </Paper>
+      </Collapse>
+
+      {/* The original WhatsApp button, which renders itself in a fixed position */}
+      <WhatsAppButton />
+
+      {/* --- END: Contextual Support Button --- */}
+
+      </Box>
+      {/* --- END: Contextual Support Button --- */}
 
 
-        <WhatsAppButton />
 
             {/* Hidden Flyer for download */}
             <Box

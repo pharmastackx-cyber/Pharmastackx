@@ -130,7 +130,7 @@ export async function POST(req: Request) {
           amount: Number(aiEnrichedData.amount) || 0,
           imageUrl: willAssignImage ? (dbMatch as any).imageUrl : aiEnrichedData.found_image_url || '',
           businessName: businessName,
-          isPublished: false,
+          isPublished: aiEnrichedData.confidence_score >= 80,
           POM: aiEnrichedData.is_pom,
           slug: businessName.toLowerCase().replace(/\s+/g, '-'),
           info: aiEnrichedData.unit_form, 
@@ -163,6 +163,8 @@ export async function POST(req: Request) {
         console.log('No products were successfully enriched to be saved.');
     }
 
+    const publishedCount = savedProducts.filter(p => p.isPublished).length;
+
     if (errors.length > 0) {
         console.log(`${errors.length} items failed during AI enrichment.`);
     }
@@ -170,6 +172,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ 
         message: `Processed ${rawProducts.length} items. Saved ${savedProducts.length}.`,
         savedProducts: savedProducts, 
+        publishedCount: publishedCount,
         warnings: [],
         errors: errors,
     }, { status: 200 });
