@@ -14,7 +14,8 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
   }
 
-  const user = await User.findOne({ email });
+   // Convert email to lowercase before searching
+   const user = await User.findOne({ email: email.toLowerCase() });
   
   if (!user) {
     return NextResponse.json({ error: 'No account found with this email.' }, { status: 404 }); 

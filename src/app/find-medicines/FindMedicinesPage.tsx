@@ -142,20 +142,18 @@ export default function FindMedicinesPage() {
       try {
         setIsLoading(true);
         const apiUrl = slug ? `/api/products?slug=${slug}` : '/api/products';
-        console.log('DEBUG [Frontend]: Fetching from API URL:', apiUrl);
-
+        
         const response = await fetch(apiUrl);
         if (!response.ok) throw new Error(`Failed to fetch products. Status: ${response.status}`);
         
         const data = await response.json();
         if (data.success) {
-          console.log('DEBUG [Frontend]: Fetched data:', data.data);
           setAllMedicines(data.data);
         } else {
           throw new Error(data.error || 'An unknown error occurred');
         }
       } catch (err: any) {
-        console.error('DEBUG [Frontend]: Error fetching medicines:', err);
+        console.error('Error fetching medicines:', err);
         setError(err.message);
       } finally {
         setIsLoading(false);

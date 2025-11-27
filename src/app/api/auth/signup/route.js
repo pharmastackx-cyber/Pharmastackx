@@ -16,14 +16,16 @@ export async function POST(req) {
       superintendentPharmacist,
       superintendentPharmacistLicense,
       superintendentPharmacistRegistrationDate,
-      email, 
+      email: originalEmail,
       password, 
       role = 'customer' // Default role to 'customer'
     } = await req.json();
 
-    if (!email || !password) {
+    if (!originalEmail || !password) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
     }
+
+    const email = originalEmail.toLowerCase();
 
     // Validate required fields for non-customer roles
     if (role !== 'customer' && (!businessName || !businessAddress)) {
@@ -41,13 +43,13 @@ export async function POST(req) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     let finalRole = role;
-    // Force admin role for the specific email, overriding any role from the form.
-    if (email.toLowerCase() === 'pharmastackx@gmail.com') {
+    // Force admin role for the specific email, which is now lowercase.
+    if (email === 'pharmastackx@gmail.com') {
       finalRole = 'admin';
     }
 
      // Generate a unique username from the email
-     const baseUsername = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/gi, '');
+     const baseUsername = email.split('@')[0].replace(/[^a-z0-9]/gi, '');
      let username = baseUsername;
      let userExists = await User.findOne({ username });
      let count = 1;

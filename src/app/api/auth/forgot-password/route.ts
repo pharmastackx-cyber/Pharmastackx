@@ -8,12 +8,14 @@ import { dbConnect } from '@/lib/mongoConnect';
 export async function POST(request: Request) {
   try {
     await dbConnect();
-    const { email } = await request.json();
+    const { email: originalEmail } = await request.json();
 
-    if (!email) {
+    if (!originalEmail) {
       return NextResponse.json({ message: 'Email is required.' }, { status: 400 });
     }
 
+    const email = originalEmail.toLowerCase(); 
+    
     const user = await User.findOne({ email });
     if (!user) {
       // For security, we don't reveal if the user exists or not.
