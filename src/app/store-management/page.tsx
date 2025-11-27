@@ -981,9 +981,8 @@ export default function StoreManagementPage() {
 
   const handleConfirmBulkUpload = async () => {
     const targetBusiness = (isAdmin && selectedBusinessForUpload) ? selectedBusinessForUpload : userBusinessName;
-    let targetCoordinates = location; // Default to the logged-in user's location
+    let targetCoordinates = location;
 
-    // If an admin is uploading for another business, find that business's specific coordinates
     if (isAdmin && selectedBusinessForUpload) {
         const selectedBiz = allBusinesses.find(b => b.businessName === selectedBusinessForUpload);
         if (selectedBiz) {
@@ -991,8 +990,18 @@ export default function StoreManagementPage() {
         }
     }
 
-    // Use the raw data for validation
-    if (!rawBulkData.length || !targetBusiness) {
+    // --- FIX: NORMALIZE HEADERS (KEYS) TO LOWERCASE BEFORE SENDING ---
+    const productsToSend = rawBulkData.map(row => {
+        const normalizedRow: { [key: string]: any } = {};
+        for (const key in row) {
+            if (Object.prototype.hasOwnProperty.call(row, key)) {
+                normalizedRow[key.trim().toLowerCase()] = row[key];
+            }
+        }
+        return normalizedRow;
+    });
+
+    if (!productsToSend.length || !targetBusiness) {
       alert('No data to upload or the target business is not specified.');
       return;
     }
@@ -1003,13 +1012,12 @@ export default function StoreManagementPage() {
 
     try {
       const payload = {
-        products: rawBulkData, // Send the raw, unprocessed data
+        products: productsToSend, // Use the data with normalized keys
         fileName: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv',
         businessName: targetBusiness,
-        coordinates: targetCoordinates, // <-- THIS IS THE FIX
+        coordinates: targetCoordinates,
       };
 
-      // Call the new AI enrichment endpoint
       const response = await fetch('/api/stock/enrich-and-upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1026,7 +1034,6 @@ export default function StoreManagementPage() {
       if (savedProducts && savedProducts.length > 0) {
         setStockData(prev => [...savedProducts, ...prev]);
         setUploadSuccessInfo({ totalSaved: savedProducts.length, publishedCount: resultData.publishedCount || 0 });
-
       }
 
       setUploadResult({
@@ -1041,7 +1048,7 @@ export default function StoreManagementPage() {
 
       setShowBulkPreview(false);
       setBulkData([]);
-      setRawBulkData([]); // Clear the raw data state
+      setRawBulkData([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
 
     } catch (error) {
@@ -1057,6 +1064,7 @@ export default function StoreManagementPage() {
       setIsSubmitting(false);
     }
   };
+
 
 
 
