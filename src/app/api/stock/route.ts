@@ -6,9 +6,18 @@ import { isValidObjectId } from 'mongoose';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import User from '@/models/User';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export const dynamic = 'force-dynamic';
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+if (!GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY environment variable is not set.");
+}
+
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
 
 // Helper function to check if an item is incomplete
 const isItemIncomplete = (item: any): boolean => {
@@ -108,6 +117,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Product with this name already exists for this business' }, { status: 409 });
     }
 
+    // Generate the vector embedding
+    const result = await embeddingModel.embedContent(itemName);
+    const newVector = result.embedding.values;
+
     const newProduct = new Product({
       itemName,
       activeIngredient,
@@ -118,7 +131,8 @@ export async function POST(req: NextRequest) {
       coordinates: coordinates || '',
       info: info || '',
       POM: POM || false,
-      slug: slug
+      slug: slug,
+      itemNameVector: newVector
     });
 
     const savedProduct = await newProduct.save();
