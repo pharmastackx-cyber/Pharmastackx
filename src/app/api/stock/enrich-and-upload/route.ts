@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { dbConnect } from '@/lib/mongoConnect';
-import DraftStock from '@/models/DraftStock';
-import Product from '@/models/Product'; // Import the Product model for vector search
+
+import Product from '@/models/Product'; 
 
 // --- Initialize the AI Model ---
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -27,7 +27,10 @@ You are an expert pharmaceutical data analyst. Your task is to process raw, mess
     *   \`unit_form\`: A brief description of the product's packaging form, such as "Box of 30 tablets", "500ml bottle", "10g tube", or "Sachet", note that this would be usually 1 sachet for tabs, 1 bottle or soemthing like that , it will hardly be box since its retail but can be pack instead of sachets usually for products that a pack contains full dose of multiple sachets eg. amlodipine has two sachets in a pack and are sold by most pharmacies as a pack not sachet but soem still sell as sachet but most tablets will be 1 sachet  .
     *   \`is_pom\`: Set to true if it is a Prescription-Only Medicine, otherwise false.
 
-4.  **OUTPUT FORMAT:** You MUST return ONLY a single, valid JSON object for each item. Do not include any text, explanations, or markdown formatting before or after the JSON.
+4.  **FIND IMAGE URL:** If there is no <DATABASE_MATCH> or if the confidence_score is low, try to find a representative public image URL for the product from your knowledge. Set this to the "found_image_url" field. If you cannot find one, leave it as an empty string.
+
+5.  **OUTPUT FORMAT:** You MUST return ONLY a single, valid JSON object for each item. Do not include any text, explanations, or markdown formatting before or after the JSON.
+
 
 Here is your required JSON output structure:
 {
@@ -38,7 +41,8 @@ Here is your required JSON output structure:
   "is_pom": "boolean",
   "amount_in_stock": "number",
   "amount": "number",
-  "confidence_score": "number (0-100)"
+  "confidence_score": "number (0-100)",
+   "found_image_url": "string"
 }
 `;
 
@@ -47,7 +51,7 @@ Here is your required JSON output structure:
 export async function POST(req: Request) {
   try {
     await dbConnect();
-    const { products: rawProducts, businessName } = await req.json();
+    const { products: rawProducts, businessName, coordinates } = await req.json();
 
     if (!rawProducts || !Array.isArray(rawProducts) || rawProducts.length === 0) {
       return NextResponse.json({ message: 'No products to process.' }, { status: 400 });
@@ -114,6 +118,9 @@ export async function POST(req: Request) {
         const willAssignImage = dbMatch && aiEnrichedData.confidence_score > 50;
 
         console.log(`AI Confidence: ${aiEnrichedData.confidence_score}. Match Found: ${!!dbMatch}. Image Assigned: ${willAssignImage}`);
+
+        // --- Generate Vector for the new product ---
+        const newVector = (await embeddingModel.embedContent(aiEnrichedData.cleaned_name)).embedding.values;
    
 
         const finalProduct = {
@@ -121,13 +128,14 @@ export async function POST(req: Request) {
           activeIngredient: aiEnrichedData.active_ingredient,
           category: aiEnrichedData.drug_class,
           amount: Number(aiEnrichedData.amount) || 0,
-          imageUrl: willAssignImage ? (dbMatch as any).imageUrl : '',
+          imageUrl: willAssignImage ? (dbMatch as any).imageUrl : aiEnrichedData.found_image_url || '',
           businessName: businessName,
           isPublished: false,
           POM: aiEnrichedData.is_pom,
           slug: businessName.toLowerCase().replace(/\s+/g, '-'),
           info: aiEnrichedData.unit_form, 
-          coordinates: ''
+          coordinates: coordinates || '',
+          itemNameVector: newVector,
       };
       
         
@@ -149,8 +157,8 @@ export async function POST(req: Request) {
     let savedProducts: any[] = [];
     if (enrichedProducts.length > 0) {
         console.log(`AI processing complete. Saving ${enrichedProducts.length} products to the database.`);
-        savedProducts = await DraftStock.insertMany(enrichedProducts, { ordered: false });
-        console.log(`Successfully saved ${savedProducts.length} products to DraftStock.`);
+        savedProducts = await Product.insertMany(enrichedProducts, { ordered: false });
+        console.log(`Successfully saved ${savedProducts.length} products to the Product collection.`);
     } else {
         console.log('No products were successfully enriched to be saved.');
     }
@@ -171,7 +179,7 @@ export async function POST(req: Request) {
     if (error.code === 11000) {
         return NextResponse.json({ 
             message: 'Database error: Duplicate items detected.', 
-            details: 'Some of the items you tried to upload already exist in the draft stock.' 
+            details: 'Some of the items you tried to upload already exist in the products collection.' 
         }, { status: 409 });
     }
     return NextResponse.json({ message: 'An unexpected server error occurred.', details: error.message }, { status: 500 });

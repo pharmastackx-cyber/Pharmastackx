@@ -13,10 +13,11 @@ import {
   CardActions,
   InputAdornment,
   Fade,
-  Backdrop,Switch
+  Backdrop,Switch, Popover, 
 } from '@mui/material';
 
-import { Storefront, LocationOn, UploadFile, ExpandMore, Inventory, CheckCircle, Warning,  } from '@mui/icons-material';
+import { Storefront, LocationOn, UploadFile, ExpandMore, Inventory, CheckCircle, Warning, MoreVert, } from '@mui/icons-material';
+
 import Papa from 'papaparse';
 import WhatsAppButton from '../../components/WhatsAppButton';
 import { ContentCopy, Download, QrCode2 } from '@mui/icons-material';
@@ -165,12 +166,16 @@ export default function StoreManagementPage() {
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
 
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>(['businessName', 'coordinates']);
+
+
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<keyof StockItem | ''>( '');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editingRowData, setEditingRowData] = useState<StockItem | {}>({});
 
@@ -329,8 +334,24 @@ export default function StoreManagementPage() {
   }, []);
 
 
-  const [showIncomplete, setShowIncomplete] = useState(false);
-  const [showUnpublishedOnly, setShowUnpublishedOnly] = useState(false);
+   // --- START: New Filter States ---
+   const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
+   const [filters, setFilters] = useState({
+     showPublished: true,
+     showUnpublished: true,
+     showComplete: true,
+     showIncomplete: true,
+   });
+ 
+   const handleFilterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+     setFilters({
+       ...filters,
+       [event.target.name]: event.target.checked,
+     });
+   };
+   // --- END: New Filter States ---
+ 
+   const [updatingStatus, setUpdatingStatus] = useState<string[]>([]);
 
 
   const isItemIncomplete = (item: StockItem) => {
@@ -355,6 +376,9 @@ export default function StoreManagementPage() {
       imageUrl: 'Please upload an image.',
       info: 'Please add info (e.g., "1 sachet", "100ml bottle").',
     };
+
+    const [columnMenu, setColumnMenu] = useState<{ anchorEl: null | HTMLElement; columnKey: string; } | null>(null);
+
   
     /**
      * Validates a stock item and returns an array of specific error messages.
@@ -643,10 +667,27 @@ export default function StoreManagementPage() {
 
   const filteredStock = stockData.filter(item => {
     const searchMatch = Object.values(item).join(' ').toLowerCase().includes(searchQuery.toLowerCase());
-    const incompleteMatch = !showIncomplete || isItemIncomplete(item);
-    const unpublishedMatch = !showUnpublishedOnly || item.isPublished === false;
-    return searchMatch && incompleteMatch && unpublishedMatch;
+
+    // --- START: New Filtering Logic ---
+    const isPublished = item.isPublished;
+    const isIncomplete = isItemIncomplete(item);
+
+    const publicationStatusMatch =
+      (filters.showPublished && isPublished) ||
+      (filters.showUnpublished && !isPublished);
+    
+    const completionStatusMatch =
+      (filters.showComplete && !isIncomplete) ||
+      (filters.showIncomplete && isIncomplete);
+
+    // This ensures that if a user unchecks both options in a category, it shows nothing, as expected.
+    if (!filters.showPublished && !filters.showUnpublished) return false;
+    if (!filters.showComplete && !filters.showIncomplete) return false;
+    
+    return searchMatch && publicationStatusMatch && completionStatusMatch;
+    // --- END: New Filtering Logic ---
   });
+
 
 
   const sortedStock = [...filteredStock].sort((a, b) => {
@@ -937,6 +978,15 @@ export default function StoreManagementPage() {
 
   const handleConfirmBulkUpload = async () => {
     const targetBusiness = (isAdmin && selectedBusinessForUpload) ? selectedBusinessForUpload : userBusinessName;
+    let targetCoordinates = location; // Default to the logged-in user's location
+
+    // If an admin is uploading for another business, find that business's specific coordinates
+    if (isAdmin && selectedBusinessForUpload) {
+        const selectedBiz = allBusinesses.find(b => b.businessName === selectedBusinessForUpload);
+        if (selectedBiz) {
+            targetCoordinates = selectedBiz.coordinates;
+        }
+    }
 
     // Use the raw data for validation
     if (!rawBulkData.length || !targetBusiness) {
@@ -953,6 +1003,7 @@ export default function StoreManagementPage() {
         products: rawBulkData, // Send the raw, unprocessed data
         fileName: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv',
         businessName: targetBusiness,
+        coordinates: targetCoordinates, // <-- THIS IS THE FIX
       };
 
       // Call the new AI enrichment endpoint
@@ -967,22 +1018,19 @@ export default function StoreManagementPage() {
         throw new Error(resultData.message || 'AI enrichment process failed');
       }
 
-      // The new endpoint might return a 202 Accepted status for long processing.
-      // For now, we'll handle the immediate response.
       const { savedProducts, warnings, errors } = resultData;
 
       if (savedProducts && savedProducts.length > 0) {
-        // The AI service will return fully structured data.
         setStockData(prev => [...savedProducts, ...prev]);
         setUploadSuccessInfo({ count: savedProducts.length });
       }
 
-      setUploadResult({ 
-        message: `${savedProducts.length} out of ${rawBulkData.length} items were processed.`, 
-        warnings: warnings || [], 
-        errors: errors || [] 
+      setUploadResult({
+        message: `${savedProducts.length} out of ${rawBulkData.length} items were processed.`,
+        warnings: warnings || [],
+        errors: errors || []
       });
-      
+
       const status = (errors?.length || 0) > 0 ? ((savedProducts?.length || 0) > 0 ? 'PARTIAL' : 'FAILURE') : 'SUCCESS';
       const logDetails = `User initiated AI bulk enrichment. Result: ${savedProducts?.length || 0} saved, ${warnings?.length || 0} warnings, ${errors?.length || 0} errors.`;
       logAction('BULK_ENRICH', status, logDetails, { type: 'Business', name: targetBusiness });
@@ -994,10 +1042,10 @@ export default function StoreManagementPage() {
 
     } catch (error) {
       console.error('Error during AI bulk enrichment:', error);
-      setUploadResult({ 
-        message: "An unexpected error occurred during AI enrichment.", 
-        warnings: [], 
-        errors: [{ message: (error as Error).message, item: 'N/A'}] 
+      setUploadResult({
+        message: "An unexpected error occurred during AI enrichment.",
+        warnings: [],
+        errors: [{ message: (error as Error).message, item: 'N/A'}]
       });
       const logDetails = `User AI enrichment failed entirely. Error: ${(error as Error).message}`;
       logAction('BULK_ENRICH', 'FAILURE', logDetails, { type: 'Business', name: targetBusiness });
@@ -1008,42 +1056,230 @@ export default function StoreManagementPage() {
 
 
 
-  const handlePublish = async (id: string) => {
+
+  const handlePublish = async (id: string, isSilent = false) => {
+    // Find the item's current position in the filtered list before any changes
+    const currentIndex = filteredStock.findIndex(item => item._id === id);
+
     try {
       const response = await fetch('/api/stock/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Failed to publish item.');
       const { product: updatedProduct } = result;
+
+      // Update the main list; this will cause the item to disappear from a filtered view
       setStockData(prevData => prevData.map(item => item._id === id ? { ...item, ...updatedProduct } : item));
-      alert(`Item "${result.product.itemName}" has been published successfully!`);
+
+      // --- Smart Navigation Logic (for modal view) ---
+      if (!isSilent) {
+        let nextProduct = null;
+        if (filteredStock.length > 1) {
+            const nextIndex = currentIndex < filteredStock.length - 1 ? currentIndex : currentIndex - 1;
+            const nextProductId = filteredStock.filter(p => p._id !== id)[nextIndex]?._id;
+            if (nextProductId) {
+                nextProduct = stockData.find(p => p._id === nextProductId);
+            }
+        }
+        setSelectedProduct(nextProduct || null);
+        setTileEditData(nextProduct || null);
+      }
+      // --- END: Smart Navigation Logic ---
+
+      if (!isSilent) {
+        alert(`Item "${result.product.itemName}" has been published successfully!`);
+      }
       logAction('PUBLISH_ITEM', 'SUCCESS', `User published item '${result.product.itemName}'.`, { type: 'Product', id, name: result.product.itemName });
     } catch (error) {
       const item = stockData.find(i => i._id === id);
       console.error('Error publishing item:', error);
-      alert((error as Error).message);
+      if (!isSilent) {
+        alert((error as Error).message);
+      }
       logAction('PUBLISH_ITEM', 'FAILURE', `User failed to publish item '${item?.itemName || 'Unknown'}'. Error: ${(error as Error).message}`, { type: 'Product', id, name: item?.itemName });
     }
   };
 
-  const handleUnpublish = async (id: string) => {
+
+
+
+  const handleUnpublish = async (id: string, isSilent = false) => {
     const itemToUpdate = stockData.find(item => item._id === id);
-    if (!window.confirm('Are you sure you want to withdraw this item? It will be removed from the public storefront.')) {
+    if (!isSilent && !window.confirm('Are you sure you want to withdraw this item?')) {
       logAction('UNPUBLISH_ITEM', 'INFO', `User cancelled unpublishing item '${itemToUpdate?.itemName || 'Unknown'}'.`, { type: 'Product', id, name: itemToUpdate?.itemName });
       return;
     }
+
+    // Find the item's current position in the filtered list before any changes
+    const currentIndex = filteredStock.findIndex(item => item._id === id);
+
     try {
       const response = await fetch('/api/stock/unpublish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to unpublish item.');
+      if (!response.ok) throw new Error((await response.json()).message || 'Failed to unpublish item.');
+      const { product: updatedProduct } = await response.json();
+
+      // Update the main list; this will cause the item to disappear from a filtered view
+      setStockData(prevData => prevData.map(item => item._id === id ? { ...item, ...updatedProduct } : item));
+
+      // --- Smart Navigation Logic (for modal view) ---
+      if (!isSilent) {
+          let nextProduct = null;
+          if (filteredStock.length > 1) { // If there were other items in the list
+              const nextIndex = currentIndex < filteredStock.length - 1 ? currentIndex : currentIndex - 1;
+              const nextProductId = filteredStock.filter(p => p._id !== id)[nextIndex]?._id;
+              if (nextProductId) {
+                  nextProduct = stockData.find(p => p._id === nextProductId);
+              }
+          }
+          setSelectedProduct(nextProduct || null);
+          setTileEditData(nextProduct || null);
       }
-      setStockData(prevData => prevData.map(item => item._id === id ? { ...item, isPublished: false } : item));
-      alert(`Item "${itemToUpdate?.itemName || 'Item'}" has been unpublished successfully.`);
+      // --- END: Smart Navigation Logic ---
+
+      if (!isSilent) {
+        alert(`Item "${itemToUpdate?.itemName || 'Item'}" has been unpublished successfully.`);
+      }
       logAction('UNPUBLISH_ITEM', 'SUCCESS', `User unpublished item '${itemToUpdate?.itemName || 'Item'}'.`, { type: 'Product', id, name: itemToUpdate?.itemName });
     } catch (error) {
       console.error('Error unpublishing item:', error);
-      alert((error as Error).message);
+      if (!isSilent) {
+        alert((error as Error).message);
+      }
       logAction('UNPUBLISH_ITEM', 'FAILURE', `User failed to unpublish item '${itemToUpdate?.itemName || 'Item'}'. Error: ${(error as Error).message}`, { type: 'Product', id, name: itemToUpdate?.itemName });
+    }
+  };
+
+  const handleStatusToggle = async (item: StockItem) => {
+    // Stop if the item has no ID or is already being updated
+    if (!item._id || updatingStatus.includes(item._id)) return;
+
+    const action = item.isPublished ? 'withdraw' : 'publish';
+    const confirmationMessage = `Are you sure you want to ${action} the item "${item.itemName}"?`;
+
+    if (!window.confirm(confirmationMessage)) {
+      return; // Stop if user clicks 'Cancel'
+    }
+
+    if (action === 'publish' && isItemIncomplete(item)) {
+      alert("This item has incomplete details. Please open it, fill in the missing fields, and then publish.");
+      return;
+    }
+
+    setUpdatingStatus(prev => [...prev, item._id!]); 
+
+    try {
+      const endpoint = action === 'publish' ? '/api/stock/publish' : '/api/stock/unpublish';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item._id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `HTTP error! Status: ${response.status}` }));
+        throw new Error(errorData.message || `Failed to ${action} item.`);
+      }
+
+      let updatedProduct;
+      
+      // --- FIX: Check for an empty response body before trying to parse it ---
+      const responseBody = await response.text();
+      if (responseBody) {
+        // If the response has a body (from 'publish'), parse it to get the updated product
+        const result = JSON.parse(responseBody);
+        updatedProduct = result.product;
+      } else {
+        // If the body is empty (from 'withdraw'), manually create the updated state for the UI
+        updatedProduct = { ...item, isPublished: false }; 
+      }
+
+      if (!updatedProduct) {
+        throw new Error("Could not get updated product information from the server.");
+      }
+      
+      // Update the main data list, which will update the table
+      setStockData(prevData =>
+        prevData.map(p => (p._id === item._id ? { ...p, ...updatedProduct } : p))
+      );
+
+      const logStatus = action === 'publish' ? 'PUBLISH_ITEM' : 'UNPUBLISH_ITEM';
+      logAction(logStatus, 'SUCCESS', `User ${action}ed item '${updatedProduct.itemName}' from table view.`, { type: 'Product', id: updatedProduct._id, name: updatedProduct.itemName });
+
+    } catch (error) {
+      console.error(`Error during inline ${action}:`, error);
+      alert(`An error occurred: ${(error as Error).message}`);
+    } finally {
+      setUpdatingStatus(prev => prev.filter(id => id !== item._id!));
+    }
+  };
+
+
+  const handleColumnHide = (columnKey: string) => {
+    // Prevent essential columns from being hidden
+    if (columnKey === 'itemName') {
+      alert('The "Item Name" column cannot be hidden.');
+      setColumnMenu(null); // Close the menu
+      return;
+    }
+    // Format the column name for the confirmation message
+    const formattedColumnName = (columnKey.replace(/([a-z])([A-Z])/g, '$1 $2')).charAt(0).toUpperCase() + (columnKey.replace(/([a-z])([A-Z])/g, '$1 $2')).slice(1);
+    if (window.confirm(`Are you sure you want to hide the "${formattedColumnName}" column?`)) {
+      setHiddenColumns(prev => [...prev, columnKey]);
+    }
+    setColumnMenu(null); // Close the menu after action
+  };
+
+
+
+  const handlePublishAll = async () => {
+    // 1. Identify which of the currently visible items are ready for publishing.
+    const itemsToPublish = paginatedStock.filter(item =>
+      !item.isPublished && !isItemIncomplete(item)
+    );
+
+    const itemIdsToPublish = itemsToPublish.map(item => item._id);
+
+    if (itemIdsToPublish.length === 0) {
+      alert("There are no complete, unpublished items on this page to publish.");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to publish ${itemIdsToPublish.length} items on this page?`)) {
+        return;
+    }
+
+    setIsSubmitting(true); // Use the existing submitting state for the loading indicator
+
+    try {
+      // 2. Call the new bulk publish API endpoint.
+      const response = await fetch('/api/stock/publish-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: itemIdsToPublish }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to publish items.');
+      }
+
+      // 3. Update the local state to reflect the changes instantly.
+      setStockData(prevData =>
+        prevData.map(item =>
+          itemIdsToPublish.includes(item._id)
+            ? { ...item, isPublished: true }
+            : item
+        )
+      );
+
+      alert(`${result.publishedCount} items have been published successfully!`);
+      logAction('BULK_PUBLISH', 'SUCCESS', `User published ${result.publishedCount} items from the current page.`);
+
+    } catch (error) {
+      console.error('Error bulk publishing items:', error);
+      alert(`An error occurred: ${(error as Error).message}`);
+      logAction('BULK_PUBLISH', 'FAILURE', `User failed to bulk publish items. Error: ${(error as Error).message}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1431,7 +1667,8 @@ export default function StoreManagementPage() {
 
 
   return (
-    <Box sx={{ p: isMobile ? 2 : 4 }}>
+    <Box sx={{ p: isMobile ? 2 : 4, pb: '100px' }}>
+
       <Typography variant={isMobile ? 'h5' : 'h4'} gutterBottom>Store Management</Typography>
       
       <Tabs value={selectedTab} onChange={handleTabChange} variant={isMobile ? 'scrollable' : 'standard'} scrollButtons="auto">
@@ -1720,16 +1957,47 @@ export default function StoreManagementPage() {
             {showBulkPreview && (
             <Paper sx={{ mt: 3, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black' }}>
               <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>Item Name</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Active Ingredient</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Amount</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Info</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>POM</TableCell>
-                  </TableRow>
-                </TableHead>
+                            <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600 }}>S/N</TableCell>
+                  {(['itemName', 'activeIngredient', 'category', 'amount', 'imageUrl', 'info', 'POM', 'businessName', 'coordinates'] as (keyof StockItem)[]).filter(key => !hiddenColumns.includes(key)).map(key => (
+                    <TableCell key={key} sx={{ fontWeight: 600, p: 0 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box onClick={() => handleSort(key)} sx={{ cursor: 'pointer', flexGrow: 1, p: '12px 16px', '&:hover': { color: 'primary.main' } }}>
+                          {(key.replace(/([a-z])([A-Z])/g, '$1 $2')).charAt(0).toUpperCase() + (key.replace(/([a-z])([A-Z])/g, '$1 $2')).slice(1)}
+                          {sortColumn === key && <span style={{ marginLeft: 4, fontSize: 12, color: 'gray' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                        </Box>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setColumnMenu({ anchorEl: e.currentTarget, columnKey: key });
+                          }}
+                          sx={{ mr: 0.5 }}
+                        >
+                          <MoreVert fontSize="inherit" />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  ))}
+                  <TableCell>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              
+              {/* --- ADD THIS POPOVER FOR THE COLUMN HIDE MENU --- */}
+              <Popover
+                  open={Boolean(columnMenu)}
+                  anchorEl={columnMenu?.anchorEl}
+                  onClose={() => setColumnMenu(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+              >
+                  <MenuItem onClick={() => handleColumnHide(columnMenu!.columnKey)}>
+                      Hide Column
+                  </MenuItem>
+              </Popover>
+
                 <TableBody>
                   {bulkData.slice(0, 5).map((row, i) => (
                     <TableRow key={i}>
@@ -1857,122 +2125,310 @@ export default function StoreManagementPage() {
       )}
 
       {selectedTab === 2 && (
-         <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-           
-           {/* --- START: ADD THIS CORRECTED CODE --- */}
-<Box sx={{ width: '100%', maxWidth: 900, mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-  <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'center', flex: 1 }}>
-    <Inventory color="primary" sx={{ fontSize: 40 }} />
-    <Box>
-      <Typography variant="h6">{totalProducts}</Typography>
-      <Typography variant="body2" color="text.secondary">Total Products</Typography>
-    </Box>
-  </Paper>
-  <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'center', flex: 1 }}>
-    <CheckCircle color="success" sx={{ fontSize: 40 }} />
-    <Box>
-      <Typography variant="h6">{publishedItems}</Typography>
-      <Typography variant="body2" color="text.secondary">Published</Typography>
-    </Box>
-  </Paper>
-  <Paper 
-  sx={{ 
-    p: 2, 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: 2, 
-    justifyContent: 'center', 
-    flex: 1, 
-    cursor: 'pointer',
-    '&:hover': {
-      backgroundColor: 'action.hover'
-    }
-  }}
-  onClick={() => setShowIncomplete(true)}
->
-    <Warning color="warning" sx={{ fontSize: 40 }} />
-    <Box>
-      <Typography variant="h6">{needsAttention}</Typography>
-      <Typography variant="body2" color="text.secondary">Needs Attention</Typography>
-    </Box>
-</Paper>
+         <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
 
-</Box>
-{/* --- END: ADD THIS CORRECTED CODE --- */}
-
-           
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Current Stock Catalogue</Typography>
+<Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Current Stock Catalogue</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2, maxWidth: 900, width: '100%', textAlign: 'center', fontStyle: 'italic' }}>
             These are all medications you have uploaded. A red dot indicates an item with incomplete details that you can edit.
-            Use the search bar to find items, click column headers to sort, or toggle the checkbox to only see incomplete products that need your attention.
+            Use the search bar to find items, click column headers to sort, or toggle the checkbox to filter.
             </Typography>
+           
+            <Box sx={{ width: '100%', maxWidth: 900, mb: 3, display: 'flex', flexDirection: 'row', gap: 1 }}>
+    <Paper sx={{ p: 1.5, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'center', gap: 1.5, justifyContent: 'center', flex: 1, textAlign: { xs: 'center', sm: 'left' } }}>
+        <Inventory color="primary" sx={{ fontSize: 32 }} />
+        <Box>
+            <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600 }}>{totalProducts}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>Total Products</Typography>
+        </Box>
+    </Paper>
+    <Paper sx={{ p: 1.5, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'center', gap: 1.5, justifyContent: 'center', flex: 1, textAlign: { xs: 'center', sm: 'left' } }}>
+        <CheckCircle color="success" sx={{ fontSize: 32 }} />
+        <Box>
+            <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600 }}>{publishedItems}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>Published</Typography>
+        </Box>
+    </Paper>
+    <Paper
+        sx={{
+            p: 1.5,
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: 'center',
+            gap: 1.5,
+            justifyContent: 'center',
+            flex: 1,
+            textAlign: { xs: 'center', sm: 'left' },
+            cursor: 'pointer',
+            '&:hover': {
+                backgroundColor: 'action.hover'
+            }
+        }}
+        onClick={() => setFilters({ showPublished: true, showUnpublished: true, showComplete: false, showIncomplete: true })}
+    >
+        <Warning color="warning" sx={{ fontSize: 32 }} />
+        <Box>
+            <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600 }}>{needsAttention}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>Needs Attention</Typography>
+        </Box>
+    </Paper>
+</Box>
+
+
+
+           
+            
 
              {loadingStock ? <CircularProgress /> :
               <Paper sx={{ maxWidth: 900, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', borderRadius: 2, p: 2 }}>
               <>
-  <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-    <TextField label="Search items" variant="outlined" size="small" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ width: isMobile ? '100%' : 300 }} />
-    <FormControlLabel control={<Checkbox checked={showIncomplete} onChange={(e) => setShowIncomplete(e.target.checked)} name="showIncomplete" />} label="Show only incomplete items" />
-    <FormControlLabel control={<Checkbox checked={showUnpublishedOnly} onChange={(e) => setShowUnpublishedOnly(e.target.checked)} name="showUnpublishedOnly" />} label="Show only unpublished" />
+              <>
+    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+        <TextField label="Search items" variant="outlined" size="small" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ width: isMobile ? '100%' : 300 }} />
+        <Button
+            variant="outlined"
+            onClick={(event) => setFilterMenuAnchor(event.currentTarget)}
+            endIcon={<ExpandMore />}
+        >
+            Filters
+        </Button>
 
-  </Box>
+        <Button
+        variant="contained"
+        color="success"
+        onClick={handlePublishAll}
+        disabled={isSubmitting || paginatedStock.filter(item => !item.isPublished && !isItemIncomplete(item)).length === 0}
+        startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <CheckCircle />}
+    >
+        Publish Page ({paginatedStock.filter(item => !item.isPublished && !isItemIncomplete(item)).length})
+    </Button>
+
+    </Box>
+
+    <Popover
+        open={Boolean(filterMenuAnchor)}
+        anchorEl={filterMenuAnchor}
+        onClose={() => setFilterMenuAnchor(null)}
+        anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left',
+        }}
+    >
+        <Box sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
+            <Typography variant="caption" color="text.secondary">Publication Status</Typography>
+            <FormControlLabel
+                control={<Checkbox checked={filters.showPublished} onChange={handleFilterChange} name="showPublished" />}
+                label="Published"
+            />
+            <FormControlLabel
+                control={<Checkbox checked={filters.showUnpublished} onChange={handleFilterChange} name="showUnpublished" />}
+                label="Unpublished"
+            />
+            <Divider sx={{ my: 1 }} />
+            <Typography variant="caption" color="text.secondary">Completion Status</Typography>
+            <FormControlLabel
+                control={<Checkbox checked={filters.showComplete} onChange={handleFilterChange} name="showComplete" />}
+                label="Complete"
+            />
+            <FormControlLabel
+                control={<Checkbox checked={filters.showIncomplete} onChange={handleFilterChange} name="showIncomplete" />}
+                label="Incomplete"
+            />
+
+
+        </Box>
+    </Popover>
+</>
+
 
   <TableContainer>
-    <Table size="small">
-      <TableHead>
-        <TableRow>
-          <TableCell sx={{ fontWeight: 600 }}>S/N</TableCell>
-          {(['itemName', 'activeIngredient', 'category', 'amount', 'imageUrl', 'info', 'POM', 'businessName', 'coordinates'] as (keyof StockItem)[]).map(key => (
-            <TableCell key={key} onClick={() => handleSort(key)} sx={{ cursor: 'pointer', fontWeight: 600, '&:hover': { color: 'primary.main' } }}>
-              {(key.replace(/([a-z])([A-Z])/g, '$1 $2')).charAt(0).toUpperCase() + (key.replace(/([a-z])([A-Z])/g, '$1 $2')).slice(1)}
-              {sortColumn === key && <span style={{ marginLeft: 4, fontSize: 12, color: 'gray' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>}
-            </TableCell>
-          ))}
-          <TableCell>Status</TableCell>
-          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-        </TableRow>
-      </TableHead>
+    <Table size="small"> 
+    <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600 }}>S/N</TableCell>
+                  {/* Filter out hidden columns before rendering headers */}
+                  {(['itemName', 'activeIngredient', 'category', 'amount', 'imageUrl', 'info', 'POM', 'businessName', 'coordinates'] as (keyof StockItem)[]).filter(key => !hiddenColumns.includes(key)).map(key => (
+                    <TableCell key={key} sx={{ fontWeight: 600, padding: '0 8px' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        {/* Make the text part clickable for sorting */}
+                        <Box 
+                          onClick={() => handleSort(key)} 
+                          sx={{ 
+                            cursor: 'pointer', 
+                            flexGrow: 1, 
+                            padding: '12px 8px', // Make the clickable area bigger
+                            '&:hover': { color: 'primary.main' }
+                          }}
+                        >
+                          {(key.replace(/([a-z])([A-Z])/g, '$1 $2')).charAt(0).toUpperCase() + (key.replace(/([a-z])([A-Z])/g, '$1 $2')).slice(1)}
+                          {sortColumn === key && <span style={{ marginLeft: 4, fontSize: 12, color: 'gray' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>}
+                        </Box>
+                        {/* Icon to open the hide menu */}
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent the sort function from firing
+                            setColumnMenu({ anchorEl: e.currentTarget, columnKey: key });
+                          }}
+                          sx={{ marginLeft: 0.5 }}
+                        >
+                          <MoreVert fontSize="inherit" />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  ))}
+                  <TableCell>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              
+              {/* This is the menu that opens when the icon is clicked */}
+              <Popover
+                  open={Boolean(columnMenu)}
+                  anchorEl={columnMenu?.anchorEl}
+                  onClose={() => setColumnMenu(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+              >
+                  {/* The default option to hide the selected column */}
+                  <MenuItem onClick={() => {
+                      if (columnMenu) handleColumnHide(columnMenu.columnKey);
+                    }}>
+                      Hide Column
+                  </MenuItem>
+
+                  {/* --- START: ADDED "SHOW ALL" OPTION --- */}
+                  {/* This part only appears if at least one column is hidden */}
+                  {hiddenColumns.length > 0 && (
+                    <Box>
+                      <Divider />
+                      <MenuItem onClick={() => {
+                          setHiddenColumns([]);
+                          setColumnMenu(null); // Close menu after clicking
+                      }}>
+                          Show All Columns
+                      </MenuItem>
+                    </Box>
+                  )}
+                  {/* --- END: ADDED "SHOW ALL" OPTION --- */}
+              </Popover>
+
+
       
       <TableBody>
-        {paginatedStock.map((row, i) => {
-          const globalIndex = stockData.findIndex(item => item._id === row._id);
-          const serialNumber = startIndex + i + 1;
-          return (
-            <TableRow key={row._id} onClick={() => { setSelectedProduct(row); setTileEditData(row); }} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}>
-              <TableCell>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  {isItemIncomplete(row) ? <Tooltip title="This item has incomplete details."><Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'red', mr: 1, }} /></Tooltip> : null}
-                  {serialNumber}
-                </Box>
-              </TableCell>
-              <TableCell>{row.itemName}</TableCell>
-              <TableCell>{row.activeIngredient}</TableCell>
-              <TableCell>{row.category}</TableCell>
-              <TableCell>{typeof row.amount === 'number' ? `₦${row.amount.toFixed(2)}` : row.amount}</TableCell>
-              <TableCell><img src={row.imageUrl || '/placeholder.png'} alt={row.itemName || 'Product image'} style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }} onError={e => (e.currentTarget.src = '/placeholder.png')} /></TableCell>
-              <TableCell>{row.info}</TableCell>
-              <TableCell>{row.POM ? 'Yes' : 'No'}</TableCell>
-              <TableCell>{row.businessName}</TableCell>
-              <TableCell>{row.coordinates}</TableCell>
-              <TableCell>{row.isPublished ? (<Chip label="Published" color="success" size="small" />) : (<Chip label="Draft" color="warning" size="small" />)}</TableCell>
-              
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <Button variant="outlined" color="error" size="small" onClick={() => handleDelete(row._id!)}>Delete</Button>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
+                {paginatedStock.map((row, i) => {
+                  const globalIndex = stockData.findIndex(item => item._id === row._id);
+                  const serialNumber = startIndex + i + 1;
+                  return (
+                    <TableRow key={row._id} onClick={() => { setSelectedProduct(row); setTileEditData(row); }} sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          {isItemIncomplete(row) ? <Tooltip title="This item has incomplete details."><Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'red', mr: 1, }} /></Tooltip> : null}
+                          {serialNumber}
+                        </Box>
+                      </TableCell>
+                      
+                      {/* --- START: CORRECTED COLUMN CHECKS --- */}
+                      {!hiddenColumns.includes('itemName') && <TableCell>{row.itemName}</TableCell>}
+                      {!hiddenColumns.includes('activeIngredient') && <TableCell>{row.activeIngredient}</TableCell>}
+                      {!hiddenColumns.includes('category') && <TableCell>{row.category}</TableCell>}
+                      {!hiddenColumns.includes('amount') && <TableCell>{typeof row.amount === 'number' ? `₦${row.amount.toFixed(2)}` : row.amount}</TableCell>}
+                      {!hiddenColumns.includes('imageUrl') && <TableCell sx={{ p: 0.5, width: 70 }}>
+                        <img 
+                          src={row.imageUrl || '/placeholder.png'} 
+                          alt={row.itemName || 'Product'} 
+                          style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '4px', display: 'block' }} 
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src='/placeholder.png'; }}
+                        />
+                      </TableCell>}
+
+                      {!hiddenColumns.includes('info') && <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.info}</TableCell>}
+                      {!hiddenColumns.includes('POM') && <TableCell>
+                        <Tooltip title={row.POM ? "Prescription Only Medicine" : "Over The Counter"}>
+                          <Chip label={row.POM ? "POM" : "OTC"} size="small" color={row.POM ? 'error' : 'info'} />
+                        </Tooltip>
+                      </TableCell>}
+                      {!hiddenColumns.includes('businessName') && <TableCell>{row.businessName}</TableCell>}
+                      {!hiddenColumns.includes('coordinates') && <TableCell>
+                        {row.coordinates && row.coordinates !== 'N/A' ? row.coordinates : 'No'}
+                      </TableCell>}
+
+
+                      {/* --- END: CORRECTED COLUMN CHECKS --- */}
+
+                      {/* Status and Actions cells are not hideable */}
+                      <TableCell
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (row._id) { handleStatusToggle(row); }
+                        }}
+                        sx={{
+                          cursor: row._id && updatingStatus.includes(row._id) ? 'default' : 'pointer',
+                          position: 'relative',
+                          '&:hover .MuiChip-root': {
+                            filter: row._id && updatingStatus.includes(row._id) ? 'none' : 'brightness(0.9)',
+                          },
+                        }}
+                      >
+                        {row._id && updatingStatus.includes(row._id) ? (
+                          <CircularProgress size={20} />
+                        ) : (
+                          row.isPublished ?
+                            <Chip label="Published" color="success" size="small" /> :
+                            <Chip label="Draft" color="warning" size="small" />
+                        )}
+                      </TableCell>
+                      
+                      <TableCell align="right">
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedProduct(row);
+                              setTileEditData(row);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+
     </Table>
   </TableContainer>
   
-  <Box sx={{ display: 'flex', justifyContent: isMobile ? 'center' : 'space-between', alignItems: 'center', mt: 2, width: '100%', flexDirection: isMobile ? 'column' : 'row' }}>
-    <Typography variant="body2" color="text.secondary" sx={{ mb: isMobile ? 2 : 0 }}>Page {currentPage} of {Math.ceil(filteredStock.length / itemsPerPage)}</Typography>
-    <Box>
-      <Button variant="outlined" size="small" disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} sx={{ mr:1 }}>Prev</Button>
-      <Button variant="outlined" size="small" disabled={currentPage===Math.ceil(filteredStock.length/itemsPerPage)} onClick={()=>setCurrentPage(p=>p+1)}>Next</Button>
-    </Box>
-  </Box>
+  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, width: '100%', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Page {currentPage} of {Math.ceil(filteredStock.length / itemsPerPage)}
+              </Typography>
+              <FormControl size="small" sx={{ minWidth: 80 }}>
+                <InputLabel>Rows</InputLabel>
+                <Select
+                  value={itemsPerPage}
+                  label="Rows"
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1); // Reset to first page
+                  }}
+                >
+                  <MenuItem value={5}>5</MenuItem>
+                  <MenuItem value={10}>10</MenuItem>
+                  <MenuItem value={15}>15</MenuItem>
+                  <MenuItem value={30}>30</MenuItem>
+                  <MenuItem value={40}>40</MenuItem>
+                  <MenuItem value={50}>50</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+            <Box>
+              <Button variant="outlined" size="small" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} sx={{ mr: 1 }}>Prev</Button>
+              <Button variant="outlined" size="small" disabled={currentPage === Math.ceil(filteredStock.length / itemsPerPage)} onClick={() => setCurrentPage(p => p + 1)}>Next</Button>
+            </Box>
+          </Box>
+
 </>
 
             </Paper>
