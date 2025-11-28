@@ -1098,6 +1098,10 @@ const handleConfirmBulkUpload = async () => {
       
       logAction('BULK_UPLOAD_COMPLETE', result.errors.length > 0 ? 'PARTIAL' : 'SUCCESS', `Upload finished. Published: ${result.publishedCount}, Drafts: ${result.draftCount}.`, { type: 'Business', name: targetBusiness });
 
+            // Fire-and-forget request to trigger the background enrichment process
+            fetch('/api/stock/enrich-and-upload');
+
+
   } catch (error: any) {
       // --- 4. Handle any network or server errors ---
       console.error("Bulk upload failed:", error);
