@@ -77,9 +77,6 @@ interface CsvFileHistoryItem {
   fileContent: string; 
 }
 
-const [csvFileHistory, setCsvFileHistory] = useState<CsvFileHistoryItem[]>([]);
-const [loadingCsvHistory, setLoadingCsvHistory] = useState(false);
-const [csvHistoryError, setCsvHistoryError] = useState<string | null>(null);
 
 
 
@@ -117,6 +114,9 @@ export default function StoreManagementPage() {
     const [loadingLogs, setLoadingLogs] = useState(false);
     const [logsError, setLogsError] = useState<string | null>(null);
     
+    const [csvFileHistory, setCsvFileHistory] = useState<CsvFileHistoryItem[]>([]);
+    const [loadingCsvHistory, setLoadingCsvHistory] = useState(false);
+    const [csvHistoryError, setCsvHistoryError] = useState<string | null>(null);
     
     const [logInsights, setLogInsights] = useState<string[] | null>(null);
 
