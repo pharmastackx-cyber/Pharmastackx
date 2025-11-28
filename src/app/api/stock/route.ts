@@ -130,6 +130,7 @@ export async function POST(req: NextRequest) {
       info: info || '',
       POM: POM || false,
       slug: slug,
+      isPublished: true,
       itemNameVector: newVector,
       enrichmentStatus: 'completed' // Mark manually added items as complete
     });

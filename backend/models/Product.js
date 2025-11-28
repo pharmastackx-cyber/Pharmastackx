@@ -13,6 +13,12 @@ const ProductSchema = new mongoose.Schema({
   POM: { type: Boolean, default: false },
   isPublished: { type: Boolean, default: false },
   bulkUploadId: { type: mongoose.Schema.Types.ObjectId, ref: 'BulkUpload', default: null },
+  // ** THE DEFINITIVE FIX IS HERE. **
+  // This is the correct file, and we are adding the missing field.
+  enrichmentStatus: { 
+    type: String,
+    required: false, // Not required for older documents
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.models.Product || mongoose.model('Product', ProductSchema);

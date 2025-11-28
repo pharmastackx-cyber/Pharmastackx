@@ -56,7 +56,8 @@ Required JSON Output:
   "is_published": "boolean"
 }`;
 
-// --- SHARED AI LOGIC (Unchanged from before) ---
+
+// --- SHARED AI LOGIC (MODEL NAME CORRECTED) ---
 async function enrichProduct(product: IProduct, genAI: GoogleGenerativeAI): Promise<any> {
     const itemName = product.itemName;
     const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
@@ -82,10 +83,13 @@ async function enrichProduct(product: IProduct, genAI: GoogleGenerativeAI): Prom
                 isPublished: true, 
             };
         } else {
+            // ** THE DEFINITIVE FIX IS HERE **
+            // Using the model you selected: gemini-2.5-flash
             const generationModel = genAI.getGenerativeModel({
-                model: "gemini-1.5-flash",
+                model: "gemini-2.5-flash",
                 generationConfig: { responseMimeType: "application/json" },
             });
+
             if (matchScore >= 70) {
                 const prompt = `<RAW_INVENTORY_DATA>\n${JSON.stringify(product)}\n</RAW_INVENTORY_DATA>\n\n<DATABASE_MATCH>\n${JSON.stringify(topMatch)}\n</DATABASE_MATCH>`;
                 const result = await generationModel.generateContent([validationPrompt, prompt]);
@@ -120,19 +124,14 @@ async function enrichProduct(product: IProduct, genAI: GoogleGenerativeAI): Prom
     return { ...updateData, enrichmentStatus: 'completed' };
 }
 
-/**
- * =================================================================================
- * [GATEKEEPER WORKER] - GET Request (Triggered after bulk uploads)
- * =================================================================================
- */
+
 export async function GET(req: NextRequest) {
     await dbConnect();
 
-    // --- 1. Attempt to acquire the lock ---
     try {
         await EnrichmentLock.create({ lockName: LOCK_NAME });
     } catch (error: any) {
-        if (error.code === 11000) { // E11000 is the duplicate key error code for a failed lock
+        if (error.code === 11000) { 
             console.log('[Gatekeeper-GET] Enrichment process is already running. Another trigger will be ignored.');
             return NextResponse.json({ message: "Enrichment process already active." }, { status: 200 });
         }
@@ -141,28 +140,26 @@ export async function GET(req: NextRequest) {
     }
 
     console.log('[Gatekeeper-GET] Lock acquired. Starting enrichment process.');
-    const BATCH_SIZE = 10; // Process 10 products at a time
+    const BATCH_SIZE = 10; 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    let processedCount = 0;
 
-    // --- 2. Process all pending products in batches ---
     try {
-        let processedCount = 0;
+        
         while (true) {
-            // Find a batch of 'pending' items and atomically update them to 'processing'
             const productsToProcess = await Product.find({ enrichmentStatus: 'pending' }).limit(BATCH_SIZE);
 
             if (productsToProcess.length === 0) {
                 console.log('[Gatekeeper-GET] No more pending products to enrich. Process finished.');
-                break; // Exit the loop
+                break; 
             }
 
             const productIds = productsToProcess.map(p => p._id);
             await Product.updateMany({ _id: { $in: productIds } }, { $set: { enrichmentStatus: 'processing' } });
             
-            console.log(`[Gatekeeper-GET] Processing batch of ${productsToProcess.length} products.`);
+            console.log(`[Gatekeeper-GET] Processing batch of ${productsToProcess.length} products sequentially to respect rate limits.`);
 
-            // Enrich the batch concurrently
-            const enrichmentPromises = productsToProcess.map(async (product) => {
+            for (const product of productsToProcess) {
                 try {
                     const updateData = await enrichProduct(product, genAI);
                     await Product.updateOne({ _id: product._id }, { $set: updateData });
@@ -171,9 +168,10 @@ export async function GET(req: NextRequest) {
                     console.error(`[Gatekeeper-Worker] Failed to process product ID ${product._id}. Error: ${itemError.message}`);
                     await Product.updateOne({ _id: product._id }, { $set: { enrichmentStatus: 'completed', category: 'Enrichment-Failed' } });
                 }
-            });
+            }
+        
 
-            await Promise.all(enrichmentPromises);
+            
             processedCount += productsToProcess.length;
         }
 
@@ -184,17 +182,12 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ message: 'An error occurred during batch processing.' }, { status: 500 });
 
     } finally {
-        // --- 3. Release the lock ---
         await EnrichmentLock.deleteOne({ lockName: LOCK_NAME });
         console.log('[Gatekeeper-GET] Lock released.');
     }
 }
 
-/**
- * =================================================================================
- * [MANUAL TRIGGER HANDLER] - POST Request (User-Forced Re-enrichment)
- * =================================================================================
- */
+
 export async function POST(req: NextRequest) {
     try {
         await dbConnect();
@@ -215,8 +208,6 @@ export async function POST(req: NextRequest) {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
         const updateData = await enrichProduct(product, genAI);
 
-        // The vector doesn't need to be regenerated on manual enrichment
-        // as the name isn't changing.
         delete updateData.itemNameVector;
 
         const updatedProduct = await Product.findByIdAndUpdate(productId, { $set: updateData }, { new: true });

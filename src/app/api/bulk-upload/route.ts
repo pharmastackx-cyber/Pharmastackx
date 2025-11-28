@@ -2,10 +2,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
 import BulkUpload from '@/models/BulkUpload';
-import Product from '@/models/Product';
+import Product, { IProduct } from '@/models/Product';
 import Fuse from 'fuse.js';
 
-// Helper to find a value by case-insensitive key search from the parsed CSV data
+// Helper to find a value by case-insensitive key search
 const findValueByKey = (obj: any, possibleKeys: string[]): any => {
     if (!obj) return undefined;
     const lowerCaseKeys = possibleKeys.map(k => k.toLowerCase());
@@ -42,7 +42,8 @@ export async function POST(req: NextRequest) {
   await dbConnect();
 
   try {
-    const { fileName, products: rawProducts, businessName, coordinates } = await req.json();
+    const { fileName, products: rawProducts, businessName, coordinates, fileContent } = await req.json();
+
 
     if (!fileName || !Array.isArray(rawProducts) || !businessName) {
       return NextResponse.json({ message: 'fileName, businessName, and a products array are required' }, { status: 400 });
@@ -51,110 +52,121 @@ export async function POST(req: NextRequest) {
        return NextResponse.json({ message: 'Cannot process an empty list of products.' }, { status: 400 });
     }
 
-    console.log(`[Bulk-Upload] Received ${rawProducts.length} items for ${businessName} from ${fileName}.`);
-
-    // --- 1. Create the initial bulk upload log ---
     const bulkUpload = await BulkUpload.create({
       csvName: fileName,
-      itemCount: rawProducts.length, // Initial count
+      itemCount: rawProducts.length,
       businessName: businessName,
     });
 
-    // --- 2. Fetch all products from the DB for fuzzy matching ---
     const allDbProducts = await Product.find({}, 'itemName activeIngredient category POM info imageUrl').lean();
 
-    // --- 3. Setup Fuse.js for fuzzy searching ---
     const fuse = new Fuse(allDbProducts, {
       keys: ['itemName'],
       includeScore: true,
       threshold: 0.3, 
     });
 
-    const productsToInsert: any[] = [];
+    const productsToCreate: any[] = [];
     const errors: any[] = [];
     let highConfidenceMatches = 0;
     let lowConfidenceDrafts = 0;
 
-    // --- 4. Process each uploaded product with the fuzzy match strategy ---
+    console.log("--- [BULK UPLOAD DEBUG] Starting item processing... ---");
+
     for (const [index, rawItem] of rawProducts.entries()) {
       const itemName = findValueByKey(rawItem, ['item name', 'product', 'name', 'item', 'product name']);
       const itemAmount = Number(findValueByKey(rawItem, ['amount', 'price', 'sellingprice', '₦'])) || 0;
-      const itemStock = Number(findValueByKey(rawItem, ['stock', 'quantity', 'qty', 'in stock'])) || 0;
 
       if (!itemName || String(itemName).trim() === '') {
         errors.push({ message: `Missing 'Item Name' in one row.`, item: { row: index + 2 } });
         continue;
       }
 
-      const results = fuse.search(String(itemName).trim());
+      const trimmedItemName = String(itemName).trim();
+      const results = fuse.search(trimmedItemName);
       const topMatch = results.length > 0 ? results[0] : null;
-      
-      const isHighConfidence = topMatch && topMatch.score != null && topMatch.score <= 0.1;
 
-      // --- STRATEGY 1: HIGH CONFIDENCE MATCH (=> 90%) ---
+      const isHighConfidence = topMatch && topMatch.score != null && topMatch.score <= 0.01;
+
+      // ** NEW DEBUG LOGGING **
+      console.log(`[DEBUG] Item: "${trimmedItemName}" | Match Score: ${topMatch?.score ?? 'N/A'} | High Confidence?: ${isHighConfidence}`);
+
       if (isHighConfidence) {
         highConfidenceMatches++;
         const dbProduct = topMatch.item;
-        productsToInsert.push({
-          itemName: String(itemName).trim(),
+        productsToCreate.push({
+          itemName: trimmedItemName,
           activeIngredient: dbProduct.activeIngredient,
           category: dbProduct.category,
           amount: itemAmount,
-          stock: itemStock,
           imageUrl: dbProduct.imageUrl || '',
           businessName: businessName,
-          isPublished: true, // AUTO-PUBLISH
+          isPublished: true,
           POM: dbProduct.POM,
           slug: businessName.toLowerCase().replace(/\s+/g, '-'),
           info: dbProduct.info,
           coordinates: coordinates || '',
           bulkUploadId: bulkUpload._id,
-          enrichmentStatus: 'completed', // Mark as completed
+          enrichmentStatus: 'completed', 
         });
       } 
-      // --- STRATEGY 2: LOW/NO CONFIDENCE MATCH (< 90%) ---
       else {
         lowConfidenceDrafts++;
-        productsToInsert.push({
-          itemName: String(itemName).trim(),
+        productsToCreate.push({
+          itemName: trimmedItemName,
+          activeIngredient: 'N/A',
+          category: 'N/A',
           amount: itemAmount,
-          stock: itemStock,
+          imageUrl: '',
           businessName: businessName,
-          isPublished: false, // SAVE AS DRAFT
+          isPublished: false,
+          POM: false,
           slug: businessName.toLowerCase().replace(/\s+/g, '-'),
+          info: '',
           coordinates: coordinates || '',
           bulkUploadId: bulkUpload._id,
-          enrichmentStatus: 'pending', // Mark for background AI
+          enrichmentStatus: 'pending', // This should now work as expected.
         });
       }
     }
 
-    // --- 5. Perform a single bulk insert operation ---
-    let savedProductsCount = 0;
-    if (productsToInsert.length > 0) {
-      const result = await Product.insertMany(productsToInsert, { ordered: false });
-      savedProductsCount = result.length;
+    console.log("--- [BULK UPLOAD DEBUG] Finished item processing. Saving to database... ---");
+
+    const savedDocsFromDb: IProduct[] = [];
+    if (productsToCreate.length > 0) {
+        for (const productData of productsToCreate) {
+            try {
+                const savedDoc = await Product.create(productData);
+                savedDocsFromDb.push(savedDoc);
+            } catch (singleSaveError) {
+                console.error(`[BULK-UPLOAD] Failed to save item: ${productData.itemName}`, singleSaveError);
+                errors.push({ message: `Failed to save item: ${productData.itemName}`, item: productData });
+            }
+        }
     }
 
-    // --- 6. Finalize the log and respond ---
-    const finalBulkUploadRecord = await BulkUpload.findByIdAndUpdate(
-        bulkUpload._id, 
-        { 
-            status: 'Processed', 
-            itemCount: savedProductsCount,
-            summary: `Published: ${highConfidenceMatches}, Drafts: ${lowConfidenceDrafts}`
-        },
-        { new: true }
-    );
+    const savedProductsForResponse = savedDocsFromDb.map(doc => ({
+        _id: (doc._id as any).toString(),
+        itemName: doc.itemName,
+        activeIngredient: doc.activeIngredient,
+        category: doc.category,
+        amount: doc.amount,
+        imageUrl: doc.imageUrl,
+        businessName: doc.businessName,
+        coordinates: doc.coordinates,
+        info: doc.info,
+        POM: doc.POM,
+        slug: doc.slug,
+        isPublished: doc.isPublished,
+        bulkUploadId: doc.bulkUploadId?.toString() ?? '',
+        enrichmentStatus: doc.enrichmentStatus,
+    }));
 
-    const summary = `Processing complete. Instantly published ${highConfidenceMatches} items. Saved ${lowConfidenceDrafts} items as drafts for background enrichment.`;
-    console.log(`[Bulk-Upload] ${summary}`);
+    const summary = `Processing complete. Instantly published ${highConfidenceMatches} items. Saved ${savedProductsForResponse.length} items as drafts.`;
 
     return NextResponse.json({ 
         message: summary,
-        bulkUploadRecord: finalBulkUploadRecord,
-        publishedCount: highConfidenceMatches,
-        draftCount: lowConfidenceDrafts,
+        savedProducts: savedProductsForResponse, 
         errors: errors,
     }, { status: 201 });
 

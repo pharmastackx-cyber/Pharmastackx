@@ -1,7 +1,6 @@
 
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
-
 export interface IProduct extends Document {
   itemName: string;
   activeIngredient: string;
@@ -15,13 +14,14 @@ export interface IProduct extends Document {
   slug: string;
   isPublished: boolean;
   bulkUploadId?: mongoose.Types.ObjectId;
-  itemNameVector?: number[]; // Stores the vector representation of the item name
-  enrichmentStatus: 'pending' | 'processing' | 'completed'; // New field for AI workflow
+  itemNameVector?: number[];
+  // SIMPLIFIED DEFINITION:
+  enrichmentStatus?: string; 
 }
 
 const productSchema: Schema<IProduct> = new mongoose.Schema({
   itemName: { type: String, required: true },
-  itemNameVector: { type: [Number], required: false }, // Added for vector search
+  itemNameVector: { type: [Number], required: false },
   activeIngredient: { type: String, required: false, default: 'N/A' },
   category: { type: String, required: false, default: 'N/A' },
   amount: { type: Number, required: false, default: 0 },
@@ -33,14 +33,15 @@ const productSchema: Schema<IProduct> = new mongoose.Schema({
   slug: { type: String, required: false },
   isPublished: { type: Boolean, default: false },
   bulkUploadId: { type: mongoose.Schema.Types.ObjectId, ref: 'BulkUpload', default: null },
-  enrichmentStatus: { // New field for AI workflow
+  // ** THE FIX IS HERE **
+  // We are removing the enum and default to prevent Mongoose from stripping the field.
+  // The API code is now solely responsible for setting this value.
+  enrichmentStatus: { 
     type: String,
-    enum: ['pending', 'processing', 'completed'],
-    default: 'pending',
+    required: false, // It's not required because old documents won't have it.
   },
-});
+}, { timestamps: true }); 
 
-// Add an index on enrichmentStatus for faster querying
 productSchema.index({ enrichmentStatus: 1 });
 
 const Product: Model<IProduct> = mongoose.models.Product || mongoose.model<IProduct>('Product', productSchema);

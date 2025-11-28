@@ -69,6 +69,19 @@ interface UploadHistoryItem {
   businessName?: string;
 }
 
+interface CsvFileHistoryItem {
+  _id: string;
+  fileName: string;
+  businessName: string;
+  createdAt: string;
+  fileContent: string; 
+}
+
+const [csvFileHistory, setCsvFileHistory] = useState<CsvFileHistoryItem[]>([]);
+const [loadingCsvHistory, setLoadingCsvHistory] = useState(false);
+const [csvHistoryError, setCsvHistoryError] = useState<string | null>(null);
+
+
 
 interface Order {
   _id: string;
@@ -103,8 +116,15 @@ export default function StoreManagementPage() {
     const [activityLogs, setActivityLogs] = useState<any[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
     const [logsError, setLogsError] = useState<string | null>(null);
-    // For the Activity Log Insights feature
+    
+    const [csvFileHistory, setCsvFileHistory] = useState<CsvFileHistoryItem[]>([]);
+    const [loadingCsvHistory, setLoadingCsvHistory] = useState(false);
+    const [csvHistoryError, setCsvHistoryError] = useState<string | null>(null);
+    
     const [logInsights, setLogInsights] = useState<string[] | null>(null);
+
+    const [logView, setLogView] = useState<'logs' | 'csv'>('logs');
+
 
   const [location, setLocation] = useState<string | null>(null);
   const [userSlug, setUserSlug] = useState<string | null>(null);
@@ -143,6 +163,7 @@ export default function StoreManagementPage() {
   const [isFetchingSuggestion, setIsFetchingSuggestion] = useState(false);
   
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
+  const [rawFileContent, setRawFileContent] = useState<string>('');
 
 
   const allBusinesses = useMemo(() => {
@@ -319,6 +340,30 @@ export default function StoreManagementPage() {
   };
   // --- END: FINAL CORRECTED LOG INSIGHTS HANDLERS ---
 
+  const handleDownloadCsv = (fileContent: string, fileName: string) => {
+    if (!fileContent) {
+      alert('File content is empty and cannot be downloaded.');
+      return;
+    }
+  
+    // Create a Blob from the raw file content
+    const blob = new Blob([fileContent], { type: 'text/csv;charset=utf-8;' });
+  
+    // Create a link element
+    const link = document.createElement('a');
+    if (link.download !== undefined) { 
+      // Create a URL for the blob
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', fileName);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      // Clean up the URL object
+      URL.revokeObjectURL(url);
+    }
+  };
   
 
   
@@ -651,32 +696,57 @@ export default function StoreManagementPage() {
       }
     }, [uploadSuccessInfo]);
   
-      // This effect fetches logs when an admin selects the Activity Log tab.
-  useEffect(() => {
-    const fetchLogs = async () => {
-      if (!isAdmin) return; // Should not run for non-admins
-      setLoadingLogs(true);
-      setLogsError(null);
-      try {
-        const response = await fetch('/api/logs');
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch activity logs.');
-        }
-        const data = await response.json();
-        setActivityLogs(data);
-      } catch (error) {
-        setLogsError((error as Error).message);
-      } finally {
-        setLoadingLogs(false);
-      }
-    };
-
-    // The new tab is at index 4
-    if (selectedTab === 4) {
-      fetchLogs();
+    // This effect fetches data for the last tab based on the selected view.
+useEffect(() => {
+  const fetchLogs = async () => {
+    if (!isAdmin) return;
+    setLoadingLogs(true);
+    setLogsError(null);
+    try {
+      const response = await fetch('/api/logs');
+      if (!response.ok) throw new Error('Failed to fetch activity logs.');
+      const data = await response.json();
+      setActivityLogs(data);
+    } catch (error) {
+      setLogsError((error as Error).message);
+    } finally {
+      setLoadingLogs(false);
     }
-  }, [selectedTab, isAdmin]);
+  };
+
+  const fetchCsvHistory = async () => {
+    if (!isAdmin) return;
+    setLoadingCsvHistory(true);
+    setCsvHistoryError(null);
+    try {
+      const response = await fetch('/api/bulk-upload');
+      if (!response.ok) throw new Error('Failed to fetch CSV history.');
+      const data = await response.json();
+      const formattedData: CsvFileHistoryItem[] = data.uploads.map((upload: any) => ({
+        _id: upload._id,
+        fileName: upload.fileName,
+        businessName: upload.businessName,
+        createdAt: upload.createdAt,
+        fileContent: upload.fileContent,
+      }));
+      setCsvFileHistory(formattedData);
+    } catch (error) {
+      setCsvHistoryError((error as Error).message);
+    } finally {
+      setLoadingCsvHistory(false);
+    }
+  };
+
+  // Only run when the last tab is active
+  if (selectedTab === 4) {
+    if (logView === 'logs') {
+      fetchLogs();
+    } else if (logView === 'csv') {
+      fetchCsvHistory();
+    }
+  }
+}, [selectedTab, isAdmin, logView]); // Note: `logView` is now a dependency
+
 
   useEffect(() => {
     // Log the initial page view once user information is available.
@@ -966,20 +1036,40 @@ export default function StoreManagementPage() {
 
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
-    // --- FIX: This logic replaces the old FileReader method ---
-    if (fileExtension === 'csv' || fileExtension === 'txt') {
-      // Pass the file object directly to PapaParse.
-      // It handles encoding detection much better than FileReader.
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (result) => processData(result.data),
-        error: (error: any) => {
-          console.error("CSV parsing error:", error);
-          alert("Failed to parse CSV file. Please check the file for formatting issues.");
-        }
-      });
-    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+    // --- FIX: This logic is being updated to read the raw file content first ---
+if (fileExtension === 'csv' || fileExtension === 'txt') {
+  const reader = new FileReader();
+
+  // This function runs after the file has been successfully read
+  reader.onload = (e) => {
+    const fileText = e.target?.result as string;
+
+    // **THIS IS THE KEY ADDITION:** We save the raw file text to our state
+    setRawFileContent(fileText); 
+
+    // Now, we continue to parse the text to show the preview, just like before.
+    Papa.parse(fileText, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (result) => processData(result.data),
+      error: (error: any) => {
+        console.error("CSV parsing error:", error);
+        alert("Failed to parse CSV file. Please check the file for formatting issues.");
+      }
+    });
+  };
+
+  // If there's an error reading the file, we log it.
+  reader.onerror = (error) => {
+      console.error("Error reading file:", error);
+      alert("Could not read the selected file.");
+  };
+
+  // This starts the process of reading the file as text.
+  reader.readAsText(file);
+
+} else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+
       // This part for Excel remains the same, as it's already robust.
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -1040,21 +1130,35 @@ const handleConfirmBulkUpload = async () => {
       return;
   }
 
-  // --- 1. Set UI to "uploading" state ---
+  // --- 1. Set UI to "uploading" state and add initial log ---
+  console.log('[handleConfirmBulkUpload] Step 1: Initiating upload process...');
   setIsUploading(true);
   setShowBulkPreview(false);
   setUploadSuccessInfo(null);
   setUploadResult(null); // Clear previous results
-  
-  // We can use the total item count to give the user a sense of progress
   const totalItems = rawBulkData.length;
-  setProcessedCount(0); // Reset counters
-  setUploadProgress(50); // Set to 50% as the upload is in progress
+  console.log(`[handleConfirmBulkUpload] Found ${totalItems} items to upload for business: ${targetBusiness}`);
 
   logAction('BULK_UPLOAD_START', 'INFO', `User initiated bulk upload of ${totalItems} items.`, { type: 'Business', name: targetBusiness });
 
   try {
+
+    if (rawFileContent) {
+      fetch('/api/save-csv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              fileName: fileName,
+              fileContent: rawFileContent,
+              businessName: targetBusiness,
+          }),
+      }).catch(err => {
+          // Log the error but don't block the user.
+          console.error("Failed to save CSV history:", err); 
+      });
+  }
       // --- 2. Send the ENTIRE file data in a SINGLE request ---
+      console.log('[handleConfirmBulkUpload] Step 2: Sending data to /api/bulk-upload...');
       const response = await fetch('/api/bulk-upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1066,50 +1170,86 @@ const handleConfirmBulkUpload = async () => {
           }),
       });
 
+      console.log('[handleConfirmBulkUpload] Received response from /api/bulk-upload.');
       const result = await response.json();
+      console.log('[DEBUG] Full content of first saved product:', result.savedProducts[0]);
+
       if (!response.ok) {
           // Throw an error that will be caught by the 'catch' block
+          console.error('[handleConfirmBulkUpload] Server returned an error:', result);
           throw new Error(result.details || result.message || 'An unknown error occurred on the server.');
       }
 
+      console.log('[handleConfirmBulkUpload] Step 3: Processing successful response from server.', result);
+
       // --- 3. Process the successful response from the new API ---
-      setUploadProgress(100);
-      
       // Update the main stock data list with the newly added products
       if (result.savedProducts && result.savedProducts.length > 0) {
+          console.log(`[handleConfirmBulkUpload] Adding ${result.savedProducts.length} new products to local stock data.`);
           setStockData(prev => [...result.savedProducts, ...prev]);
       }
 
+      // Correctly count published vs. drafts from the response
+      const publishedCount = result.savedProducts?.filter((p: any) => p.enrichmentStatus === 'completed').length || 0;
+      const draftCount = result.savedProducts?.filter((p: any) => p.enrichmentStatus === 'pending').length || 0;
+
       // Set the success info for the friendly alert at the top of the page
-      const totalSaved = (result.publishedCount || 0) + (result.draftCount || 0);
       setUploadSuccessInfo({
-          totalSaved: totalSaved,
-          publishedCount: result.publishedCount || 0,
+          totalSaved: result.savedProducts.length,
+          publishedCount: publishedCount,
       });
 
       // Set results for the detailed error/warning box if there are any
       if (result.errors && result.errors.length > 0) {
+          console.warn(`[handleConfirmBulkUpload] Upload completed with ${result.errors.length} errors.`);
           setUploadResult({
               message: result.message,
               warnings: [], // The new API doesn't produce warnings in the same way
               errors: result.errors,
           });
       }
+
+      logAction('BULK_UPLOAD_COMPLETE', result.errors.length > 0 ? 'PARTIAL' : 'SUCCESS', `Upload finished. Published: ${publishedCount}, Drafts: ${draftCount}.`, { type: 'Business', name: targetBusiness });
+
+            // --- 4. Trigger the background enrichment process for each draft ---
+            const draftsToEnrich = result.savedProducts?.filter((p: any) => p.enrichmentStatus === 'pending') || [];
       
-      logAction('BULK_UPLOAD_COMPLETE', result.errors.length > 0 ? 'PARTIAL' : 'SUCCESS', `Upload finished. Published: ${result.publishedCount}, Drafts: ${result.draftCount}.`, { type: 'Business', name: targetBusiness });
-
-            // Fire-and-forget request to trigger the background enrichment process
-            fetch('/api/stock/enrich-and-upload');
-
+            if (draftsToEnrich.length > 0) {
+              console.log(`[handleConfirmBulkUpload] Step 4: Found ${draftsToEnrich.length} new drafts. Triggering background enrichment for each.`);
+              
+              // Asynchronously trigger enrichment for each draft
+              (async () => {
+                for (const draft of draftsToEnrich) {
+                  try {
+                    // We send a "fire-and-forget" request for each one.
+                    // We don't need to wait for the result here.
+                    fetch('/api/stock/enrich-and-upload', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ productId: draft._id }),
+                    });
+                  } catch (err) {
+                    // Log an error if the fetch call itself fails, but don't stop the others.
+                    console.error(`[handleConfirmBulkUpload] Failed to send enrichment trigger for product ${draft._id}:`, err);
+                  }
+                }
+              })();
+              console.log('[handleConfirmBulkUpload] All enrichment triggers have been sent.');
+      
+            } else {
+              console.log('[handleConfirmBulkUpload] Step 4: No drafts were created. Skipping enrichment trigger.');
+            }
+      
 
   } catch (error: any) {
-      // --- 4. Handle any network or server errors ---
-      console.error("Bulk upload failed:", error);
+      // --- 5. Handle any network or server errors ---
+      console.error("[handleConfirmBulkUpload] Step 5: An error occurred during the upload process.", error);
       alert(`Upload Failed: ${error.message}`);
       logAction('BULK_UPLOAD_COMPLETE', 'FAILURE', `Bulk upload failed. Error: ${error.message}`, { type: 'Business', name: targetBusiness });
 
   } finally {
-      // --- 5. Reset the UI regardless of success or failure ---
+      // --- 6. Reset the UI regardless of success or failure ---
+      console.log('[handleConfirmBulkUpload] Step 6: Finalizing UI state.');
       setIsUploading(false);
       setBulkData([]);
       setRawBulkData([]);
@@ -1118,6 +1258,7 @@ const handleConfirmBulkUpload = async () => {
       }
   }
 };
+
 
 
 
@@ -2794,85 +2935,126 @@ const handleConfirmBulkUpload = async () => {
         
       )}
 
-           {/* --- START: ADD THIS NEW CODE FOR THE LOG TAB --- */}
+          {/* --- START: NEW DUAL-VIEW LOG/CSV TAB --- */}
 {selectedTab === 4 && isAdmin && (
-  <Box sx={{ mt: 3 }}>
-    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Admin Activity Log</Typography>
+  <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
+    {/* View Toggle Buttons */}
+    <Stack direction="row" spacing={2} sx={{ mb: 3, border: '1px solid #ddd', p: 0.5, borderRadius: '8px' }}>
+      <Button variant={logView === 'logs' ? 'contained' : 'text'} onClick={() => setLogView('logs')}>
+        General Activity
+      </Button>
+      <Button variant={logView === 'csv' ? 'contained' : 'text'} onClick={() => setLogView('csv')}>
+        CSV History
+      </Button>
+    </Stack>
 
-              {/* --- START: LOG INSIGHTS UI --- */}
-              <Paper sx={{ p: 2, mb: 3, bgcolor: 'grey.100', borderRadius: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>Log Insights</Typography>
-              <Stack direction="row" spacing={1.5} sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}>
-                  <Button variant="contained" onClick={handleGenerateUserActivity} size="small">User Activity</Button>
-                  <Button variant="contained" onClick={handleGenerateActionCounts} size="small">Action Counts</Button>
-                  <Button variant="contained" onClick={handleGenerateStatusSummary} size="small">Status Summary</Button>
-                  <Button variant="outlined" color="secondary" onClick={() => setLogInsights(null)} size="small">Clear Insights</Button>
-              </Stack>
-              <Collapse in={!!logInsights}>
-                {logInsights && (
-                    <Paper variant="outlined" sx={{ p: 2, maxHeight: 200, overflowY: 'auto', bgcolor: '#f5f5f5' }}>
-                        <Typography component="pre" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                            {logInsights.join('\n')}
-                        </Typography>
-                    </Paper>
-                )}
-              </Collapse>
+    {/* View 1: General Activity Log */}
+    {logView === 'logs' && (
+      <Box sx={{width: '100%'}}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, textAlign: 'center' }}>Admin Activity Log</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: 'italic', textAlign: 'center' }}>
+          Showing the 200 most recent actions taken across the platform.
+        </Typography>
+        
+        {/* This is the existing Activity Log UI that you wanted to keep */}
+        {loadingLogs ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
+        ) : logsError ? (
+          <Alert severity="error">{logsError}</Alert>
+        ) : (
+          <Paper sx={{ width: '100%', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <TableContainer sx={{ maxHeight: 600 }}>
+              <Table stickyHeader>
+                {/* The Table Head and Body from your original file */}
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Timestamp</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Actor</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Action</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Target</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Details</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {activityLogs.map((log) => (
+                    <TableRow hover key={log._id}>
+                      <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
+                      <TableCell>{log.actor?.name}</TableCell>
+                      <TableCell><Chip label={log.action} size="small" variant="outlined" /></TableCell>
+                      <TableCell>{log.target?.name || 'N/A'}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={log.status}
+                          size="small"
+                          color={log.status === 'SUCCESS' ? 'success' : log.status === 'FAILURE' ? 'error' : 'default'}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>{log.details}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Paper>
-          {/* --- END: LOG INSIGHTS UI --- */}
+        )}
+      </Box>
+    )}
 
+    {/* View 2: CSV History */}
+    {logView === 'csv' && (
+      <Box sx={{width: '100%'}}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, textAlign: 'center' }}>Uploaded CSV File History</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: 'italic', textAlign: 'center' }}>
+          Here is a record of all uploaded CSV files.
+        </Typography>
 
-    <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: 'italic' }}>
-      Showing the 200 most recent actions taken across the platform.
-    </Typography>
-    {loadingLogs ? (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
-    ) : logsError ? (
-      <Alert severity="error">{logsError}</Alert>
-    ) : (
-      <Paper sx={{ width: '100%', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-        <TableContainer sx={{ maxHeight: 600 }}>
-          <Table stickyHeader aria-label="activity log table">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Timestamp</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Actor</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Action</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Target</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Details</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {activityLogs.map((log) => (
-                <TableRow hover key={log._id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                  <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                  <TableCell>{log.actor?.name}</TableCell>
-                  <TableCell><Chip label={log.action} size="small" variant="outlined" /></TableCell>
-                  <TableCell>{log.target?.name || 'N/A'}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={log.status}
-                      size="small"
-                      color={
-                        log.status === 'SUCCESS' ? 'success' :
-                        log.status === 'FAILURE' ? 'error' :
-                        log.status === 'PARTIAL' ? 'warning' :
-                        'default'
-                      }
-                    />
-                  </TableCell>
-                  <TableCell sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>{log.details}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+        {loadingCsvHistory ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
+        ) : csvHistoryError ? (
+          <Alert severity="error">{csvHistoryError}</Alert>
+        ) : (
+          <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+            <TableContainer sx={{ maxHeight: 600 }}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Timestamp</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Business Name</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Document</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {csvFileHistory.map((file) => (
+                    <TableRow hover key={file._id}>
+                      <TableCell>{new Date(file.createdAt).toLocaleString()}</TableCell>
+                      <TableCell>{file.businessName}</TableCell>
+                      <TableCell>{file.fileName}</TableCell>
+                      <TableCell align="right">
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={<Download />}
+                          onClick={() => handleDownloadCsv(file.fileContent, file.fileName)}
+                          disabled={!file.fileContent}
+                        >
+                          Download
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        )}
+      </Box>
     )}
   </Box>
 )}
-{/* --- END: ADD THIS NEW CODE --- */}
+{/* --- END: NEW DUAL-VIEW LOG/CSV TAB --- */}
 
               {/* --- START: Contextual Support Button --- */}
       <Box sx={{
