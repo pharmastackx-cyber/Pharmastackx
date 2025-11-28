@@ -1,0 +1,8 @@
+{
+    "crons": [
+        {
+            "path": "/api/stock/enrich-and-upload",
+            "schedule": "*/5 * * * *"
+        }
+    ]
+}

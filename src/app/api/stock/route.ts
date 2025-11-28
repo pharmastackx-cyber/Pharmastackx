@@ -111,13 +111,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Prevent duplicate entries
     const existingProduct = await Product.findOne({ itemName, businessName });
     if (existingProduct) {
       return NextResponse.json({ error: 'Product with this name already exists for this business' }, { status: 409 });
     }
 
-    // Generate the vector embedding
     const result = await embeddingModel.embedContent(itemName);
     const newVector = result.embedding.values;
 
@@ -132,7 +130,8 @@ export async function POST(req: NextRequest) {
       info: info || '',
       POM: POM || false,
       slug: slug,
-      itemNameVector: newVector
+      itemNameVector: newVector,
+      enrichmentStatus: 'completed' // Mark manually added items as complete
     });
 
     const savedProduct = await newProduct.save();

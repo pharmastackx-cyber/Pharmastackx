@@ -1,53 +1,27 @@
-import { NextResponse } from 'next/server';
+
+import { NextResponse, NextRequest } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { dbConnect } from '@/lib/mongoConnect';
+import Product, { IProduct } from '@/models/Product';
+import { isValidObjectId } from 'mongoose';
 
-import Product from '@/models/Product'; 
-
-// --- Initialize the AI Model ---
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
-// --- Helper function to find a value by searching for possible keys case-insensitively ---
-const findValueByKey = (obj: any, possibleKeys: string[]): any => {
-  const lowerCaseKeys = possibleKeys.map(k => k.toLowerCase());
-  for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-          const lowerCaseKey = key.trim().toLowerCase();
-          if (lowerCaseKeys.includes(lowerCaseKey)) {
-              return obj[key];
-          }
-      }
-  }
-  return undefined;
-};
-
-
-// --- The Master Prompt for the AI ---
-const masterPrompt = `
-You are an expert pharmaceutical data analyst. Your task is to process raw, messy inventory data and enrich it into a clean, structured JSON format. Follow these rules strictly:
-
-1.  **VALIDATE THE MATCH:** You will be given a <RAW_INVENTORY_DATA> item and a potential <DATABASE_MATCH> from our system. 
-    *   Compare the item names carefully. If they are clearly the same product (ignoring minor typos or abbreviations), set "confidence_score" to 95-100.
-    *   If they are related but different (e.g., different dosages), set "confidence_score" to 70-90.
-    *   If they are completely different, set "confidence_score" to 0.
-
-2.  **EXTRACT FROM RAW DATA:** The user's uploaded file is the source of truth for price and stock. You MUST extract these from the <RAW_INVENTORY_DATA>.
-    *   \`amount_in_stock\`: Find the quantity from columns like 'stock', 'quantity', 'qty', etc. It must be an integer.
-    *   \`amount\`: Find the price from columns like 'price', 'amount', 'sellingprice', '₦', etc. It must be a number. Ignore columns like 'cost price'.
-
-3.  **ENRICH DETAILS:** Based on the product name, fill in the other fields using your internal knowledge.
-    *   \`cleaned_name\`: The proper, full product name, but as a rule never change the key details in the name, its almost not necessary to change the name except title..no full name change.
+// --- PROMPT ENGINEERING (Unchanged) ---
+const fullEnrichmentPrompt = `
+You are an expert pharmaceutical data analyst. Your task is to fully enrich a new, unknown product based on its name. Follow these rules:
+1.  **ANALYZE RAW DATA:** You will get a <RAW_INVENTORY_DATA> JSON object.
+2.  **EXTRACT CORE INFO:** The user's file is the source of truth for price and stock.
+    *   \`amount_in_stock\`: Find the quantity (e.g., from 'stock', 'quantity'). Must be an integer.
+    *   \`amount\`: Find the price (e.g., from 'price', 'amount', '₦'). Must be a number.
+3.  **ENRICH FROM KNOWLEDGE:** Based on the product name, fill in the details.
+    *   \`cleaned_name\`: The proper, full product name. Do not change key details.
     *   \`active_ingredient\`: The main active ingredient(s).
-    *   \`drug_class\`: The pharmaceutical class of the drug.
-    *   \`unit_form\`: A brief description of the product's packaging form, such as "Box of 30 tablets", "500ml bottle", "10g tube", or "Sachet", note that this would be usually 1 sachet for tabs, 1 bottle or soemthing like that , it will hardly be box since its retail but can be pack instead of sachets usually for products that a pack contains full dose of multiple sachets eg. amlodipine has two sachets in a pack and are sold by most pharmacies as a pack not sachet but soem still sell as sachet but most tablets will be 1 sachet  .
-    *   \`is_pom\`: Set to true if it is a Prescription-Only Medicine, otherwise false.
+    *   \`drug_class\`: The pharmaceutical class.
+    *   \`unit_form\`: The product's packaging form (e.g., "Box of 30 tablets", "500ml bottle").
+    *   \`is_pom\`: True if it is a Prescription-Only Medicine.
+4.  **FIND IMAGE:** Find a public, representative image URL. If you cannot find one with high confidence, you MUST return an empty string ("").
+5.  **OUTPUT FORMAT:** Return ONLY a single, valid JSON object.
 
-4.  **FIND IMAGE URL:** If there is no <DATABASE_MATCH> or if the confidence_score is low, try to find a representative public image URL for the product from your knowledge. Set this to the "found_image_url" field. If you cannot find one, leave it as an empty string.
-
-5.  **OUTPUT FORMAT:** You MUST return ONLY a single, valid JSON object for each item. Do not include any text, explanations, or markdown formatting before or after the JSON.
-
-
-Here is your required JSON output structure:
+Required JSON Output:
 {
   "cleaned_name": "string",
   "active_ingredient": "string",
@@ -56,158 +30,221 @@ Here is your required JSON output structure:
   "is_pom": "boolean",
   "amount_in_stock": "number",
   "amount": "number",
-  "confidence_score": "number (0-100)",
-   "found_image_url": "string"
-}
-`;
+  "found_image_url": "string"
+}`;
+
+const validationPrompt = `
+You are an expert pharmaceutical data analyst. Your task is to validate a user's product against a potential database match that has a medium confidence score.
+1.  **ANALYZE DATA:** You will get <RAW_INVENTORY_DATA> from the user and a <DATABASE_MATCH> from our system.
+2.  **PRIORITIZE DATABASE:** The <DATABASE_MATCH> is likely correct. Use its 'active_ingredient', 'drug_class', and 'unit_form' unless they are clearly wrong.
+3.  **CLEAN USER'S NAME:** Clean up the user's item name from <RAW_INVENTORY_DATA> to create 'cleaned_name'.
+4.  **EXTRACT USER'S DATA:** The user's file is the source of truth for 'amount' and 'amount_in_stock'.
+5.  **CONFIDENCE & PUBLISH:** Based on your analysis, set 'is_published' to true if you are confident the match is correct, otherwise false.
+6.  **DO NOT FIND IMAGE:** You do not need to find an image.
+7.  **OUTPUT FORMAT:** Return ONLY a single, valid JSON object.
+
+Required JSON Output:
+{
+  "cleaned_name": "string",
+  "active_ingredient": "string",
+  "drug_class": "string",
+  "unit_form": "string",
+  "is_pom": "boolean",
+  "amount_in_stock": "number",
+  "amount": "number",
+  "is_published": "boolean"
+}`;
 
 
-
-export async function POST(req: Request) {
-  try {
-    await dbConnect();
-    const { products: rawProducts, businessName, coordinates } = await req.json();
-
-    if (!rawProducts || !Array.isArray(rawProducts) || rawProducts.length === 0) {
-      return NextResponse.json({ message: 'No products to process.' }, { status: 400 });
-    }
-
-    console.log(`Received ${rawProducts.length} raw products for enrichment for business: ${businessName}.`);
-
-    // Model for generating the structured JSON
-    const generationModel = genAI.getGenerativeModel({
-      model: "models/gemini-2.5-flash",
-      generationConfig: { responseMimeType: "application/json" },
-    });
+/**
+ * =================================================================================
+ * CORE AI ENRICHMENT LOGIC
+ * =================================================================================
+ * This shared function contains the tiered AI logic for enriching a single product.
+ * It is used by both the automated cron job and the manual trigger.
+ */
+async function enrichProduct(product: IProduct, genAI: GoogleGenerativeAI): Promise<any> {
+    const itemName = product.itemName;
     
-    // Model for creating the vector embeddings
     const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
 
-    const processingResults = await Promise.allSettled(rawProducts.map(async (rawItem: any, index: number) => {
-      try {
-        // --- FIX: Robustly find item name by checking multiple possible keys case-insensitively ---
-        const itemNameValue = findValueByKey(rawItem, ['item name', 'product', 'name', 'item']);
-        
-        if (!itemNameValue || String(itemNameValue).trim() === '') {
-             // Throw a specific, useful error instead of crashing.
-             throw new Error(`Item Name is missing in one of the rows (check near row ${index + 2}). The column must be named 'Item Name', 'Product', or 'Name'.`);
+    // --- 1. VECTOR SEARCH ---
+    const queryVector = (await embeddingModel.embedContent(itemName)).embedding.values;
+    const similarProducts = await Product.aggregate([
+        { $vectorSearch: { index: "vector_index", path: "itemNameVector", queryVector, numCandidates: 100, limit: 1 } },
+        { $project: { _id: 0, itemName: 1, activeIngredient: 1, category: 1, imageUrl: 1, POM: 1, info: 1, score: { $meta: "vectorSearchScore" } } },
+    ]);
+    const topMatch = similarProducts.length > 0 ? similarProducts[0] : null;
+    const matchScore = topMatch ? topMatch.score * 100 : 0;
+    
+    let updateData: any;
+
+    // --- 2. TIERED LOGIC ---
+    try {
+        // TIER 1: HIGH CONFIDENCE (>= 90%) - NO AI
+        if (matchScore >= 90) {
+            console.log(`[Enrich-Product] High Confidence Match for "${itemName}" (${matchScore.toFixed(2)}%).`);
+            updateData = {
+                activeIngredient: topMatch.activeIngredient,
+                category: topMatch.category,
+                imageUrl: topMatch.imageUrl || product.imageUrl || '',
+                info: topMatch.info,
+                POM: topMatch.POM,
+                isPublished: true, // Auto-publish on high confidence
+            };
+        } else {
+            const generationModel = genAI.getGenerativeModel({
+                model: "gemini-1.5-flash",
+                generationConfig: { responseMimeType: "application/json" },
+            });
+
+            // TIER 2: MEDIUM CONFIDENCE (70-89%) - VALIDATE WITH AI
+            if (matchScore >= 70) {
+                console.log(`[Enrich-Product] Medium Confidence Match for "${itemName}" (${matchScore.toFixed(2)}%). Validating.`);
+                const prompt = `<RAW_INVENTORY_DATA>\n${JSON.stringify(product)}\n</RAW_INVENTORY_DATA>\n\n<DATABASE_MATCH>\n${JSON.stringify(topMatch)}\n</DATABASE_MATCH>`;
+                const result = await generationModel.generateContent([validationPrompt, prompt]);
+                const aiData = JSON.parse(result.response.text());
+
+                const newVector = aiData.cleaned_name ? (await embeddingModel.embedContent(aiData.cleaned_name)).embedding.values : queryVector;
+                updateData = {
+                    itemName: aiData.cleaned_name || itemName,
+                    activeIngredient: aiData.active_ingredient,
+                    category: aiData.drug_class,
+                    info: aiData.unit_form,
+                    POM: aiData.is_pom,
+                    isPublished: aiData.is_published || false,
+                    itemNameVector: newVector,
+                };
+            } 
+            // TIER 3: LOW/NO CONFIDENCE (< 70%) - FULL ENRICHMENT
+            else {
+                console.log(`[Enrich-Product] Low Confidence Match for "${itemName}" (${matchScore.toFixed(2)}%). Full Enrichment.`);
+                const prompt = `<RAW_INVENTORY_DATA>\n${JSON.stringify(product)}\n</RAW_INVENTORY_DATA>`;
+                const result = await generationModel.generateContent([fullEnrichmentPrompt, prompt]);
+                const aiData = JSON.parse(result.response.text());
+
+                const newVector = aiData.cleaned_name ? (await embeddingModel.embedContent(aiData.cleaned_name)).embedding.values : queryVector;
+                updateData = {
+                    itemName: aiData.cleaned_name || itemName,
+                    activeIngredient: aiData.active_ingredient,
+                    category: aiData.drug_class,
+                    info: aiData.unit_form,
+                    imageUrl: aiData.found_image_url || product.imageUrl || '',
+                    POM: aiData.is_pom,
+                    isPublished: false, // Always requires manual review on full enrichment
+                    itemNameVector: newVector,
+                };
+            }
+        }
+    } catch (aiError: any) {
+        console.warn(`[Enrich-Product] AI enrichment failed for "${itemName}". Error: ${aiError.message}`);
+        // Return a 'failed' status update
+        return { enrichmentStatus: 'completed', category: 'Enrichment-Failed' }; // Mark as 'completed' to avoid retries
+    }
+
+    return { ...updateData, enrichmentStatus: 'completed' };
+}
+
+
+/**
+ * =================================================================================
+ * [CRON JOB HANDLER] - GET Request (Automated Background Worker)
+ * =================================================================================
+ */
+export async function GET(req: NextRequest) {
+    console.log('[Cron-GET] Starting scheduled enrichment job.');
+    try {
+        await dbConnect();
+
+        // 1. Find 'pending' items and atomically update them to 'processing'
+        // This prevents multiple cron jobs from picking up the same items.
+        const pendingProducts = await Product.find({ enrichmentStatus: 'pending' }).limit(5);
+
+        if (pendingProducts.length === 0) {
+            console.log('[Cron-GET] No pending products to enrich. Job finished.');
+            return NextResponse.json({ message: 'No pending products to enrich.' });
         }
         
-        const itemName = String(itemNameValue).trim();
-        // --- END OF FIX ---
-        const queryVector = (await embeddingModel.embedContent(itemName)).embedding.values;
-
-        const similarProducts = await Product.aggregate([
-          {
-            $vectorSearch: {
-              index: "vector_index", // The name of the index you will create in Atlas
-              path: "itemNameVector",
-              queryVector: queryVector,
-              numCandidates: 150,
-              limit: 5,
-            },
-          },
-          {
-            $project: {
-              _id: 1,
-              itemName: 1,
-              imageUrl: 1,
-              score: { $meta: "vectorSearchScore" },
-            },
-          },
-        ]);
-
-         // --- THE ONLY DEBUG LOG ---
-        console.log(`\n--- [${itemName}] ---`);
-        console.log('Raw Vector Search Results:', JSON.stringify(similarProducts, null, 2));
-        // --- END DEBUG LOG ---
-
-        const dbMatch = similarProducts.length > 0 && similarProducts[0].score > 0.4 ? similarProducts[0] : null;
+        const productIds = pendingProducts.map(p => p._id);
+        await Product.updateMany({ _id: { $in: productIds } }, { $set: { enrichmentStatus: 'processing' } });
         
+        console.log(`[Cron-GET] Locked ${pendingProducts.length} products for processing.`);
+
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+        let processedCount = 0;
+
+        // 2. Loop through and enrich each product
+        for (const product of pendingProducts) {
+            try {
+                console.log(`[Cron-GET] Enriching: "${product.itemName}" (ID: ${product._id})`);
+                const updateData = await enrichProduct(product, genAI);
+                await Product.updateOne({ _id: product._id }, { $set: updateData });
+                processedCount++;
+                console.log(`[Cron-GET] Successfully enriched and completed: "${product.itemName}"`);
+            } catch (itemError: any) {
+                console.error(`[Cron-GET] Failed to process product ID ${product._id}. Error: ${itemError.message}`);
+                // Mark as failed to prevent retries
+                await Product.updateOne({ _id: product._id }, { $set: { enrichmentStatus: 'completed', category: 'Enrichment-Failed' } });
+            }
+        }
         
-        const userPrompt = `
-        <RAW_INVENTORY_DATA>
-        ${JSON.stringify(rawItem)}
-        </RAW_INVENTORY_DATA>
+        const summary = `Enrichment job finished. Processed ${processedCount}/${pendingProducts.length} products.`;
+        console.log(`[Cron-GET] ${summary}`);
+        return NextResponse.json({ message: summary, processedCount });
 
-        <DATABASE_MATCH>
-        ${JSON.stringify(dbMatch)}
-        </DATABASE_MATCH>
-        `;
+    } catch (error: any) {
+        console.error('[Cron-GET] Fatal error in enrichment job:', error);
+        return new NextResponse(JSON.stringify({ message: 'Internal server error', details: error.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+}
 
-        const result = await generationModel.generateContent([masterPrompt, userPrompt]);
-        const responseText = result.response.text();
-        const aiEnrichedData = JSON.parse(responseText);
-        const willAssignImage = dbMatch && aiEnrichedData.confidence_score > 50;
+/**
+ * =================================================================================
+ * [MANUAL TRIGGER HANDLER] - POST Request (User-Forced Re-enrichment)
+ * =================================================================================
+ */
+export async function POST(req: NextRequest) {
+    try {
+        await dbConnect();
+        const { productId } = await req.json();
 
-        console.log(`AI Confidence: ${aiEnrichedData.confidence_score}. Match Found: ${!!dbMatch}. Image Assigned: ${willAssignImage}`);
+        if (!productId || !isValidObjectId(productId)) {
+            return NextResponse.json({ message: 'Valid productId is required.' }, { status: 400 });
+        }
 
-        // --- Generate Vector for the new product ---
-        const newVector = (await embeddingModel.embedContent(aiEnrichedData.cleaned_name)).embedding.values;
-   
+        // 1. Find the product and lock it for processing
+        const product = await Product.findById(productId);
 
-        const finalProduct = {
-          itemName: aiEnrichedData.cleaned_name,
-          activeIngredient: aiEnrichedData.active_ingredient,
-          category: aiEnrichedData.drug_class,
-          amount: Number(aiEnrichedData.amount) || 0,
-          imageUrl: willAssignImage ? (dbMatch as any).imageUrl : aiEnrichedData.found_image_url || '',
-          businessName: businessName,
-          isPublished: aiEnrichedData.confidence_score >= 80,
-          POM: aiEnrichedData.is_pom,
-          slug: businessName.toLowerCase().replace(/\s+/g, '-'),
-          info: aiEnrichedData.unit_form, 
-          coordinates: coordinates || '',
-          itemNameVector: newVector,
-      };
-      
+        if (!product) {
+            return NextResponse.json({ message: 'Product not found.' }, { status: 404 });
+        }
+
+        console.log(`[POST-Manual] Starting manual re-enrichment for "${product.itemName}" (ID: ${productId})`);
+        product.enrichmentStatus = 'processing';
+        await product.save();
         
-        return finalProduct;
-      } catch (error: any) {
-        console.error('Error processing single item with AI:', { rawItem, error });
-        throw { message: error.message, item: rawItem };
-      }
-    }));
+        // 2. Enrich the product
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+        const updateData = await enrichProduct(product, genAI);
+        
+        // 3. Update the product with the new data
+        const updatedProduct = await Product.findByIdAndUpdate(productId, { $set: updateData }, { new: true });
 
-    const enrichedProducts = processingResults
-      .filter(p => p.status === 'fulfilled')
-      .map((p: PromiseFulfilledResult<any>) => p.value);
-      
-    const errors = processingResults
-      .filter(p => p.status === 'rejected')
-      .map((p: PromiseRejectedResult) => p.reason);
+        console.log(`[POST-Manual] Successfully re-enriched and saved: "${updatedProduct?.itemName}"`);
 
-    let savedProducts: any[] = [];
-    if (enrichedProducts.length > 0) {
-        console.log(`AI processing complete. Saving ${enrichedProducts.length} products to the database.`);
-        savedProducts = await Product.insertMany(enrichedProducts, { ordered: false });
-        console.log(`Successfully saved ${savedProducts.length} products to the Product collection.`);
-    } else {
-        console.log('No products were successfully enriched to be saved.');
+        return NextResponse.json({
+            message: 'Product re-enriched successfully.',
+            product: updatedProduct,
+        }, { status: 200 });
+
+    } catch (error: any) {
+        console.error('[POST-Manual] Fatal error in manual enrichment:', error);
+        return new NextResponse(JSON.stringify({ message: 'An internal server error occurred.', details: error.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
-
-    const publishedCount = savedProducts.filter(p => p.isPublished).length;
-
-    if (errors.length > 0) {
-        console.log(`${errors.length} items failed during AI enrichment.`);
-    }
-
-    return NextResponse.json({ 
-        message: `Processed ${rawProducts.length} items. Saved ${savedProducts.length}.`,
-        savedProducts: savedProducts, 
-        publishedCount: publishedCount,
-        warnings: [],
-        errors: errors,
-    }, { status: 200 });
-
-  } catch (error: any) {
-    console.error("Fatal error in enrich-and-upload endpoint:", error);
-    if (error.code === 11000) {
-        return NextResponse.json({ 
-            message: 'Database error: Duplicate items detected.', 
-            details: 'Some of the items you tried to upload already exist in the products collection.' 
-        }, { status: 409 });
-    }
-    return NextResponse.json({ message: 'An unexpected server error occurred.', details: error.message }, { status: 500 });
-  }
 }

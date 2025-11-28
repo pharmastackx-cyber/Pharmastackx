@@ -1,6 +1,11 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+
+// Helper to add a delay
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+
 import {
   Box, Typography, Tabs, Tab, IconButton, TextField, Button,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer, Paper, useTheme, 
@@ -13,7 +18,7 @@ import {
   CardActions,
   InputAdornment,
   Fade,
-  Backdrop,Switch, Popover, 
+  Backdrop,Switch, Popover, LinearProgress ,
 } from '@mui/material';
 
 import { Storefront, LocationOn, UploadFile, ExpandMore, Inventory, CheckCircle, Warning, MoreVert, } from '@mui/icons-material';
@@ -79,6 +84,13 @@ interface Order {
   createdAt: string;
 }
 
+interface Business {
+  businessName: string;
+  slug: string;
+  coordinates: string;
+}
+
+
 
 export default function StoreManagementPage() {
   const [selectedTab, setSelectedTab] = useState(0);
@@ -110,6 +122,15 @@ export default function StoreManagementPage() {
     // For Admin: holds the business they have selected from the dropdown
     const [selectedBusinessForUpload, setSelectedBusinessForUpload] = useState<string | null>(null);
 
+      // --- NEW STATE FOR PROGRESSIVE UPLOAD ---
+      const [isUploading, setIsUploading] = useState(false);
+      const [uploadProgress, setUploadProgress] = useState(0);
+      const [processedCount, setProcessedCount] = useState(0);
+      const [errorCount, setErrorCount] = useState(0);
+      const [finalUploadResult, setFinalUploadResult] = useState<{ successes: any[], errors: any[] } | null>(null);
+      const [estimatedTime, setEstimatedTime] = useState(0);
+  
+
 
   const [showBulkPreview, setShowBulkPreview] = useState(false);
   const [bulkData, setBulkData] = useState<StockItem[]>([]);
@@ -121,6 +142,9 @@ export default function StoreManagementPage() {
   const [suggestionData, setSuggestionData] = useState<StockItem | null>(null);
   const [isFetchingSuggestion, setIsFetchingSuggestion] = useState(false);
   
+  const [enrichingId, setEnrichingId] = useState<string | null>(null);
+
+
   const allBusinesses = useMemo(() => {
     if (!isAdmin || !stockData) return [];
     
@@ -420,7 +444,8 @@ export default function StoreManagementPage() {
     const [isEditingTile, setIsEditingTile] = useState(false);
     const [tileEditData, setTileEditData] = useState<StockItem | null>(null);
     const [tileImageFile, setTileImageFile] = useState<File | null>(null);
-    const [isUploading, setIsUploading] = useState(false);
+    const [isTileUploading, setIsTileUploading] = useState(false);
+
 
 
 
@@ -977,93 +1002,123 @@ export default function StoreManagementPage() {
   };
 
 
+  // --- TYPE DEFINITIONS FOR BATCH PROCESSING ---
+interface FulfilledResult {
+  status: 'fulfilled';
+  value: { savedProduct: any };
+  originalRow: any;
+}
+
+interface RejectedResult {
+  status: 'rejected';
+  reason: { message?: string };
+  originalRow: any;
+}
+
+type SettledResult = FulfilledResult | RejectedResult;
+// --- END TYPE DEFINITIONS ---
 
 
-  const handleConfirmBulkUpload = async () => {
-    const targetBusiness = (isAdmin && selectedBusinessForUpload) ? selectedBusinessForUpload : userBusinessName;
-    let targetCoordinates = location;
 
-    if (isAdmin && selectedBusinessForUpload) {
-        const selectedBiz = allBusinesses.find(b => b.businessName === selectedBusinessForUpload);
-        if (selectedBiz) {
-            targetCoordinates = selectedBiz.coordinates;
-        }
-    }
 
-    // --- FIX: NORMALIZE HEADERS (KEYS) TO LOWERCASE BEFORE SENDING ---
-    const productsToSend = rawBulkData.map(row => {
-        const normalizedRow: { [key: string]: any } = {};
-        for (const key in row) {
-            if (Object.prototype.hasOwnProperty.call(row, key)) {
-                normalizedRow[key.trim().toLowerCase()] = row[key];
-            }
-        }
-        return normalizedRow;
-    });
+const handleConfirmBulkUpload = async () => {
+  // Determine the target business for the upload
+  const targetBusiness = (isAdmin && selectedBusinessForUpload) ? selectedBusinessForUpload : userBusinessName;
+  let targetCoordinates = location;
+  const fileName = fileInputRef.current?.files?.[0]?.name || 'uploaded_file';
 
-    if (!productsToSend.length || !targetBusiness) {
-      alert('No data to upload or the target business is not specified.');
+  // Find coordinates if admin is uploading for another business
+  if (isAdmin && selectedBusinessForUpload) {
+      const selectedBiz = allBusinesses.find((b: any) => b.businessName === selectedBusinessForUpload);
+      if (selectedBiz) {
+          targetCoordinates = selectedBiz.coordinates;
+      }
+  }
+
+  if (!rawBulkData.length || !targetBusiness) {
+      alert('No data to upload or target business not specified.');
       return;
-    }
+  }
 
-    setIsSubmitting(true);
-    setUploadResult(null);
-    setUploadSuccessInfo(null);
+  // --- 1. Set UI to "uploading" state ---
+  setIsUploading(true);
+  setShowBulkPreview(false);
+  setUploadSuccessInfo(null);
+  setUploadResult(null); // Clear previous results
+  
+  // We can use the total item count to give the user a sense of progress
+  const totalItems = rawBulkData.length;
+  setProcessedCount(0); // Reset counters
+  setUploadProgress(50); // Set to 50% as the upload is in progress
 
-    try {
-      const payload = {
-        products: productsToSend, // Use the data with normalized keys
-        fileName: fileInputRef.current?.files?.[0]?.name || 'bulk_upload.csv',
-        businessName: targetBusiness,
-        coordinates: targetCoordinates,
-      };
+  logAction('BULK_UPLOAD_START', 'INFO', `User initiated bulk upload of ${totalItems} items.`, { type: 'Business', name: targetBusiness });
 
-      const response = await fetch('/api/stock/enrich-and-upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+  try {
+      // --- 2. Send the ENTIRE file data in a SINGLE request ---
+      const response = await fetch('/api/bulk-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              fileName: fileName,
+              products: rawBulkData, // Send the raw parsed data
+              businessName: targetBusiness,
+              coordinates: targetCoordinates,
+          }),
       });
 
-      const resultData = await response.json();
+      const result = await response.json();
       if (!response.ok) {
-        throw new Error(resultData.message || 'AI enrichment process failed');
+          // Throw an error that will be caught by the 'catch' block
+          throw new Error(result.details || result.message || 'An unknown error occurred on the server.');
       }
 
-      const { savedProducts, warnings, errors } = resultData;
-
-      if (savedProducts && savedProducts.length > 0) {
-        setStockData(prev => [...savedProducts, ...prev]);
-        setUploadSuccessInfo({ totalSaved: savedProducts.length, publishedCount: resultData.publishedCount || 0 });
+      // --- 3. Process the successful response from the new API ---
+      setUploadProgress(100);
+      
+      // Update the main stock data list with the newly added products
+      if (result.savedProducts && result.savedProducts.length > 0) {
+          setStockData(prev => [...result.savedProducts, ...prev]);
       }
 
-      setUploadResult({
-        message: `${savedProducts.length} out of ${rawBulkData.length} items were processed.`,
-        warnings: warnings || [],
-        errors: errors || []
+      // Set the success info for the friendly alert at the top of the page
+      const totalSaved = (result.publishedCount || 0) + (result.draftCount || 0);
+      setUploadSuccessInfo({
+          totalSaved: totalSaved,
+          publishedCount: result.publishedCount || 0,
       });
 
-      const status = (errors?.length || 0) > 0 ? ((savedProducts?.length || 0) > 0 ? 'PARTIAL' : 'FAILURE') : 'SUCCESS';
-      const logDetails = `User initiated AI bulk enrichment. Result: ${savedProducts?.length || 0} saved, ${warnings?.length || 0} warnings, ${errors?.length || 0} errors.`;
-      logAction('BULK_ENRICH', status, logDetails, { type: 'Business', name: targetBusiness });
+      // Set results for the detailed error/warning box if there are any
+      if (result.errors && result.errors.length > 0) {
+          setUploadResult({
+              message: result.message,
+              warnings: [], // The new API doesn't produce warnings in the same way
+              errors: result.errors,
+          });
+      }
+      
+      logAction('BULK_UPLOAD_COMPLETE', result.errors.length > 0 ? 'PARTIAL' : 'SUCCESS', `Upload finished. Published: ${result.publishedCount}, Drafts: ${result.draftCount}.`, { type: 'Business', name: targetBusiness });
 
-      setShowBulkPreview(false);
+  } catch (error: any) {
+      // --- 4. Handle any network or server errors ---
+      console.error("Bulk upload failed:", error);
+      alert(`Upload Failed: ${error.message}`);
+      logAction('BULK_UPLOAD_COMPLETE', 'FAILURE', `Bulk upload failed. Error: ${error.message}`, { type: 'Business', name: targetBusiness });
+
+  } finally {
+      // --- 5. Reset the UI regardless of success or failure ---
+      setIsUploading(false);
       setBulkData([]);
       setRawBulkData([]);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (fileInputRef.current) {
+          fileInputRef.current.value = ""; // Clear the file input
+      }
+  }
+};
 
-    } catch (error) {
-      console.error('Error during AI bulk enrichment:', error);
-      setUploadResult({
-        message: "An unexpected error occurred during AI enrichment.",
-        warnings: [],
-        errors: [{ message: (error as Error).message, item: 'N/A'}]
-      });
-      const logDetails = `User AI enrichment failed entirely. Error: ${(error as Error).message}`;
-      logAction('BULK_ENRICH', 'FAILURE', logDetails, { type: 'Business', name: targetBusiness });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+
+
+
+
 
 
 
@@ -1369,6 +1424,54 @@ export default function StoreManagementPage() {
   };
 
 
+  const handleEnrich = async (productId: string) => {
+    if (!productId) return;
+
+    if (!window.confirm('Are you sure you want to enrich this item with AI? This may overwrite existing data like category, info, and image URL.')) {
+      logAction('ENRICH_ITEM', 'INFO', `User cancelled enriching item.`, { type: 'Product', id: productId });
+      return;
+    }
+
+    setEnrichingId(productId);
+    try {
+      const response = await fetch('/api/stock/enrich-and-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Enrichment failed');
+      }
+
+      const { product: updatedProduct } = result;
+
+      // Update the main data source
+      setStockData(prevData =>
+        prevData.map(item => (item._id === productId ? { ...item, ...updatedProduct } : item))
+      );
+
+      // If the modal is open for this product, update its data as well
+      if (selectedProduct?._id === productId) {
+        setSelectedProduct(prev => ({ ...prev!, ...updatedProduct }));
+        setTileEditData(prev => ({ ...prev!, ...updatedProduct }));
+      }
+      
+      alert(`Successfully enriched "${updatedProduct.itemName}".`);
+      logAction('ENRICH_ITEM', 'SUCCESS', `User enriched item '${updatedProduct.itemName}'.`, { type: 'Product', id: productId, name: updatedProduct.itemName });
+
+    } catch (error) {
+      console.error('Error enriching item:', error);
+      alert(`An error occurred during enrichment: ${(error as Error).message}`);
+      const item = stockData.find(i => i._id === productId);
+      logAction('ENRICH_ITEM', 'FAILURE', `Failed to enrich item '${item?.itemName || 'Unknown'}'. Error: ${(error as Error).message}`, { type: 'Product', id: productId, name: item?.itemName });
+    } finally {
+      setEnrichingId(null);
+    }
+  };
+
+
   const handleUpdateOrderStatus = async (orderId: string, newStatus: 'processing' | 'completed' | 'cancelled' | 'failed') => {
     const confirmationMessage = `Are you sure you want to change the order status to ${newStatus}?`;
     const order = orders.find(o => o._id === orderId);
@@ -1545,7 +1648,7 @@ export default function StoreManagementPage() {
 
   const handleTileSave = async () => {
     if (!tileEditData?._id) return;
-    setIsUploading(true);
+    setIsTileUploading(true);
     
     // The 'tileEditData' object already has the new image as a Base64 URL from the preview.
     // We can save it directly without calling the broken '/api/products/upload' endpoint.
@@ -1577,7 +1680,7 @@ export default function StoreManagementPage() {
       alert((error as Error).message);
       logAction('UPDATE_ITEM', 'FAILURE', `User failed to update item '${dataToSave.itemName}'. Error: ${(error as Error).message}`, { type: 'Product', id: dataToSave._id, name: dataToSave.itemName });
     } finally {
-      setIsUploading(false);
+      setIsTileUploading(false);
       setIsEditingTile(false);
       setTileImageFile(null); // Clear the selected file state
     }
@@ -1674,7 +1777,14 @@ export default function StoreManagementPage() {
   const whatsAppUrl = `https://wa.me/${whatsAppNumber}?text=${encodeURIComponent(whatsAppMessage)}`;
   // --- END: WhatsApp Activation Link ---
 
-  
+  const formatTime = (seconds: number) => {
+    if (seconds < 0) return 'Calculating...';
+    if (seconds < 60) return `${Math.round(seconds)} seconds`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.round(seconds % 60);
+    return `${minutes}m ${remainingSeconds}s`;
+  };
+
 
 
 
@@ -1815,7 +1925,8 @@ export default function StoreManagementPage() {
                   <MenuItem value="">
                     <em>Upload for Myself (Admin)</em>
                   </MenuItem>
-                  {allBusinesses.map((biz) => (
+                  {allBusinesses.map((biz: Business) => (
+
                     <MenuItem key={biz.businessName} value={biz.businessName}>
                       {biz.businessName}
                     </MenuItem>
@@ -1860,6 +1971,58 @@ export default function StoreManagementPage() {
     </Alert>
 )}
 
+      {/* --- NEW: UPLOAD PROGRESS INDICATOR --- */}
+      {isUploading && (
+        <Paper sx={{ p: 3, mt: 3, width: '100%', maxWidth: 600, bgcolor: 'background.paper', boxShadow: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Processing Upload...</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Please keep this tab open. This may take several minutes.
+          </Typography>
+          <Box sx={{ width: '100%', mt: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">{processedCount} / {rawBulkData.length} items</Typography>
+                <Typography variant="body2" color="text.secondary">{Math.round(uploadProgress)}%</Typography>
+            </Box>
+            <LinearProgress variant="determinate" value={uploadProgress} />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                <Typography variant="caption" color="text.secondary">Est. time remaining: {formatTime(estimatedTime - (processedCount * 2.5))}</Typography>
+                {errorCount > 0 && <Typography variant="caption" color="error">{errorCount} errors</Typography>}
+            </Box>
+          </Box>
+        </Paper>
+      )}
+
+      {/* --- NEW: FINAL UPLOAD RESULTS --- */}
+      {finalUploadResult && !isUploading && (
+        <Alert
+            severity={finalUploadResult.errors.length > 0 ? "error" : "success"}
+            sx={{ mt: 3, width: '100%', maxWidth: 600 }}
+            onClose={() => setFinalUploadResult(null)}
+        >
+            <AlertTitle>Upload Finished</AlertTitle>
+            <Typography>
+                {finalUploadResult.successes.length} out of {rawBulkData.length} items were processed successfully.
+            </Typography>
+            {finalUploadResult.errors.length > 0 && (
+                 <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>The following items could not be uploaded:</Typography>
+                    <Box sx={{ maxHeight: 150, overflowY: 'auto', mt: 1 }}>
+                        <ul style={{ paddingLeft: '20px', margin: 0 }}>
+                            {finalUploadResult.errors.map((err, index) => (
+                                <li key={index}>
+                                    <Typography variant="caption">
+                                        <strong>{err.item}:</strong> {err.message}
+                                    </Typography>
+                                </li>
+                            ))}
+                        </ul>
+                    </Box>
+                 </Box>
+            )}
+        </Alert>
+      )}
+
+
 
 
 
@@ -1879,7 +2042,7 @@ export default function StoreManagementPage() {
     </Typography>
 
           {!showUploadForm ? (
-            <Box sx={{ maxWidth: 350, width: '100%', height: 150, bgcolor: '#1976d2', color: 'white', borderRadius: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }} onClick={handleUploadClick}>
+            <Box sx={{ maxWidth: 350, width: '100%', height: 150, bgcolor: '#1976d2', color: 'white', borderRadius: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }} onClick={!isUploading ? handleUploadClick : undefined}>
               <IconButton sx={{ color: 'white', mb: 1 }}><UploadFile /></IconButton>
               <Typography variant="h6">Upload Single Item</Typography>
               <Typography variant="body2">Click to add a new item.</Typography>
@@ -1955,7 +2118,8 @@ export default function StoreManagementPage() {
             <IconButton sx={{ color: 'white', mb: 1 }}><UploadFile /></IconButton>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>Bulk Upload</Typography>
             <Typography variant="body2" sx={{ mb: 2 }}>Upload multiple items using a CSV file</Typography>
-            <Button variant="contained" component="label" color="secondary">
+            <Button variant="contained" component="label" color="secondary" disabled={isUploading}>
+
               Choose CSV
               <input 
   type="file" 
@@ -1963,6 +2127,7 @@ export default function StoreManagementPage() {
   hidden 
   onChange={handleBulkFileUpload} 
   ref={fileInputRef} 
+  
 />
  </Button>
 
@@ -2391,17 +2556,32 @@ export default function StoreManagementPage() {
                       </TableCell>
                       
                       <TableCell align="right">
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedProduct(row);
-                              setTileEditData(row);
-                            }}
-                          >
-                            Edit
-                          </Button>
+                      <Stack direction="row" spacing={1}>
+    <Button
+      variant="outlined"
+      size="small"
+      color="secondary"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (row._id) handleEnrich(row._id);
+      }}
+      disabled={enrichingId === row._id}
+    >
+      {enrichingId === row._id ? <CircularProgress size={20} /> : 'Enrich'}
+    </Button>
+    <Button
+      variant="outlined"
+      size="small"
+      onClick={(e) => {
+        e.stopPropagation();
+        setSelectedProduct(row);
+        setTileEditData(row);
+      }}
+    >
+      Edit
+    </Button>
+</Stack>
+
                       </TableCell>
                     </TableRow>
                   );
@@ -2925,6 +3105,16 @@ export default function StoreManagementPage() {
             {!isEditingTile && (
               <Box sx={{ mt: 4, display: 'flex', flexWrap: 'wrap', gap: 1.5, borderTop: '1px solid #eee', pt: 3 }}>
                 <Button variant="outlined" color="error" size="medium" onClick={() => { if(tileEditData?._id) handleDelete(tileEditData._id)}}>Delete Item</Button>
+                <Button
+  variant="contained"
+  color="secondary"
+  size="medium"
+  onClick={() => { if(tileEditData?._id) handleEnrich(tileEditData._id) }}
+  disabled={enrichingId === tileEditData?._id}
+>
+  {enrichingId === tileEditData?._id ? <CircularProgress size={24} color="inherit" /> : 'Enrich'}
+</Button>
+
                 {!tileEditData.isPublished ? (
                   (() => {
                     if (!tileEditData?._id) return null;

@@ -1,3 +1,4 @@
+
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
 
@@ -15,6 +16,7 @@ export interface IProduct extends Document {
   isPublished: boolean;
   bulkUploadId?: mongoose.Types.ObjectId;
   itemNameVector?: number[]; // Stores the vector representation of the item name
+  enrichmentStatus: 'pending' | 'processing' | 'completed'; // New field for AI workflow
 }
 
 const productSchema: Schema<IProduct> = new mongoose.Schema({
@@ -31,7 +33,15 @@ const productSchema: Schema<IProduct> = new mongoose.Schema({
   slug: { type: String, required: false },
   isPublished: { type: Boolean, default: false },
   bulkUploadId: { type: mongoose.Schema.Types.ObjectId, ref: 'BulkUpload', default: null },
+  enrichmentStatus: { // New field for AI workflow
+    type: String,
+    enum: ['pending', 'processing', 'completed'],
+    default: 'pending',
+  },
 });
+
+// Add an index on enrichmentStatus for faster querying
+productSchema.index({ enrichmentStatus: 1 });
 
 const Product: Model<IProduct> = mongoose.models.Product || mongoose.model<IProduct>('Product', productSchema);
 export default Product;
