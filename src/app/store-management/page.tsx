@@ -83,6 +83,9 @@ interface CsvFileHistoryItem {
 interface Order {
   _id: string;
   customerName: string;
+  // NEW: Add email and phone for the admin view
+  customerEmail?: string;
+  customerPhone?: string;
   totalPrice: number;
   status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'failed';
   items: {
@@ -93,6 +96,7 @@ interface Order {
   }[];
   createdAt: string;
 }
+
 
 interface Business {
   businessName: string;
@@ -494,54 +498,60 @@ export default function StoreManagementPage() {
 
 
 
-  const fetchOrders = useCallback(async (businessName: string | null, isAdmin: boolean = false) => {
-    if (!isAdmin && !businessName) {
-      setLoadingOrders(false);
-      setOrders([]); // Clear orders if no business name is available
-      return;
-    }
-    setLoadingOrders(true);
-    setOrdersError(null);
-    try {
-        // Construct URL with both deliveryOption and businessName
-        const params = new URLSearchParams({
-            deliveryOption: 'express',
-        });
-
-        if (!isAdmin && businessName) {
-            params.set('businessName', businessName);
-        }
-
-        const response = await fetch(`/api/orders?${params.toString()}`);
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to fetch orders');
-        }
-        const data = await response.json();
-
-        const transformedOrders = data.map((order: any) => ({
-            _id: order._id,
-            customerName: order.user?.name || 'N/A',
-            totalPrice: order.totalAmount || 0,
-            status: order.status?.toLowerCase() || 'pending',
-            items: (order.items || []).map((item: any) => ({
-              name: item.name || 'Unnamed Item',
-              qty: item.qty || 1,
-              amount: item.amount || item.price || 0, 
-              image: item.image || item.imageUrl || '', 
-            })),
-            createdAt: new Date(order.createdAt).toLocaleDateString(),
-        }));
-
-        setOrders(transformedOrders);
-    } catch (error) {
-        console.error('Error fetching orders:', error);
-        setOrdersError((error as Error).message);
-    } finally {
+    const fetchOrders = useCallback(async (businessName: string | null, isAdmin: boolean = false) => {
+      if (!isAdmin && !businessName) {
         setLoadingOrders(false);
-    }
-  }, []);
+        setOrders([]); // Clear orders if no business name is available
+        return;
+      }
+      setLoadingOrders(true);
+      setOrdersError(null);
+      try {
+          const params = new URLSearchParams();
+  
+          // CHANGE 1: Only filter by 'express' for non-admins.
+          if (!isAdmin) {
+              params.set('deliveryOption', 'express');
+          }
+  
+          if (!isAdmin && businessName) {
+              params.set('businessName', businessName);
+          }
+  
+          const response = await fetch(`/api/orders?${params.toString()}`);
+  
+          if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.message || 'Failed to fetch orders');
+          }
+          const data = await response.json();
+  
+          const transformedOrders = data.map((order: any) => ({
+              _id: order._id,
+              customerName: order.user?.name || 'N/A',
+              // CHANGE 2: Add customer email and phone from the user object.
+              customerEmail: order.user?.email,
+              customerPhone: order.user?.phone,
+              totalPrice: order.totalAmount || 0,
+              status: order.status?.toLowerCase() || 'pending',
+              items: (order.items || []).map((item: any) => ({
+                name: item.name || 'Unnamed Item',
+                qty: item.qty || 1,
+                amount: item.amount || item.price || 0,
+                image: item.image || item.imageUrl || '',
+              })),
+              createdAt: new Date(order.createdAt).toLocaleDateString(),
+          }));
+  
+          setOrders(transformedOrders);
+      } catch (error) {
+          console.error('Error fetching orders:', error);
+          setOrdersError((error as Error).message);
+      } finally {
+          setLoadingOrders(false);
+      }
+    }, []);
+  
 
 
 
@@ -2765,14 +2775,26 @@ useEffect(() => {
                 <Paper key={order._id} sx={{ p: 2, borderRadius: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <Box>
+                    <Box>
                         <Typography variant="body2" color="text.secondary">
                           {order.createdAt}
                         </Typography>
                         <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 0.5 }}>
                           {order.customerName}
                         </Typography>
+                        {/* CHANGE 3: Conditionally display email and phone for admins */}
+                        {isAdmin && (
+                          <Box sx={{ mt: 0.5 }}>
+                            <Typography variant="caption" color="text.secondary" component="p">
+                              {order.customerEmail}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" component="p">
+                              {order.customerPhone}
+                            </Typography>
+                          </Box>
+                        )}
                       </Box>
+
                       <Box
                         sx={{
                           color: 'white',
