@@ -160,7 +160,8 @@ export default function StoreManagementPage() {
   const [isFetchingSuggestion, setIsFetchingSuggestion] = useState(false);
   
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
-  const [rawFileContent, setRawFileContent] = useState<string>('');
+  const rawFileContentRef = useRef<string>(''); // <-- REPLACED
+
 
 
   const allBusinesses = useMemo(() => {
@@ -712,27 +713,52 @@ useEffect(() => {
   };
 
   const fetchCsvHistory = async () => {
-    if (!isAdmin) return;
+    // A guard clause to ensure non-admins don't run this without a business name
+    if (!isAdmin && !userBusinessName) {
+        setCsvFileHistory([]);
+        return;
+    }
+
     setLoadingCsvHistory(true);
     setCsvHistoryError(null);
     try {
-      const response = await fetch('/api/bulk-upload');
-      if (!response.ok) throw new Error('Failed to fetch CSV history.');
+      // This is the updated part: it calls your new, clean API route
+      const apiUrl = isAdmin 
+        ? '/api/csv-history' 
+        : `/api/csv-history?businessName=${encodeURIComponent(userBusinessName!)}`;
+
+      const response = await fetch(apiUrl);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Use the error message from the server if available
+        throw new Error(errorData.message || 'Failed to fetch CSV history.');
+      }
+      
       const data = await response.json();
+
+      // Check if the response has the 'uploads' array we expect
+      if (!Array.isArray(data.uploads)) {
+        throw new Error("Invalid history data format from server.");
+      }
+      
       const formattedData: CsvFileHistoryItem[] = data.uploads.map((upload: any) => ({
         _id: upload._id,
-        fileName: upload.fileName,
+        fileName: upload.fileName, // Field from the BulkUpload schema
         businessName: upload.businessName,
         createdAt: upload.createdAt,
         fileContent: upload.fileContent,
       }));
       setCsvFileHistory(formattedData);
+
     } catch (error) {
       setCsvHistoryError((error as Error).message);
     } finally {
       setLoadingCsvHistory(false);
     }
   };
+
+
 
   // Only run when the last tab is active
   if (selectedTab === 4) {
@@ -996,7 +1022,6 @@ useEffect(() => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // This nested function processes the data *after* it's parsed.
     const processData = (data: any[]) => {
       if (!data.length || (data.length === 1 && Object.values(data[0]).every(v => v === ""))) {
         alert("The uploaded file appears to be empty or could not be read properly. Please check the file format and content.");
@@ -1014,11 +1039,7 @@ useEffect(() => {
           }
         }
         return {
-          itemName: '',
-          activeIngredient: '',
-          category: '',
-          amount: 0,
-          imageUrl: '',
+          itemName: '', activeIngredient: '', category: '', amount: 0, imageUrl: '',
           ...normalizedRow,
           info: normalizedRow.info || '',
           POM: normalizedRow.POM || false,
@@ -1033,41 +1054,21 @@ useEffect(() => {
 
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
-    // --- FIX: This logic is being updated to read the raw file content first ---
-if (fileExtension === 'csv' || fileExtension === 'txt') {
-  const reader = new FileReader();
-
-  // This function runs after the file has been successfully read
-  reader.onload = (e) => {
-    const fileText = e.target?.result as string;
-
-    // **THIS IS THE KEY ADDITION:** We save the raw file text to our state
-    setRawFileContent(fileText); 
-
-    // Now, we continue to parse the text to show the preview, just like before.
-    Papa.parse(fileText, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (result) => processData(result.data),
-      error: (error: any) => {
-        console.error("CSV parsing error:", error);
-        alert("Failed to parse CSV file. Please check the file for formatting issues.");
-      }
-    });
-  };
-
-  // If there's an error reading the file, we log it.
-  reader.onerror = (error) => {
-      console.error("Error reading file:", error);
-      alert("Could not read the selected file.");
-  };
-
-  // This starts the process of reading the file as text.
-  reader.readAsText(file);
-
-} else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-
-      // This part for Excel remains the same, as it's already robust.
+    if (fileExtension === 'csv' || fileExtension === 'txt') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const fileText = e.target?.result as string;
+        rawFileContentRef.current = fileText; // Use ref
+        Papa.parse(fileText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (result) => processData(result.data),
+          error: (error: any) => { console.error("CSV parsing error:", error); alert("Failed to parse CSV file."); }
+        });
+      };
+      reader.onerror = (error) => { console.error("Error reading file:", error); alert("Could not read the selected file."); };
+      reader.readAsText(file);
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
@@ -1075,6 +1076,10 @@ if (fileExtension === 'csv' || fileExtension === 'txt') {
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
+          
+          const csvString = XLSX.utils.sheet_to_csv(worksheet);
+          rawFileContentRef.current = csvString; // Use ref
+          
           const json = XLSX.utils.sheet_to_json(worksheet);
           processData(json);
         } catch (error: any) {
@@ -1082,179 +1087,117 @@ if (fileExtension === 'csv' || fileExtension === 'txt') {
           alert("Failed to parse Excel file. It might be corrupted or in an unsupported format.");
         }
       };
+      reader.onerror = (error) => { console.error("Error reading file:", error); alert("Could not read the selected Excel file."); };
       reader.readAsArrayBuffer(file);
     } else {
-      alert(`Unsupported file type: .${fileExtension}. Please upload a CSV or Excel file.`);
+      alert(`Unsupported file type: .${fileExtension}. Please upload a CSV, TXT, XLS, or XLSX file.`);
+    }
+  };
+
+  const handleConfirmBulkUpload = async () => {
+    console.log("--- [FRONTEND DEBUG] 1. Confirm button clicked. ---");
+    const targetBusiness = (isAdmin && selectedBusinessForUpload) ? selectedBusinessForUpload : userBusinessName;
+    const file = fileInputRef.current?.files?.[0];
+    const fileName = file?.name;
+    const fileContent = rawFileContentRef.current; // Read from ref
+
+    if (!file || !fileName || !fileContent || !targetBusiness) {
+        console.error('--- [FRONTEND DEBUG] 2. VALIDATION FAILED ---', {
+            hasFile: !!file,
+            hasFileName: !!fileName,
+            hasFileContent: fileContent.length > 0,
+            hasTargetBusiness: !!targetBusiness
+        });
+        alert('Upload data is incomplete. Please try re-uploading the file.');
+        return;
+    }
+    
+    console.log('--- [FRONTEND DEBUG] 2. All data seems ready.', { fileName, fileContentLength: fileContent.length, targetBusiness });
+
+    setIsUploading(true);
+    setShowBulkPreview(false);
+    
+    try {
+        const payload = {
+            fileName: fileName,
+            fileContent: fileContent,
+            businessName: targetBusiness,
+            coordinates: location,
+        };
+
+        const payloadString = JSON.stringify(payload);
+        const payloadSizeInBytes = new TextEncoder().encode(payloadString).length;
+        const payloadSizeInMB = payloadSizeInBytes / 1024 / 1024;
+        
+        console.log(`--- [FRONTEND DEBUG] 3. Payload created. Size: ${payloadSizeInBytes} bytes (~${payloadSizeInMB.toFixed(3)} MB).`);
+        
+        if (payloadSizeInMB > 4) {
+            console.warn(`--- [FRONTEND DEBUG] WARNING: Payload size is > 4MB. This is likely to fail on the server.`);
+        }
+
+        console.log("--- [FRONTEND DEBUG] 4. Sending request...");
+        const response = await fetch('/api/bulk-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payloadString,
+        });
+
+        console.log("--- [FRONTEND DEBUG] 5. Received response:", { status: response.status, ok: response.ok });
+        const result = await response.json();
+        console.log("--- [FRONTEND DEBUG] 6. Parsed response JSON:", result);
+
+        if (!response.ok) {
+            throw new Error(result.details || result.message || 'Server responded with an error.');
+        }
+        
+        console.log('--- [FRONTEND DEBUG] 7. Upload appears successful.');
+        setStockData(prev => [...result.savedProducts, ...prev]);
+        const publishedCount = result.savedProducts?.filter((p: any) => p.enrichmentStatus === 'completed').length || 0;
+        setUploadSuccessInfo({ totalSaved: result.savedProducts.length, publishedCount: publishedCount });
+        if (result.errors && result.errors.length > 0) {
+            setUploadResult({ message: result.message, warnings: [], errors: result.errors });
+        }
+
+         // --- THE FIX: Re-added the enrichment trigger loop ---
+         const draftsToEnrich = result.savedProducts?.filter((p: any) => p.enrichmentStatus === 'pending') || [];
+         if (draftsToEnrich.length > 0) {
+             logAction('BULK_ENRICH_START', 'INFO', `Triggering enrichment for ${draftsToEnrich.length} new drafts.`);
+             // This runs in the background and does not block the UI
+             (async () => {
+                 for (const draft of draftsToEnrich) {
+                     try {
+                         // "Ping" the enrichment endpoint for each new draft
+                         fetch('/api/stock/enrich-and-upload', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({ productId: draft._id }),
+                         });
+                     } catch (err) {
+                         console.error(`Failed to trigger enrichment for product ID ${draft._id}:`, err);
+                     }
+                 }
+             })();
+         }
+         // --- END OF FIX ---
+
+    } catch (error: any) {
+        console.error("--- [FRONTEND DEBUG] CATCH BLOCK ---", error);
+        alert(`Upload Failed: ${error.message}`);
+    } finally {
+        console.log("--- [FRONTEND DEBUG] FINALLY BLOCK ---");
+        setIsUploading(false);
+        setRawBulkData([]);
+        rawFileContentRef.current = ''; 
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
     }
   };
 
 
-  // --- TYPE DEFINITIONS FOR BATCH PROCESSING ---
-interface FulfilledResult {
-  status: 'fulfilled';
-  value: { savedProduct: any };
-  originalRow: any;
-}
-
-interface RejectedResult {
-  status: 'rejected';
-  reason: { message?: string };
-  originalRow: any;
-}
-
-type SettledResult = FulfilledResult | RejectedResult;
-// --- END TYPE DEFINITIONS ---
 
 
 
-
-const handleConfirmBulkUpload = async () => {
-  // Determine the target business for the upload
-  const targetBusiness = (isAdmin && selectedBusinessForUpload) ? selectedBusinessForUpload : userBusinessName;
-  let targetCoordinates = location;
-  const fileName = fileInputRef.current?.files?.[0]?.name || 'uploaded_file';
-
-  // Find coordinates if admin is uploading for another business
-  if (isAdmin && selectedBusinessForUpload) {
-      const selectedBiz = allBusinesses.find((b: any) => b.businessName === selectedBusinessForUpload);
-      if (selectedBiz) {
-          targetCoordinates = selectedBiz.coordinates;
-      }
-  }
-
-  if (!rawBulkData.length || !targetBusiness) {
-      alert('No data to upload or target business not specified.');
-      return;
-  }
-
-  // --- 1. Set UI to "uploading" state and add initial log ---
-  console.log('[handleConfirmBulkUpload] Step 1: Initiating upload process...');
-  setIsUploading(true);
-  setShowBulkPreview(false);
-  setUploadSuccessInfo(null);
-  setUploadResult(null); // Clear previous results
-  const totalItems = rawBulkData.length;
-  console.log(`[handleConfirmBulkUpload] Found ${totalItems} items to upload for business: ${targetBusiness}`);
-
-  logAction('BULK_UPLOAD_START', 'INFO', `User initiated bulk upload of ${totalItems} items.`, { type: 'Business', name: targetBusiness });
-
-  try {
-
-    if (rawFileContent) {
-      fetch('/api/save-csv', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              fileName: fileName,
-              fileContent: rawFileContent,
-              businessName: targetBusiness,
-          }),
-      }).catch(err => {
-          // Log the error but don't block the user.
-          console.error("Failed to save CSV history:", err); 
-      });
-  }
-      // --- 2. Send the ENTIRE file data in a SINGLE request ---
-      console.log('[handleConfirmBulkUpload] Step 2: Sending data to /api/bulk-upload...');
-      const response = await fetch('/api/bulk-upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              fileName: fileName,
-              products: rawBulkData, // Send the raw parsed data
-              businessName: targetBusiness,
-              coordinates: targetCoordinates,
-          }),
-      });
-
-      console.log('[handleConfirmBulkUpload] Received response from /api/bulk-upload.');
-      const result = await response.json();
-      console.log('[DEBUG] Full content of first saved product:', result.savedProducts[0]);
-
-      if (!response.ok) {
-          // Throw an error that will be caught by the 'catch' block
-          console.error('[handleConfirmBulkUpload] Server returned an error:', result);
-          throw new Error(result.details || result.message || 'An unknown error occurred on the server.');
-      }
-
-      console.log('[handleConfirmBulkUpload] Step 3: Processing successful response from server.', result);
-
-      // --- 3. Process the successful response from the new API ---
-      // Update the main stock data list with the newly added products
-      if (result.savedProducts && result.savedProducts.length > 0) {
-          console.log(`[handleConfirmBulkUpload] Adding ${result.savedProducts.length} new products to local stock data.`);
-          setStockData(prev => [...result.savedProducts, ...prev]);
-      }
-
-      // Correctly count published vs. drafts from the response
-      const publishedCount = result.savedProducts?.filter((p: any) => p.enrichmentStatus === 'completed').length || 0;
-      const draftCount = result.savedProducts?.filter((p: any) => p.enrichmentStatus === 'pending').length || 0;
-
-      // Set the success info for the friendly alert at the top of the page
-      setUploadSuccessInfo({
-          totalSaved: result.savedProducts.length,
-          publishedCount: publishedCount,
-      });
-
-      // Set results for the detailed error/warning box if there are any
-      if (result.errors && result.errors.length > 0) {
-          console.warn(`[handleConfirmBulkUpload] Upload completed with ${result.errors.length} errors.`);
-          setUploadResult({
-              message: result.message,
-              warnings: [], // The new API doesn't produce warnings in the same way
-              errors: result.errors,
-          });
-      }
-
-      logAction('BULK_UPLOAD_COMPLETE', result.errors.length > 0 ? 'PARTIAL' : 'SUCCESS', `Upload finished. Published: ${publishedCount}, Drafts: ${draftCount}.`, { type: 'Business', name: targetBusiness });
-
-            // --- 4. Trigger the background enrichment process for each draft ---
-            const draftsToEnrich = result.savedProducts?.filter((p: any) => p.enrichmentStatus === 'pending') || [];
-      
-            if (draftsToEnrich.length > 0) {
-              console.log(`[handleConfirmBulkUpload] Step 4: Found ${draftsToEnrich.length} new drafts. Triggering background enrichment for each.`);
-              
-              // Asynchronously trigger enrichment for each draft
-              (async () => {
-                for (const draft of draftsToEnrich) {
-                  try {
-                    // We send a "fire-and-forget" request for each one.
-                    // We don't need to wait for the result here.
-                    fetch('/api/stock/enrich-and-upload', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ productId: draft._id }),
-                    });
-                  } catch (err) {
-                    // Log an error if the fetch call itself fails, but don't stop the others.
-                    console.error(`[handleConfirmBulkUpload] Failed to send enrichment trigger for product ${draft._id}:`, err);
-                  }
-                }
-              })();
-              console.log('[handleConfirmBulkUpload] All enrichment triggers have been sent.');
-      
-            } else {
-              console.log('[handleConfirmBulkUpload] Step 4: No drafts were created. Skipping enrichment trigger.');
-            }
-      
-
-  } catch (error: any) {
-      // --- 5. Handle any network or server errors ---
-      console.error("[handleConfirmBulkUpload] Step 5: An error occurred during the upload process.", error);
-      alert(`Upload Failed: ${error.message}`);
-      logAction('BULK_UPLOAD_COMPLETE', 'FAILURE', `Bulk upload failed. Error: ${error.message}`, { type: 'Business', name: targetBusiness });
-
-  } finally {
-      // --- 6. Reset the UI regardless of success or failure ---
-      console.log('[handleConfirmBulkUpload] Step 6: Finalizing UI state.');
-      setIsUploading(false);
-      setBulkData([]);
-      setRawBulkData([]);
-      if (fileInputRef.current) {
-          fileInputRef.current.value = ""; // Clear the file input
-      }
-  }
-};
 
 
 

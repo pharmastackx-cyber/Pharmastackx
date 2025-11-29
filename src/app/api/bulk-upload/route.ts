@@ -1,9 +1,9 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
 import BulkUpload from '@/models/BulkUpload';
 import Product, { IProduct } from '@/models/Product';
 import Fuse from 'fuse.js';
+import Papa from 'papaparse';
 
 // Helper to find a value by case-insensitive key search
 const findValueByKey = (obj: any, possibleKeys: string[]): any => {
@@ -22,8 +22,8 @@ const findValueByKey = (obj: any, possibleKeys: string[]): any => {
 
 export async function GET(req: NextRequest) {
   await dbConnect();
-  const { searchParams } = new URL(req.url);
-  const businessName = searchParams.get('businessName');
+  const businessName = req.nextUrl.searchParams.get("businessName");
+
   if (!businessName) {
     return NextResponse.json({ message: 'businessName query parameter is required' }, { status: 400 });
   }
@@ -42,21 +42,31 @@ export async function POST(req: NextRequest) {
   await dbConnect();
 
   try {
-    const { fileName, products: rawProducts, businessName, coordinates, fileContent } = await req.json();
+    const { fileName, fileContent, businessName, coordinates } = await req.json();
 
-
-    if (!fileName || !Array.isArray(rawProducts) || !businessName) {
-      return NextResponse.json({ message: 'fileName, businessName, and a products array are required' }, { status: 400 });
-    }
-    if (rawProducts.length === 0) {
-       return NextResponse.json({ message: 'Cannot process an empty list of products.' }, { status: 400 });
+    if (!fileName || !fileContent || !businessName) {
+      return NextResponse.json({ message: 'Server validation failed: fileName, fileContent, and businessName are required.' }, { status: 400 });
     }
 
+    const parseResult = Papa.parse(fileContent, {
+      header: true,
+      skipEmptyLines: true,
+    });
+    
+    const rawProducts = parseResult.data as any[];
+
+    if (!rawProducts || rawProducts.length === 0) {
+        return NextResponse.json({ message: 'The provided file content is empty or could not be parsed on the server.' }, { status: 400 });
+    }
+
+    // --- THE PERMANENT FIX ---
     const bulkUpload = await BulkUpload.create({
-      csvName: fileName,
+      fileName: fileName,       // Corrected field name
+      fileContent: fileContent,   // Added the missing required field
       itemCount: rawProducts.length,
       businessName: businessName,
     });
+    // --- END OF FIX ---
 
     const allDbProducts = await Product.find({}, 'itemName activeIngredient category POM info imageUrl').lean();
 
@@ -71,14 +81,12 @@ export async function POST(req: NextRequest) {
     let highConfidenceMatches = 0;
     let lowConfidenceDrafts = 0;
 
-    console.log("--- [BULK UPLOAD DEBUG] Starting item processing... ---");
-
-    for (const [index, rawItem] of rawProducts.entries()) {
+    for (const rawItem of rawProducts) {
       const itemName = findValueByKey(rawItem, ['item name', 'product', 'name', 'item', 'product name']);
       const itemAmount = Number(findValueByKey(rawItem, ['amount', 'price', 'sellingprice', '₦'])) || 0;
 
       if (!itemName || String(itemName).trim() === '') {
-        errors.push({ message: `Missing 'Item Name' in one row.`, item: { row: index + 2 } });
+        errors.push({ message: `Missing 'Item Name' in one row.`, item: rawItem });
         continue;
       }
 
@@ -87,9 +95,6 @@ export async function POST(req: NextRequest) {
       const topMatch = results.length > 0 ? results[0] : null;
 
       const isHighConfidence = topMatch && topMatch.score != null && topMatch.score <= 0.01;
-
-      // ** NEW DEBUG LOGGING **
-      console.log(`[DEBUG] Item: "${trimmedItemName}" | Match Score: ${topMatch?.score ?? 'N/A'} | High Confidence?: ${isHighConfidence}`);
 
       if (isHighConfidence) {
         highConfidenceMatches++;
@@ -125,12 +130,10 @@ export async function POST(req: NextRequest) {
           info: '',
           coordinates: coordinates || '',
           bulkUploadId: bulkUpload._id,
-          enrichmentStatus: 'pending', // This should now work as expected.
+          enrichmentStatus: 'pending',
         });
       }
     }
-
-    console.log("--- [BULK UPLOAD DEBUG] Finished item processing. Saving to database... ---");
 
     const savedDocsFromDb: IProduct[] = [];
     if (productsToCreate.length > 0) {

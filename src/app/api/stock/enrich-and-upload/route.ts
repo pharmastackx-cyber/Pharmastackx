@@ -10,11 +10,10 @@ import { isValidObjectId } from 'mongoose';
 const fullEnrichmentPrompt = `
 You are an expert pharmaceutical data analyst. Your task is to fully enrich a new, unknown product based on its name. Follow these rules:
 1.  **ANALYZE RAW DATA:** You will get a <RAW_INVENTORY_DATA> JSON object.
-2.  **EXTRACT CORE INFO:** The user's file is the source of truth for price and stock.
-    *   \`amount_in_stock\`: Find the quantity (e.g., from 'stock', 'quantity'). Must be an integer.
-    *   \`amount\`: Find the price (e.g., from 'price', 'amount', '₦'). Must be a number.
+2.  **EXTRACT CORE INFO:** The user's file is the source of truth for name of the drug , price and stock, never change those.
+   
 3.  **ENRICH FROM KNOWLEDGE:** Based on the product name, fill in the details.
-    *   \`cleaned_name\`: The proper, full product name. Do not change key details.
+    .
     *   \`active_ingredient\`: The main active ingredient(s).
     *   \`drug_class\`: The pharmaceutical class.
     *   \`unit_form\`: The product's packaging form (e.g., "Box of 30 tablets", "500ml bottle").
@@ -24,13 +23,12 @@ You are an expert pharmaceutical data analyst. Your task is to fully enrich a ne
 
 Required JSON Output:
 {
-  "cleaned_name": "string",
+  
   "active_ingredient": "string",
   "drug_class": "string",
   "unit_form": "string",
   "is_pom": "boolean",
-  "amount_in_stock": "number",
-  "amount": "number",
+  
   "found_image_url": "string"
 }`;
 
@@ -38,7 +36,7 @@ const validationPrompt = `
 You are an expert pharmaceutical data analyst. Your task is to validate a user's product against a potential database match that has a medium confidence score.
 1.  **ANALYZE DATA:** You will get <RAW_INVENTORY_DATA> from the user and a <DATABASE_MATCH> from our system.
 2.  **PRIORITIZE DATABASE:** The <DATABASE_MATCH> is likely correct. Use its 'active_ingredient', 'drug_class', and 'unit_form' unless they are clearly wrong.
-3.  **CLEAN USER'S NAME:** Clean up the user's item name from <RAW_INVENTORY_DATA> to create 'cleaned_name'.
+3.  **CLEAN USER'S NAME:** Clean up the user's item name from <RAW_INVENTORY_DATA> to create 'cleaned_name', but almost always never change the name.
 4.  **EXTRACT USER'S DATA:** The user's file is the source of truth for 'amount' and 'amount_in_stock'.
 5.  **CONFIDENCE & PUBLISH:** Based on your analysis, set 'is_published' to true if you are confident the match is correct, otherwise false.
 6.  **DO NOT FIND IMAGE:** You do not need to find an image.
@@ -46,13 +44,12 @@ You are an expert pharmaceutical data analyst. Your task is to validate a user's
 
 Required JSON Output:
 {
-  "cleaned_name": "string",
+  
   "active_ingredient": "string",
   "drug_class": "string",
   "unit_form": "string",
   "is_pom": "boolean",
-  "amount_in_stock": "number",
-  "amount": "number",
+  
   "is_published": "boolean"
 }`;
 
@@ -126,6 +123,13 @@ async function enrichProduct(product: IProduct, genAI: GoogleGenerativeAI): Prom
 
 
 export async function GET(req: NextRequest) {
+
+
+    // --- NEW DEBUG LOG ---
+    console.log("\n\n--- [ENRICHMENT WORKER] The GET endpoint has been triggered! Attempting to start the loop. ---\n");
+    // --- END NEW DEBUG LOG ---
+
+
     await dbConnect();
 
     try {
@@ -147,7 +151,9 @@ export async function GET(req: NextRequest) {
     try {
         
         while (true) {
-            const productsToProcess = await Product.find({ enrichmentStatus: 'pending' }).limit(BATCH_SIZE);
+            // New code (around line 150)
+const productsToProcess = await Product.find({ enrichmentStatus: { $in: ['pending', 'failed'] } }).limit(BATCH_SIZE);
+
 
             if (productsToProcess.length === 0) {
                 console.log('[Gatekeeper-GET] No more pending products to enrich. Process finished.');
@@ -164,10 +170,13 @@ export async function GET(req: NextRequest) {
                     const updateData = await enrichProduct(product, genAI);
                     await Product.updateOne({ _id: product._id }, { $set: updateData });
                     console.log(`[Gatekeeper-Worker] Successfully enriched: "${product.itemName}"`);
-                } catch (itemError: any) {
-                    console.error(`[Gatekeeper-Worker] Failed to process product ID ${product._id}. Error: ${itemError.message}`);
-                    await Product.updateOne({ _id: product._id }, { $set: { enrichmentStatus: 'completed', category: 'Enrichment-Failed' } });
-                }
+                // New code (around line 166)
+} catch (itemError: any) {
+    console.error(`[Gatekeeper-Worker] FAILED to process "${product.itemName}". Error: ${itemError.message}`);
+    // This is the key change:
+    await Product.updateOne({ _id: product._id }, { $set: { enrichmentStatus: 'failed' } });
+}
+
             }
         
 
