@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ['admin', 'customer', 'pharmacy', 'clinic', 'vendor', 'agent'],
+    enum: ['admin', 'customer', 'pharmacy', 'clinic', 'vendor', 'agent', 'pharmacist'],
     required: true
   },
   businessName: { type: String },
@@ -15,6 +15,10 @@ const userSchema = new mongoose.Schema({
   state: { type: String },
   city: { type: String },
   phoneNumber: { type: String },
+  mobile: { type: String },
+  licenseNumber: { type: String },
+  stateOfPractice: { type: String },
+  pharmacy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   createdAt: { type: Date, default: Date.now }
 });
 

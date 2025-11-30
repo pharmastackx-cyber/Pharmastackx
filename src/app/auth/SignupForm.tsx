@@ -1,8 +1,9 @@
 'use client';
-import React, { useState } from "react";
-import { TextField, Button, MenuItem, Box, Typography, InputAdornment, IconButton } from "@mui/material";
+import React, { useState, useEffect, useCallback } from "react";
+import { TextField, Button, MenuItem, Box, Typography, InputAdornment, IconButton, ListSubheader } from "@mui/material";
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from "axios";
+import CreatePharmacyModal from "../components/CreatePharmacyModal";
 
 const nigerianStates = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
@@ -11,6 +12,11 @@ const nigerianStates = [
   "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto",
   "Taraba", "Yobe", "Zamfara"
 ];
+
+interface Pharmacy {
+  _id: string;
+  businessName: string;
+}
 
 export default function SignupForm({
   setError,
@@ -31,16 +37,52 @@ export default function SignupForm({
     businessAddress: "",
     phoneNumber: "",
     license: "",
+    pharmacy: "",
+    mobile: "",
+    licenseNumber: "",
+    stateOfPractice: "",
   });
   const [loading, setLoading] = useState(false);
   const [showProviderStep, setShowProviderStep] = useState(false);
   const [providerType, setProviderType] = useState("");
-  
+  const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
+  const [pharmacySearch, setPharmacySearch] = useState("");
+  const [isCreatePharmacyModalOpen, setCreatePharmacyModalOpen] = useState(false);
+
   const [providerLoading, setProviderLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const fetchPharmacies = useCallback(async () => {
+    try {
+      const { data } = await axios.get('/api/pharmacies');
+      setPharmacies(data);
+    } catch (error) {
+      console.error("Failed to fetch pharmacies", error);
+      setError("Failed to load pharmacies list.");
+    }
+  }, [setError]);
+
+  useEffect(() => {
+    if (providerType === 'pharmacist') {
+      fetchPharmacies();
+    }
+  }, [providerType, fetchPharmacies]);
+
+  const handlePharmacySearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setPharmacySearch(event.target.value);
+  };
+
+  const filteredPharmacies = pharmacies.filter(
+    (p) => p && p.businessName && p.businessName.toLowerCase().includes(pharmacySearch.toLowerCase())
+  );
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+    const { name, value } = e.target;
+    if (name === 'pharmacy' && value === 'create-new') {
+      setCreatePharmacyModalOpen(true);
+      return;
+    }
+    setForm((prevForm) => ({ ...prevForm, [name as string]: value }));
   };
 
   const handleClickShowPassword = () => setShowPassword((show) => !show);
@@ -65,21 +107,38 @@ export default function SignupForm({
 
   const providerTypes = [
     { label: "Pharmacy", value: "pharmacy" },
+    { label: "Pharmacist", value: "pharmacist" },
     { label: "Clinic", value: "clinic" },
     { label: "Vendor", value: "vendor" },
     { label: "Delivery Agent", value: "agent" },
+    
   ];
+
+  const handlePharmacyCreated = (newPharmacy: Pharmacy) => {
+    fetchPharmacies().then(() => {
+        setForm((prevForm) => ({ ...prevForm, pharmacy: newPharmacy._id }));
+        setCreatePharmacyModalOpen(false);
+    });
+  };
 
   const handleProviderSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
     setProviderLoading(true);
+
+    const { username, email, password, mobile, licenseNumber, stateOfPractice, pharmacy, businessName, state, city, businessAddress, phoneNumber, license } = form;
+
+    let payload: any = { username, email, password, role: providerType };
+
+    if (providerType === 'pharmacist') {
+      payload = { ...payload, mobile, licenseNumber, stateOfPractice, pharmacy };
+    } else {
+      payload = { ...payload, businessName, state, city, businessAddress, phoneNumber, license };
+    }
+
     try {
-      await axios.post("/api/auth/signup", {
-        ...form,
-        role: providerType,
-      });
+      await axios.post("/api/auth/signup", payload);
       onSignupSuccess(form.email, form.password);
     } catch (err: any) {
       setError(err.response?.data?.error || "Signup failed");
@@ -220,66 +279,138 @@ export default function SignupForm({
                 </MenuItem>
               ))}
             </TextField>
-            <TextField
-              label="Business Name"
-              name="businessName"
-              value={form.businessName || ""}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              required
-            />
-            <TextField
-               select
-               label="State"
-               name="state"
-               value={form.state || ""}
-               onChange={handleChange}
-               fullWidth
-               margin="normal"
-               required
-           >
-               {nigerianStates.map((state) => (
-                   <MenuItem key={state} value={state}>
-                       {state}
-                   </MenuItem>
-               ))}
-           </TextField>
-            <TextField
-              label="City"
-              name="city"
-              value={form.city || ""}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              required
-            />
-            <TextField
-              label="Business Address"
-              name="businessAddress"
-              value={form.businessAddress || ""}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              required
-            />
-            <TextField
-              label="Phone Number"
-              name="phoneNumber"
-              value={form.phoneNumber || ""}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              required
-            />
-            <TextField
-              label="License (optional)"
-              name="license"
-              value={form.license || ""}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-            />
+            
+            {providerType === 'pharmacist' && (
+              <>
+                <TextField
+                  label="Mobile"
+                  name="mobile"
+                  value={form.mobile || ""}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                />
+                <TextField
+                  label="License Number (optional)"
+                  name="licenseNumber"
+                  value={form.licenseNumber || ""}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                />
+                <TextField
+                  select
+                  label="State of Practice"
+                  name="stateOfPractice"
+                  value={form.stateOfPractice || ""}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                >
+                  {nigerianStates.map((state) => (
+                    <MenuItem key={state} value={state}>
+                      {state}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
+                  label="Pharmacy"
+                  name="pharmacy"
+                  value={form.pharmacy}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                >
+                  <ListSubheader>
+                    <TextField
+                      size="small"
+                      autoFocus
+                      placeholder="Type to search..."
+                      fullWidth
+                      value={pharmacySearch}
+                      onChange={handlePharmacySearchChange}
+                      onKeyDown={(e) => e.stopPropagation()} // Prevent dropdown from closing on keydown
+                    />
+                  </ListSubheader>
+                  <MenuItem value="create-new">+ Create New Pharmacy</MenuItem>
+                  {filteredPharmacies.map((p) => (
+                    <MenuItem key={p._id} value={p._id}>
+                      {p.businessName}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </>
+            )}
+
+            {providerType && providerType !== 'pharmacist' && (
+              <>
+                <TextField
+                  label="Business Name"
+                  name="businessName"
+                  value={form.businessName || ""}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                />
+                <TextField
+                  select
+                  label="State"
+                  name="state"
+                  value={form.state || ""}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                >
+                  {nigerianStates.map((state) => (
+                    <MenuItem key={state} value={state}>
+                      {state}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  label="City"
+                  name="city"
+                  value={form.city || ""}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                />
+                <TextField
+                  label="Business Address"
+                  name="businessAddress"
+                  value={form.businessAddress || ""}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                />
+                <TextField
+                  label="Phone Number"
+                  name="phoneNumber"
+                  value={form.phoneNumber || ""}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                />
+                <TextField
+                  label="License (optional)"
+                  name="license"
+                  value={form.license || ""}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                />
+              </>
+            )}
+
             <Button
               type="submit"
               variant="contained"
@@ -302,6 +433,12 @@ export default function SignupForm({
               Back
             </Button>
           </form>
+          <CreatePharmacyModal
+            open={isCreatePharmacyModalOpen}
+            onClose={() => setCreatePharmacyModalOpen(false)}
+            onPharmacyCreated={handlePharmacyCreated}
+            setError={setError}
+          />
         </Box>
       )}
     </>
