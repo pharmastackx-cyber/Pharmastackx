@@ -20,6 +20,10 @@ export interface IUser extends Document {
   };
   passwordResetToken?: string;
   passwordResetExpires?: Date;
+  mobile?: string;
+  stateOfPractice?: string;
+  licenseNumber?: string;
+  pharmacy?: string;
 }
 
 // The schema defines the blueprint for the database
@@ -49,7 +53,10 @@ const userSchema: Schema<IUser> = new mongoose.Schema({
   },
   passwordResetToken: { type: String },
   passwordResetExpires: { type: Date },
-
+  mobile: { type: String },
+  stateOfPractice: { type: String },
+  licenseNumber: { type: String },
+  pharmacy: { type: String },
 });
 
 // This line creates the model

@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
@@ -54,15 +55,20 @@ export async function middleware(request: NextRequest) {
     }
 
     // --- Role-based access control ---
-    console.log(`[Middleware] Protected Route: ${pathname}, User Role: ${payload.role}`);
+    let effectiveRole = payload.role;
+    if (effectiveRole === 'pharmacist') {
+      effectiveRole = 'pharmacy';
+    }
 
-    if (pathname.startsWith('/admin') && payload.role !== 'admin') {
+    console.log(`[Middleware] Protected Route: ${pathname}, User Role: ${payload.role}, Effective Role: ${effectiveRole}`);
+
+    if (pathname.startsWith('/admin') && effectiveRole !== 'admin') {
       return NextResponse.redirect(new URL('/', request.url));
     }
 
     if (pathname.startsWith('/business') || pathname.startsWith('/store-management')) {
       const allowedRoles = ['pharmacy', 'vendor', 'admin', 'stockManager'];
-      if (!allowedRoles.includes(payload.role)) {
+      if (!allowedRoles.includes(effectiveRole)) {
         return NextResponse.redirect(new URL('/', request.url));
       }
     }
