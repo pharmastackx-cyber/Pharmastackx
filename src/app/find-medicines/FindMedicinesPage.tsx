@@ -1,3 +1,4 @@
+
 'use client'
 
 import {
@@ -19,6 +20,7 @@ import {
   Snackbar,
   Alert,
   Chip,
+  Button,
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import {
@@ -27,12 +29,13 @@ import {
   Add,
   Close,
 } from '@mui/icons-material';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import { useCart } from '../../contexts/CartContext';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { event } from '../../lib/gtag';
-
+import { debounce } from 'lodash';
+import FileUploader from "../../components/FileUploader";
 
 
 // --- CONFIGURATION --- //
@@ -57,20 +60,6 @@ const haversineDistance = (coords1: { lat: number; lon: number }, coords2: { lat
   return d; // returns distance in km
 };
 
-// --- Fisher-Yates Shuffle Algorithm --- //
-const shuffle = (array: any[]) => {
-  let currentIndex = array.length, randomIndex;
-
-  while (currentIndex !== 0) {
-    randomIndex = Math.floor(Math.random() * currentIndex);
-    currentIndex--;
-
-    [array[currentIndex], array[randomIndex]] = [
-      array[randomIndex], array[currentIndex]];
-  }
-
-  return array;
-};
 
 const modalStyle = {
   position: 'absolute' as 'absolute',
@@ -88,33 +77,86 @@ const modalStyle = {
 };
 
 export default function FindMedicinesPage() {
-
   const searchParams = useSearchParams();
+  const router = useRouter();
   const slug = searchParams.get('slug') || '';
-
-
-  const [allMedicines, setAllMedicines] = useState<any[]>([]);
-  const [processedMedicines, setProcessedMedicines] = useState<any[]>([]);
+  
+  const [medicines, setMedicines] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const initialSearch = searchParams.get('search') || '';
-
   const [searchQuery, setSearchQuery] = useState(initialSearch);
-
   const [sortBy, setSortBy] = useState('recommended');
-
   const [filterBy, setFilterBy] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalProducts, setTotalProducts] = useState(0);
+
+  const itemsPerPage = 12;
   const { addToCart } = useCart();
 
   const [selectedMedicine, setSelectedMedicine] = useState<any | null>(null);
+  const [isPrescriptionModalOpen, setIsPrescriptionModalOpen] = useState(false);
+  const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
+  const [prescriptionMessage, setPrescriptionMessage] = useState("");
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   const drugClasses = ['all', 'Analgesic', 'Antibiotic', 'Antimalarial', 'Antifungal', 'Vitamin', 'NSAID', 'Antidiabetic'];
+
+  
+  const fetchMedicines = useCallback(debounce(async (page: number, search: string, filter: string, sort: string) => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: itemsPerPage.toString(),
+        search,
+        drugClass: filter,
+        sortBy: sort,
+      });
+      if (slug) params.append('slug', slug);
+
+      const response = await fetch(`/api/products?${params.toString()}`);
+      if (!response.ok) throw new Error(`Failed to fetch products. Status: ${response.status}`);
+      
+      const data = await response.json();
+      if (data.success) {
+        let processed = data.data;
+        if (userLocation) {
+          processed = data.data.map((m:any) => {
+            if (m.pharmacyCoordinates) {
+              const distance = haversineDistance(userLocation, m.pharmacyCoordinates);
+              const travelTime = distance != null ? (distance / AVERAGE_TRAVEL_SPEED_KMH) * 60 : null;
+              return { ...m, distance, travelTime };
+            } 
+            return { ...m, distance: null, travelTime: null };
+          });
+        }
+
+        if (sort === 'distance' && userLocation) {
+            processed.sort((a:any, b:any) => {
+                if (a.distance === null) return 1;
+                if (b.distance === null) return -1;
+                return a.distance - b.distance;
+            });
+        }
+
+        setMedicines(processed);
+        setTotalPages(data.pagination.totalPages);
+        setTotalProducts(data.pagination.totalProducts);
+      } else {
+        throw new Error(data.error || 'An unknown error occurred');
+      }
+    } catch (err: any) {
+      console.error('Error fetching medicines:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, 500), [slug, itemsPerPage, userLocation]);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -128,7 +170,7 @@ export default function FindMedicinesPage() {
           setLocationError(null);
         },
         (error) => {
-          setLocationError("Location access denied. Distances cannot be calculated.");
+          setLocationError("Location access denied. Distances may not be calculated.");
         }
       );
     } else {
@@ -136,171 +178,76 @@ export default function FindMedicinesPage() {
     }
   }, []);
 
- 
   useEffect(() => {
-    const fetchMedicines = async () => {
-      try {
-        setIsLoading(true);
-        const apiUrl = slug ? `/api/products?slug=${slug}` : '/api/products';
-        
-        const response = await fetch(apiUrl);
-        if (!response.ok) throw new Error(`Failed to fetch products. Status: ${response.status}`);
-        
-        const data = await response.json();
-        if (data.success) {
-          setAllMedicines(data.data);
-        } else {
-          throw new Error(data.error || 'An unknown error occurred');
-        }
-      } catch (err: any) {
-        console.error('Error fetching medicines:', err);
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchMedicines();
-  }, [slug]);
+    fetchMedicines(currentPage, searchQuery, filterBy, sortBy);
+  }, [currentPage, searchQuery, filterBy, sortBy, fetchMedicines]);
 
   useEffect(() => {
-    if (allMedicines.length === 0 && isLoading) return;
-
-    let medicinesToProcess = allMedicines.map(m => ({ ...m, distance: null, travelTime: null }));
-
-    if (userLocation) {
-      medicinesToProcess = medicinesToProcess.map(medicine => {
-        if (medicine.pharmacyCoordinates && typeof medicine.pharmacyCoordinates.lat === 'number' && typeof medicine.pharmacyCoordinates.lon === 'number') {
-          const distance = haversineDistance(userLocation, medicine.pharmacyCoordinates);
-          const travelTime = distance ? (distance / AVERAGE_TRAVEL_SPEED_KMH) * 60 : null;
-          return { ...medicine, distance, travelTime };
-        }
-        return medicine;
-      });
+    if (searchQuery) {
+      event({ action: 'search', category: 'engagement', label: searchQuery });
     }
-    setProcessedMedicines(medicinesToProcess);
-
-  }, [userLocation, allMedicines, isLoading]);
-
-  useEffect(() => {
-
-    const handler = setTimeout(() => {
-      const trimmedQuery = searchQuery.trim();
-      if (trimmedQuery) {
-        event({
-          action: 'search',
-          category: 'engagement',
-          label: trimmedQuery,
-        });
-      }
-    }, 500);
-
-    return () => {
-      clearTimeout(handler);
-    };
   }, [searchQuery]);
 
   useEffect(() => {
-
     if (slug) {
-      event({
-        action: 'visit_pharmacy_subdomain',
-        category: 'acquisition',
-        label: slug, 
-      });
+      event({ action: 'visit_pharmacy_subdomain', category: 'acquisition', label: slug });
     }
   }, [slug]);
 
 
   const handleOpenModal = (medicine: any) => {
-
-    event({
-      action: 'view_item',
-      category: 'ecommerce',
-      label: medicine.name,  
-      value: medicine.price  
-    });
-
+    event({ action: 'view_item', category: 'ecommerce', label: medicine.name, value: medicine.price });
     setSelectedMedicine(medicine);
   };
 
-
   const handleCloseModal = () => setSelectedMedicine(null);
   const handleSnackbarClose = () => setSnackbarOpen(false);
+  const handleOpenPrescriptionModal = () => setIsPrescriptionModalOpen(true);
+  const handleClosePrescriptionModal = () => {
+    setIsPrescriptionModalOpen(false);
+    setPrescriptionFile(null);
+    setPrescriptionMessage("");
+  }
 
   const handleAddToCart = (medicine: any) => {
-    
-    event({
-      action: 'add_to_cart',
-      category: 'ecommerce', 
-      label: medicine.name,  
-      value: medicine.price  
-    });
-    
+    event({ action: 'add_to_cart', category: 'ecommerce', label: medicine.name, value: medicine.price });
     addToCart(medicine);
     setSnackbarOpen(true);
   };
-
-  const baseFilteredMedicines = processedMedicines
-    .filter(medicine => {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch = query === '' ||
-        (medicine.name && medicine.name.toLowerCase().includes(query)) ||
-        (medicine.activeIngredients && medicine.activeIngredients.toLowerCase().includes(query)) ||
-        (medicine.drugClass && medicine.drugClass.toLowerCase().includes(query)) ||
-        (!slug && medicine.pharmacy && medicine.pharmacy.toLowerCase().includes(query));
-      const matchesClass = filterBy === 'all' ||
-        (medicine.drugClass && medicine.drugClass.toLowerCase().includes(filterBy.toLowerCase()));
-      return matchesSearch && matchesClass;
-    });
-
-  const getSortedMedicines = (medicines: any[]) => {
-    switch (sortBy) {
-      case 'name':
-        return [...medicines].sort((a, b) => a.name.localeCompare(b.name));
-      case 'price':
-        return [...medicines].sort((a, b) => a.price - b.price);
-      case 'distance':
-        return [...medicines].sort((a, b) => {
-          if (a.distance === null) return 1;
-          if (b.distance === null) return -1;
-          return a.distance - b.distance;
-        });
-      case 'recommended':
-        const isImageValid = (image: string | null | undefined) =>
-          typeof image === 'string' && (image.startsWith('http') || image.startsWith('/'));
-        const complete = medicines.filter(m => isImageValid(m.image) && m.info);
-        const incomplete = medicines.filter(m => !isImageValid(m.image) || !m.info);
-        return [...shuffle(complete), ...shuffle(incomplete)];
-      default:
-        return medicines;
-    }
+  
+  const handlePageChange = (_: React.ChangeEvent<unknown>, page: number) => {
+    setCurrentPage(page);
   };
 
-  const filteredMedicines = getSortedMedicines(baseFilteredMedicines);
+  const handleSendPrescription = () => {
+    if (!prescriptionFile) {
+        alert("Please upload a prescription image.");
+        return;
+    }
+    // This is where you would call the function to add to cart context
+    // For now, we will just navigate
+    router.push('/cart');
+    handleClosePrescriptionModal();
+  };
 
-  const paginatedMedicines = filteredMedicines.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const totalPages = Math.ceil(filteredMedicines.length / itemsPerPage);
-
-  if (isLoading) {
-    return <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Container>;
-  }
-
-  if (error) {
-    return (
-      <Container sx={{ textAlign: 'center', mt: 4 }}>
-        <Typography color="error" variant="h5">An Error Occurred</Typography>
-        <Typography color="error">{error}</Typography>
-      </Container>
-    );
-  }
 
   return (
     <>
       <Container maxWidth="lg" sx={{ mt: 0.5, mb: 1 }}>
+         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+            <Button
+                variant="contained"
+                onClick={handleOpenPrescriptionModal}
+                sx={{
+                    borderRadius: '20px',
+                    bgcolor: '#E91E63',
+                    '&:hover': { bgcolor: '#C2185B' },
+                    color: 'white'
+                }}
+            >
+                Search by Prescription
+            </Button>
+        </Box>
         <Box sx={{ mb: 1 }}>
           <TextField
             fullWidth
@@ -308,7 +255,10 @@ export default function FindMedicinesPage() {
             variant="outlined"
             size="small"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setCurrentPage(1); // Reset to first page on new search
+            }}
             InputProps={{
               startAdornment: <InputAdornment position="start"><Search sx={{ color: '#006D5B' }} /></InputAdornment>,
               sx: { borderRadius: '25px', bgcolor: 'white' }
@@ -318,7 +268,7 @@ export default function FindMedicinesPage() {
 
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 1 }}>
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <Select value={filterBy} onChange={(e) => setFilterBy(e.target.value)} displayEmpty sx={{ borderRadius: '20px' }}>
+            <Select value={filterBy} onChange={(e) => { setFilterBy(e.target.value); setCurrentPage(1); }} displayEmpty sx={{ borderRadius: '20px' }}>
               <MenuItem value="all">All Classes</MenuItem>
               {drugClasses.slice(1).map((drugClass) => (
                 <MenuItem key={drugClass} value={drugClass}>{drugClass}</MenuItem>
@@ -327,7 +277,7 @@ export default function FindMedicinesPage() {
           </FormControl>
 
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} displayEmpty sx={{ borderRadius: '20px' }}>
+            <Select value={sortBy} onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1);}} displayEmpty sx={{ borderRadius: '20px' }}>
               <MenuItem value="recommended">Recommended</MenuItem>
               <MenuItem value="name">Name</MenuItem>
               <MenuItem value="price">Price</MenuItem>
@@ -336,7 +286,7 @@ export default function FindMedicinesPage() {
           </FormControl>
 
           <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
-            {filteredMedicines.length} results
+            {totalProducts} results
           </Typography>
         </Box>
          {locationError && (
@@ -346,60 +296,76 @@ export default function FindMedicinesPage() {
         )}
       </Container>
 
-      <Container maxWidth="lg" sx={{ mb: 2, flex: 1, overflowY: 'auto' }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
-          {paginatedMedicines.map((medicine) => (
-            <Card key={medicine.id} sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: '20px', border: '2px solid #e0e0e0', bgcolor: 'white', cursor: 'pointer', transition: 'box-shadow 0.3s', '&:hover': { boxShadow: 6 } }} onClick={() => handleOpenModal(medicine)}>
-              <Box sx={{ position: 'relative', height: { xs: '100px', md: '120px' }, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f0f7f4', p: 1 }}>
-                {medicine.POM && (
-                  <Chip
-                      label="POM"
-                      color="error"
-                      size="small"
-                      sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          zIndex: 1,
-                          fontWeight: 'bold',
-                      }}
-                  />
-                )}
-                <CardMedia component="img" image={medicine.image} alt={medicine.name} sx={{ objectFit: 'contain', width: '100%', height: '100%', maxWidth: '80%' }}/>
-              </Box>
-
-              <CardContent sx={{ flexGrow: 1, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem', lineHeight: 1.2, mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{medicine.name}</Typography>
-                </Box>
-                <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700, color: '#006D5B', mb: 1 }}>{medicine.formattedPrice}</Typography>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                      <Typography title={medicine.pharmacy} variant="caption" sx={{ color: '#006D5B', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{medicine.pharmacy}</Typography>
-                      {medicine.travelTime !== null && medicine.distance !== null ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: '2px' }}>
-                          <LocationOn sx={{ fontSize: 14, color: 'text.secondary' }} />
-                          <Typography variant="caption" color="text.secondary">{medicine.travelTime.toFixed(0)} mins ({medicine.distance.toFixed(1)} km)</Typography>
-                        </Box>
-                      ) : (
-                        <Box sx={{ height: '18px' }} />
-                      )}
-                    </Box>
-                     <IconButton onClick={(e) => { e.stopPropagation(); handleAddToCart({ ...medicine, price: medicine.price }); }} sx={{ bgcolor: '#E91E63', color: 'white', width: 32, height: 32, flexShrink: 0, ml: 1, '&:hover': { bgcolor: '#C2185B' } }}>
-                      <Add sx={{ fontSize: '16px' }} />
-                    </IconButton>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
-
-        {totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-            <Pagination count={totalPages} page={currentPage} onChange={(_, page) => setCurrentPage(page)} color="primary" size="large" sx={{ '& .MuiPaginationItem-root.Mui-selected': { bgcolor: '#006D5B' } }}/>
+      <Container maxWidth="lg" sx={{ mb: 2, flex: 1 }}>
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}><CircularProgress /></Box>
+        ) : error ? (
+          <Box sx={{ textAlign: 'center', mt: 4 }}>
+            <Typography color="error" variant="h5">An Error Occurred</Typography>
+            <Typography color="error">{error}</Typography>
           </Box>
+        ): medicines.length === 0 ? (
+           <Box sx={{ textAlign: 'center', mt: 4 }}>
+            <Typography variant="h5">No Medicines Found</Typography>
+            <Typography>Try adjusting your search or filters.</Typography>
+          </Box>
+        ) : (
+          <>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+              {medicines.map((medicine) => (
+                <Card key={medicine.id} sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: '20px', border: '2px solid #e0e0e0', bgcolor: 'white', cursor: 'pointer', transition: 'box-shadow 0.3s', '&:hover': { boxShadow: 6 } }} onClick={() => handleOpenModal(medicine)}>
+                   <Box sx={{ position: 'relative', height: { xs: '100px', md: '120px' }, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f0f7f4', p: 1 }}>
+                    {medicine.POM && (
+                      <Chip
+                          label="POM"
+                          color="error"
+                          size="small"
+                          sx={{
+                              position: 'absolute',
+                              top: 8,
+                              right: 8,
+                              zIndex: 1,
+                              fontWeight: 'bold',
+                          }}
+                      />
+                    )}
+                    <CardMedia component="img" image={medicine.image} alt={medicine.name} sx={{ objectFit: 'contain', width: '100%', height: '100%', maxWidth: '80%' }}/>
+                  </Box>
+
+                  <CardContent sx={{ flexGrow: 1, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem', lineHeight: 1.2, mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{medicine.name}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="h5" sx={{ fontWeight: 700, color: '#006D5B', mb: 1 }}>{medicine.formattedPrice}</Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                          <Typography title={medicine.pharmacy} variant="caption" sx={{ color: '#006D5B', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{medicine.pharmacy}</Typography>
+                          {typeof medicine.travelTime === 'number' && typeof medicine.distance === 'number' ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: '2px' }}>
+                              <LocationOn sx={{ fontSize: 14, color: 'text.secondary' }} />
+                              <Typography variant="caption" color="text.secondary">{medicine.travelTime.toFixed(0)} mins ({medicine.distance.toFixed(1)} km)</Typography>
+                            </Box>
+                          ) : (
+                            <Box sx={{ height: '18px' }} />
+                          )}
+                        </Box>
+                         <IconButton onClick={(e) => { e.stopPropagation(); handleAddToCart({ ...medicine, price: medicine.price }); }} sx={{ bgcolor: '#E91E63', color: 'white', width: 32, height: 32, flexShrink: 0, ml: 1, '&:hover': { bgcolor: '#C2185B' } }}>
+                          <Add sx={{ fontSize: '16px' }} />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              ))}
+            </Box>
+
+            {totalPages > 1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                <Pagination count={totalPages} page={currentPage} onChange={handlePageChange} color="primary" size="large" sx={{ '& .MuiPaginationItem-root.Mui-selected': { bgcolor: '#006D5B' } }}/>
+              </Box>
+            )}
+          </>
         )}
       </Container>
 
@@ -423,7 +389,7 @@ export default function FindMedicinesPage() {
                  <Box sx={{ my: 2 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Pharmacy:</Typography>
                     <Typography variant="body1">{selectedMedicine.pharmacy}</Typography>
-                      {selectedMedicine.travelTime !== null && selectedMedicine.distance !== null && (
+                      {typeof selectedMedicine.travelTime === 'number' && typeof selectedMedicine.distance === 'number' && (
                         <Typography variant="body2" color="text.secondary">{selectedMedicine.travelTime.toFixed(0)} mins ({selectedMedicine.distance.toFixed(1)} km)</Typography>
                       )}
                 </Box>
@@ -448,6 +414,44 @@ export default function FindMedicinesPage() {
           )}
         </Box>
       </Modal>
+
+      <Modal open={isPrescriptionModalOpen} onClose={handleClosePrescriptionModal}>
+        <Box sx={modalStyle}>
+            <IconButton aria-label="close" onClick={handleClosePrescriptionModal} sx={{ position: 'absolute', right: 8, top: 8, color: (theme) => theme.palette.grey[500] }}><Close /></IconButton>
+            <Typography variant="h6" component="h2" sx={{ fontWeight: 700, color: '#006D5B', mb: 2 }}>
+                Search by Prescription
+            </Typography>
+            <FileUploader
+                onFileSelect={setPrescriptionFile}
+                onClear={() => setPrescriptionFile(null)}
+            />
+            <TextField
+                fullWidth
+                multiline
+                rows={4}
+                placeholder="Add a message (optional)"
+                value={prescriptionMessage}
+                onChange={(e) => setPrescriptionMessage(e.target.value)}
+                sx={{ mt: 2, borderRadius: '10px' }}
+            />
+            <Button
+                fullWidth
+                variant="contained"
+                onClick={handleSendPrescription}
+                disabled={!prescriptionFile}
+                sx={{
+                    mt: 2,
+                    borderRadius: '20px',
+                    bgcolor: '#006D5B',
+                    '&:hover': { bgcolor: '#004D3F' },
+                    color: 'white'
+                }}
+            >
+                Send
+            </Button>
+        </Box>
+      </Modal>
+
       <Snackbar open={snackbarOpen} autoHideDuration={3000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert onClose={handleSnackbarClose} severity="success" sx={{ width: '100%' }}>
           Item added to cart!

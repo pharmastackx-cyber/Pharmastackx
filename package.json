@@ -50,6 +50,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/lodash": "^4.17.21",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.0",
     "@types/qrcode": "^1.5.6",
