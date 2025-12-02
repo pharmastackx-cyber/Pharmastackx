@@ -1,4 +1,3 @@
-
 'use client'
 
 import {
@@ -33,6 +32,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 import { useCart } from '../../contexts/CartContext';
 import { useSearchParams, useRouter } from 'next/navigation';
+
 import { event } from '../../lib/gtag';
 import { debounce } from 'lodash';
 import FileUploader from "../../components/FileUploader";
@@ -78,9 +78,8 @@ const modalStyle = {
 
 export default function FindMedicinesPage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const slug = searchParams.get('slug') || '';
-  
+  const router = useRouter();
   const [medicines, setMedicines] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -94,7 +93,7 @@ export default function FindMedicinesPage() {
   const [totalProducts, setTotalProducts] = useState(0);
 
   const itemsPerPage = 12;
-  const { addToCart } = useCart();
+  const { addToCart } = useCart(); // Removed addPrescriptionToCart
 
   const [selectedMedicine, setSelectedMedicine] = useState<any | null>(null);
   const [isPrescriptionModalOpen, setIsPrescriptionModalOpen] = useState(false);
@@ -103,6 +102,7 @@ export default function FindMedicinesPage() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [prescriptionSent, setPrescriptionSent] = useState(false); // New state for prescription confirmation
 
   const drugClasses = ['all', 'Analgesic', 'Antibiotic', 'Antimalarial', 'Antifungal', 'Vitamin', 'NSAID', 'Antidiabetic'];
 
@@ -221,13 +221,33 @@ export default function FindMedicinesPage() {
 
   const handleSendPrescription = () => {
     if (!prescriptionFile) {
-        alert("Please upload a prescription image.");
-        return;
+      alert("Please upload a prescription image.");
+      return;
     }
-    // This is where you would call the function to add to cart context
-    // For now, we will just navigate
-    router.push('/cart');
-    handleClosePrescriptionModal();
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageUrl = event.target?.result as string;
+
+      const existingPrescriptions = JSON.parse(localStorage.getItem('prescriptions') || '[]');
+
+      const newPrescription = {
+        id: Date.now(),
+        fileName: prescriptionFile.name,
+        imageUrl,
+        message: prescriptionMessage,
+        status: 'pending',
+        timestamp: new Date().toISOString(),
+      };
+
+      existingPrescriptions.push(newPrescription);
+      localStorage.setItem('prescriptions', JSON.stringify(existingPrescriptions));
+      
+      handleClosePrescriptionModal();
+      setPrescriptionSent(true);
+    };
+
+    reader.readAsDataURL(prescriptionFile);
   };
 
 
@@ -447,7 +467,7 @@ export default function FindMedicinesPage() {
                     color: 'white'
                 }}
             >
-                Send
+                Send for Review
             </Button>
         </Box>
       </Modal>
@@ -455,6 +475,12 @@ export default function FindMedicinesPage() {
       <Snackbar open={snackbarOpen} autoHideDuration={3000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert onClose={handleSnackbarClose} severity="success" sx={{ width: '100%' }}>
           Item added to cart!
+        </Alert>
+      </Snackbar>
+
+      <Snackbar open={prescriptionSent} autoHideDuration={6000} onClose={() => setPrescriptionSent(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={() => setPrescriptionSent(false)} severity="success" sx={{ width: '100%' }}>
+            Prescription sent for review! A pharmacist will contact you shortly.
         </Alert>
       </Snackbar>
     </>

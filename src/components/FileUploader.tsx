@@ -2,7 +2,7 @@
 
 import { Box, Button, Typography, IconButton } from "@mui/material";
 import { AddAPhoto, CameraAlt, Clear } from "@mui/icons-material";
-import { useRef, useState, useEffect, ChangeEvent } from "react";
+import { useRef, useState, ChangeEvent } from "react";
 
 interface FileUploaderProps {
     onFileSelect: (file: File) => void;
@@ -11,15 +11,8 @@ interface FileUploaderProps {
 
 export default function FileUploader({ onFileSelect, onClear }: FileUploaderProps) {
     const [file, setFile] = useState<File | null>(null);
-    const [captureMode, setCaptureMode] = useState<'user' | 'environment'>('environment');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        // This code runs only on the client, after the component has mounted.
-        const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        setCaptureMode(isMobile ? 'environment' : 'user');
-    }, []); // The empty dependency array ensures this runs only once.
 
     const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         if (event.target.files) {
@@ -34,6 +27,7 @@ export default function FileUploader({ onFileSelect, onClear }: FileUploaderProp
     const handleClear = () => {
         setFile(null);
         onClear();
+        // Also clear the input value so the same file can be selected again
         if (fileInputRef.current) fileInputRef.current.value = "";
         if (cameraInputRef.current) cameraInputRef.current.value = "";
     };
@@ -52,6 +46,7 @@ export default function FileUploader({ onFileSelect, onClear }: FileUploaderProp
                     }
                 }}
             >
+                {/* Hidden input for file gallery selection */}
                 <input
                     type="file"
                     accept="image/*"
@@ -59,10 +54,11 @@ export default function FileUploader({ onFileSelect, onClear }: FileUploaderProp
                     ref={fileInputRef}
                     style={{ display: 'none' }}
                 />
+                {/* Hidden input for camera selection */}
                 <input
                     type="file"
                     accept="image/*"
-                    capture={captureMode} // Dynamically set based on device type
+                    capture="environment"
                     onChange={handleFileChange}
                     ref={cameraInputRef}
                     style={{ display: 'none' }}

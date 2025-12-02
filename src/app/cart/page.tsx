@@ -51,6 +51,7 @@ export const dynamic = "force-dynamic";
 export default function Cart() {
   const { user } = useSession();
   const { items, updateQuantity, removeFromCart, clearCart } = useCart();
+  
   const { activePromo, applyPromo, removePromo, validatePromo, calculateDiscount } = usePromo();
   const { addOrder } = useOrders();
   const router = useRouter();

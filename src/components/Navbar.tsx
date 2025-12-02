@@ -88,6 +88,12 @@ export default function Navbar() {
   const drawerAdminLinks = isAdmin ? (
     <>
         <ListItem disablePadding sx={{ mb: 0.5 }}>
+          <ListItemButton component={Link} href="/admin/prescription-review" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/admin/prescription-review') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+            <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><Article fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Review" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/admin/delivery-agents" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/admin/delivery-agents') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
             <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><Security fontSize="small" /></ListItemIcon>
             <ListItemText primary="Agent Management" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
@@ -240,8 +246,9 @@ export default function Navbar() {
 
   const desktopAdminLinks = isAdmin ? (
     <>
-      
-
+      <Button color="inherit" startIcon={<Article />} component={Link} href="/admin/prescription-review" sx={{ bgcolor: isActive('/admin/prescription-review') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
+        Prescription Review
+      </Button>
       <Button color="inherit" startIcon={<Security />} component={Link} href="/admin/delivery-agents">
         Agent Management
       </Button>
