@@ -36,6 +36,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { event } from '../../lib/gtag';
 import { debounce } from 'lodash';
 import FileUploader from "../../components/FileUploader";
+import MedicineNotFoundForm from '../../components/request/MedicineNotFoundForm';
 
 
 // --- CONFIGURATION --- //
@@ -325,10 +326,7 @@ export default function FindMedicinesPage() {
             <Typography color="error">{error}</Typography>
           </Box>
         ): medicines.length === 0 ? (
-           <Box sx={{ textAlign: 'center', mt: 4 }}>
-            <Typography variant="h5">No Medicines Found</Typography>
-            <Typography>Try adjusting your search or filters.</Typography>
-          </Box>
+          <MedicineNotFoundForm initialSearchQuery={searchQuery} />
         ) : (
           <>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
