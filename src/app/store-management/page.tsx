@@ -164,9 +164,13 @@ export default function StoreManagementPage() {
   const [isFetchingSuggestion, setIsFetchingSuggestion] = useState(false);
   
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
-  const rawFileContentRef = useRef<string>(''); // <-- REPLACED
+  const rawFileContentRef = useRef<string>('');
 
-
+  const [isBulkEnriching, setIsBulkEnriching] = useState(false);
+  const [bulkEnrichProgress, setBulkEnrichProgress] = useState(0);
+  const [bulkEnrichStatus, setBulkEnrichStatus] = useState('');
+  const [bulkEnrichResult, setBulkEnrichResult] = useState<{ successCount: number; errorCount: number } | null>(null);
+ 
 
   const allBusinesses = useMemo(() => {
     if (!isAdmin || !stockData) return [];
@@ -1170,7 +1174,7 @@ useEffect(() => {
 
          // --- THE FIX: Re-added the enrichment trigger loop ---
          const draftsToEnrich = result.savedProducts?.filter((p: any) => p.enrichmentStatus === 'pending') || [];
-         if (draftsToEnrich.length > 0) {
+         /* if (draftsToEnrich.length > 0) {
              logAction('BULK_ENRICH_START', 'INFO', `Triggering enrichment for ${draftsToEnrich.length} new drafts.`);
              // This runs in the background and does not block the UI
              (async () => {
@@ -1187,7 +1191,7 @@ useEffect(() => {
                      }
                  }
              })();
-         }
+         } */
          // --- END OF FIX ---
 
     } catch (error: any) {
@@ -1565,6 +1569,86 @@ useEffect(() => {
       setEnrichingId(null);
     }
   };
+
+  // --- START: ADD THIS ENTIRE FUNCTION ---
+  const handleBulkEnrich = async () => {
+    // 1. Filter for items that are incomplete and not already published
+    const itemsToEnrich = filteredStock.filter(item => isItemIncomplete(item));
+
+    if (itemsToEnrich.length === 0) {
+      alert("No incomplete items found to enrich in the current view.");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to enrich ${itemsToEnrich.length} items? This will happen in the background.`)) {
+      return;
+    }
+
+    // 2. Reset state and start the process
+    setIsBulkEnriching(true);
+    setBulkEnrichProgress(0);
+    setBulkEnrichResult(null);
+    let successCount = 0;
+    let errorCount = 0;
+
+    const BATCH_SIZE = 5;
+    
+    // 3. Loop through items in batches
+    for (let i = 0; i < itemsToEnrich.length; i += BATCH_SIZE) {
+      const batch = itemsToEnrich.slice(i, i + BATCH_SIZE);
+      setBulkEnrichStatus(`Processing batch ${i / BATCH_SIZE + 1} of ${Math.ceil(itemsToEnrich.length / BATCH_SIZE)}...`);
+
+      // 4. Process the current batch concurrently
+      await Promise.all(
+        batch.map(async (item, index) => {
+          if (!item._id) return;
+
+          try {
+            const response = await fetch('/api/stock/enrich-and-upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ productId: item._id }),
+            });
+
+            if (!response.ok) throw new Error(`Server failed for ${item.itemName}`);
+            
+            const result = await response.json();
+            const { product: updatedProduct } = result;
+
+            // Update the main data source silently
+            setStockData(prevData =>
+              prevData.map(p => (p._id === item._id ? { ...p, ...updatedProduct } : p))
+            );
+            successCount++;
+
+          } catch (error) {
+            console.error(`Failed to enrich item ID ${item._id}:`, error);
+            errorCount++;
+          }
+
+          // 5. Update overall progress after each item
+          const processedCount = i + index + 1;
+          setBulkEnrichProgress((processedCount / itemsToEnrich.length) * 100);
+          setBulkEnrichStatus(`Enriched ${processedCount} of ${itemsToEnrich.length}...`);
+        })
+      );
+      
+      // 6. Pause between batches
+      if (i + BATCH_SIZE < itemsToEnrich.length) {
+        setBulkEnrichStatus('Taking a short break between batches...');
+        await sleep(2000); // 2-second pause
+      }
+    }
+
+    // 7. Finalize and show results
+    setBulkEnrichStatus('Bulk enrichment complete!');
+    setBulkEnrichResult({ successCount, errorCount });
+    setIsBulkEnriching(false);
+    setTimeout(() => setBulkEnrichResult(null), 10000); // Hide result after 10 seconds
+  };
+  // --- END: ADD THIS ENTIRE FUNCTION ---
+
+
 
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: 'processing' | 'completed' | 'cancelled' | 'failed') => {
@@ -2454,27 +2538,62 @@ useEffect(() => {
               <Paper sx={{ maxWidth: 900, width: '100%', overflowX: 'auto', bgcolor: 'white', color: 'black', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', borderRadius: 2, p: 2 }}>
               <>
               <>
-    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-        <TextField label="Search items" variant="outlined" size="small" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ width: isMobile ? '100%' : 300 }} />
-        <Button
-            variant="outlined"
-            onClick={(event) => setFilterMenuAnchor(event.currentTarget)}
-            endIcon={<ExpandMore />}
-        >
-            Filters
-        </Button>
+              
 
-        <Button
-        variant="contained"
-        color="success"
-        onClick={handlePublishAll}
-        disabled={isSubmitting || paginatedStock.filter(item => !item.isPublished && !isItemIncomplete(item)).length === 0}
-        startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <CheckCircle />}
+<Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
+  <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+      <TextField label="Search items" variant="outlined" size="small" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} sx={{ flexGrow: 1, minWidth: '200px' }} />
+      <Button
+          variant="outlined"
+          onClick={(event) => setFilterMenuAnchor(event.currentTarget)}
+          endIcon={<ExpandMore />}
+      >
+          Filters
+      </Button>
+
+      {/* --- NEW BULK ENRICH BUTTON --- */}
+      <Button
+          variant="contained"
+          color="secondary"
+          onClick={handleBulkEnrich}
+          disabled={isBulkEnriching || filteredStock.filter(item => isItemIncomplete(item)).length === 0}
+          startIcon={isBulkEnriching ? <CircularProgress size={20} color="inherit" /> : <Inventory />}
+      >
+          Bulk Enrich ({filteredStock.filter(item => isItemIncomplete(item)).length})
+      </Button>
+
+      {/* --- START: REPLACEMENT FOR "Publish Page" BUTTON --- */}
+<Tooltip title={paginatedStock.filter(item => !item.isPublished && !isItemIncomplete(item)).length === 0 ? "No complete, unpublished items on this page" : "Publish all complete items on this page"}>
+  <span>
+    <Button
+      variant="contained"
+      color="success"
+      onClick={handlePublishAll}
+      disabled={isSubmitting || paginatedStock.filter(item => !item.isPublished && !isItemIncomplete(item)).length === 0}
+      startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <CheckCircle />}
     >
-        Publish Page ({paginatedStock.filter(item => !item.isPublished && !isItemIncomplete(item)).length})
+      Publish Page ({paginatedStock.filter(item => !item.isPublished && !isItemIncomplete(item)).length})
     </Button>
+  </span>
+</Tooltip>
+{/* --- END: REPLACEMENT FOR "Publish Page" BUTTON --- */}
 
-    </Box>
+  </Box>
+
+  {/* --- NEW BULK ENRICH PROGRESS BAR --- */}
+  {isBulkEnriching && (
+      <Paper sx={{ p: 2, backgroundColor: 'grey.100' }}>
+          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>{bulkEnrichStatus}</Typography>
+          <LinearProgress variant="determinate" value={bulkEnrichProgress} />
+      </Paper>
+  )}
+  {bulkEnrichResult && (
+      <Alert severity={bulkEnrichResult.errorCount > 0 ? 'warning' : 'success'} onClose={() => setBulkEnrichResult(null)}>
+          Bulk enrichment finished. Success: {bulkEnrichResult.successCount}, Failures: {bulkEnrichResult.errorCount}.
+      </Alert>
+  )}
+</Box>
+
 
     <Popover
         open={Boolean(filterMenuAnchor)}
@@ -2651,33 +2770,20 @@ useEffect(() => {
                       </TableCell>
                       
                       <TableCell align="right">
-                      <Stack direction="row" spacing={1}>
-    <Button
-      variant="outlined"
-      size="small"
-      color="secondary"
-      onClick={(e) => {
-        e.stopPropagation();
-        if (row._id) handleEnrich(row._id);
-      }}
-      disabled={enrichingId === row._id}
-    >
-      {enrichingId === row._id ? <CircularProgress size={20} /> : 'Enrich'}
-    </Button>
-    <Button
-      variant="outlined"
-      size="small"
-      onClick={(e) => {
-        e.stopPropagation();
-        setSelectedProduct(row);
-        setTileEditData(row);
-      }}
-    >
-      Edit
-    </Button>
-</Stack>
-
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedProduct(row);
+                            setTileEditData(row);
+                          }}
+                        >
+                          Edit
+                        </Button>
                       </TableCell>
+
+
                     </TableRow>
                   );
                 })}

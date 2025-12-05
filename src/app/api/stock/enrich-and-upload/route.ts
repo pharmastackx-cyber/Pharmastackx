@@ -6,31 +6,34 @@ import Product, { IProduct } from '@/models/Product';
 import EnrichmentLock, { LOCK_NAME } from '@/models/EnrichmentLock';
 import { isValidObjectId } from 'mongoose';
 
-// --- PROMPT ENGINEERING (Unchanged) ---
 const fullEnrichmentPrompt = `
-You are an expert pharmaceutical data analyst. Your task is to fully enrich a new, unknown product based on its name. Follow these rules:
-1.  **ANALYZE RAW DATA:** You will get a <RAW_INVENTORY_DATA> JSON object.
-2.  **EXTRACT CORE INFO:** The user's file is the source of truth for name of the drug , price and stock, never change those.
-   
-3.  **ENRICH FROM KNOWLEDGE:** Based on the product name, fill in the details.
-    .
-    *   \`active_ingredient\`: The main active ingredient(s).
-    *   \`drug_class\`: The pharmaceutical class.
-    *   \`unit_form\`: The product's packaging form (e.g., "Box of 30 tablets", "500ml bottle").
-    *   \`is_pom\`: True if it is a Prescription-Only Medicine.
-4.  **FIND IMAGE:** Find a public, representative image URL. If you cannot find one with high confidence, you MUST return an empty string ("").
-5.  **OUTPUT FORMAT:** Return ONLY a single, valid JSON object.
+You are a world-class pharmaceutical data enrichment specialist. Your primary goal is to return clean, accurate data and a highly relevant product image.
 
-Required JSON Output:
+**CRITICAL RULES:**
+1.  **INPUT:** You will receive a JSON object: <RAW_INVENTORY_DATA>.
+2.  **NEVER CHANGE CORE DATA:** The user's input for the item's name, price, and stock level is the absolute source of truth. Do NOT change it.
+3.  **ENRICHMENT (FILL BLANKS):** Your main task is to fill in the following fields if they are empty, using your internal knowledge and a targeted web search:
+    *   \\\`active_ingredient\\\`: The primary active pharmaceutical ingredient(s).
+    *   \\\`drug_class\\\`: The main therapeutic or pharmaceutical category.
+    *   \\\`unit_form\\\`: The specific packaging, e.g., "Box of 30 tablets", "500ml bottle", "Blister pack of 10".
+    *   \\\`is_pom\\\`: A boolean (\\\`true\\\`/\\\`false\\\`) for whether it is a Prescription-Only Medicine.
+4.  **IMAGE SEARCH & VALIDATION (MOST IMPORTANT):**
+    *   You MUST perform a web search to find a high-quality, professional, and visually accurate image of the product.
+    *   **SCRUTINIZE THE IMAGE:** The image must EXACTLY match the product name and form. For example, if the product is "Vitamin C Injection", the image CANNOT be of "Vitamin C Tablets".
+    *   **NO CONFIDENCE, NO IMAGE:** If you are less than 99% certain that the image is a perfect match, you MUST return an empty string ("") for the \\\`found_image_url\\\`. Do not guess. Returning a wrong image is worse than returning no image.
+5.  **OUTPUT:** Your final output MUST be a single, valid JSON object and nothing else.
+
+**Required JSON Output Format:**
 {
-  
   "active_ingredient": "string",
   "drug_class": "string",
   "unit_form": "string",
   "is_pom": "boolean",
-  
   "found_image_url": "string"
-}`;
+}
+`;
+
+
 
 const validationPrompt = `
 You are an expert pharmaceutical data analyst. Your task is to validate a user's product against a potential database match that has a medium confidence score.
@@ -70,18 +73,16 @@ async function enrichProduct(product: IProduct, genAI: GoogleGenerativeAI): Prom
     let updateData: any;
 
     try {
-        if (matchScore >= 90) {
+        if (matchScore >= 98) {
             updateData = {
                 activeIngredient: topMatch.activeIngredient,
                 category: topMatch.category,
                 imageUrl: topMatch.imageUrl || product.imageUrl || '',
                 info: topMatch.info,
                 POM: topMatch.POM,
-                isPublished: true, 
+                isPublished: false, 
             };
         } else {
-            // ** THE DEFINITIVE FIX IS HERE **
-            // Using the model you selected: gemini-2.5-flash
             const generationModel = genAI.getGenerativeModel({
                 model: "gemini-2.5-flash",
                 generationConfig: { responseMimeType: "application/json" },
@@ -97,7 +98,7 @@ async function enrichProduct(product: IProduct, genAI: GoogleGenerativeAI): Prom
                     category: aiData.drug_class,
                     info: aiData.unit_form,
                     POM: aiData.is_pom,
-                    isPublished: aiData.is_published || false,
+                    isPublished: false,
                 };
             } else {
                 const prompt = `<RAW_INVENTORY_DATA>\n${JSON.stringify(product)}\n</RAW_INVENTORY_DATA>`;
@@ -123,12 +124,7 @@ async function enrichProduct(product: IProduct, genAI: GoogleGenerativeAI): Prom
 
 
 export async function GET(req: NextRequest) {
-
-
-    // --- NEW DEBUG LOG ---
     console.log("\n\n--- [ENRICHMENT WORKER] The GET endpoint has been triggered! Attempting to start the loop. ---\n");
-    // --- END NEW DEBUG LOG ---
-
 
     await dbConnect();
 
@@ -144,16 +140,13 @@ export async function GET(req: NextRequest) {
     }
 
     console.log('[Gatekeeper-GET] Lock acquired. Starting enrichment process.');
-    const BATCH_SIZE = 10; 
+    const BATCH_SIZE = 5; 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     let processedCount = 0;
 
     try {
-        
         while (true) {
-            // New code (around line 150)
-const productsToProcess = await Product.find({ enrichmentStatus: { $in: ['pending', 'failed'] } }).limit(BATCH_SIZE);
-
+            const productsToProcess = await Product.find({ enrichmentStatus: { $in: ['pending', 'failed'] } }).limit(BATCH_SIZE);
 
             if (productsToProcess.length === 0) {
                 console.log('[Gatekeeper-GET] No more pending products to enrich. Process finished.');
@@ -163,25 +156,21 @@ const productsToProcess = await Product.find({ enrichmentStatus: { $in: ['pendin
             const productIds = productsToProcess.map(p => p._id);
             await Product.updateMany({ _id: { $in: productIds } }, { $set: { enrichmentStatus: 'processing' } });
             
-            console.log(`[Gatekeeper-GET] Processing batch of ${productsToProcess.length} products sequentially to respect rate limits.`);
+            console.log(`[Gatekeeper-GET] Processing batch of ${productsToProcess.length} products sequentially.`);
 
             for (const product of productsToProcess) {
                 try {
                     const updateData = await enrichProduct(product, genAI);
                     await Product.updateOne({ _id: product._id }, { $set: updateData });
                     console.log(`[Gatekeeper-Worker] Successfully enriched: "${product.itemName}"`);
-                // New code (around line 166)
-} catch (itemError: any) {
-    console.error(`[Gatekeeper-Worker] FAILED to process "${product.itemName}". Error: ${itemError.message}`);
-    // This is the key change:
-    await Product.updateOne({ _id: product._id }, { $set: { enrichmentStatus: 'failed' } });
-}
-
+                } catch (itemError: any) {
+                    console.error(`[Gatekeeper-Worker] FAILED to process "${product.itemName}". Error: ${itemError.message}`);
+                    await Product.updateOne({ _id: product._id }, { $set: { enrichmentStatus: 'failed' } });
+                }
             }
-        
-
             
             processedCount += productsToProcess.length;
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
         return NextResponse.json({ message: `Enrichment process completed successfully. Total processed: ${processedCount}` });

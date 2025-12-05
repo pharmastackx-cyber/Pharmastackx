@@ -19,6 +19,11 @@ if (!GEMINI_API_KEY) {
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
 
+// Helper to escape special characters for RegExp
+function escapeRegex(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\\\]/g, '\\\\$&'); // $& means the whole matched string
+}
+
 // Helper function to check if an item is incomplete
 const isItemIncomplete = (item: any): boolean => {
     const hasMissingInfo = (
@@ -52,20 +57,30 @@ export async function GET(req: NextRequest) {
 
     let query: any = {};
     if (userRole === 'admin' || userRole === 'stockManager') {
-      // No filter for admin or stockManager
+      // No filter for admin or stockManager - fetch all products
     } else if (businessName) {
       query.businessName = businessName;
     } else {
+      // Default for public view if not admin and no businessName is provided
       query.isPublished = true;
     }
 
     const itemsFromDB = await Product.find(query).sort({ createdAt: -1 }).lean();
 
+    if (userRole === 'admin' || userRole === 'stockManager') {
+      return NextResponse.json({ items: itemsFromDB });
+    }
+
     const itemsWithSuggestionFlag = await Promise.all(
       itemsFromDB.map(async (item) => {
         if (item.itemName && isItemIncomplete(item)) {
+          
+          // --- THE FIX ---
+          // Escape the item name to prevent invalid RegExp errors from special characters like '('.
+          const safeItemNameForRegex = escapeRegex(item.itemName);
+          
           const suggestionSource = await Product.findOne({
-            itemName: { $regex: new RegExp(item.itemName, 'i') },
+            itemName: { $regex: new RegExp(safeItemNameForRegex, 'i') },
             _id: { $ne: item._id },
             isPublished: true,
             imageUrl: { $ne: null, $nin: [''] },
