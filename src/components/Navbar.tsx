@@ -156,6 +156,13 @@ export default function Navbar() {
           </ListItemButton>
         </ListItem>
 
+        <ListItem disablePadding sx={{ mb: 0.5 }}>
+          <ListItemButton component={Link} href="/dispatch" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/dispatch') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+            <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><DeliveryDining fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Dispatch" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
+          </ListItemButton>
+        </ListItem>
+
         {/* Health Insights Link for Mobile Drawer */}
         {/*<ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/health-insights" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/health-insights') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
@@ -299,7 +306,9 @@ export default function Navbar() {
               Find Meds
             </Button>
 
-            
+            <Button color="inherit" startIcon={<DeliveryDining />} component={Link} href="/dispatch" sx={{ bgcolor: isActive('/dispatch') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
+              Dispatch
+            </Button>
 
             {isAdmin && <Button color="inherit" startIcon={<Chat />} component={Link} href="/carechat" sx={{ bgcolor: isActive('/carechat') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
               CareChat
