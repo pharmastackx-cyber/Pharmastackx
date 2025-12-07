@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Modal, Box, Typography, keyframes, Grid, Chip } from '@mui/material';
+import { Modal, Box, Typography, keyframes, Grid, Chip, Avatar } from '@mui/material';
 
 // Define the shape of the drug request for the props
 interface DrugRequest {
@@ -10,6 +10,7 @@ interface DrugRequest {
   form: string;
   strength: string;
   quantity: number;
+  image: string | null;
 }
 
 // Keyframes for the animations
@@ -29,7 +30,7 @@ const modalStyle = {
   left: '50%',
   transform: 'translate(-50%, -50%)',
   width: '90vw',
-  maxWidth: 800, // Increased width for the new layout
+  maxWidth: 800,
   bgcolor: '#001a14',
   border: '2px solid #004d40',
   boxShadow: '0 0 30px rgba(0, 255, 200, 0.5)',
@@ -98,7 +99,6 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
     >
       <Box sx={modalStyle}>
         <Grid container spacing={3} alignItems="center">
-            {/* Left Column: Radar Animation */}
             <Grid item xs={12} md={6}>
                  <Typography id="searching-modal-title" variant="h6" component="h2" sx={{ fontWeight: 700, mb: 1, color: '#4CAF50', textAlign: 'center' }}>
                     Searching for Pharmacies...
@@ -116,22 +116,29 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
                 </Typography>
             </Grid>
             
-            {/* Right Column: Request Summary */}
             <Grid item xs={12} md={6}>
                  <Typography variant="h6" sx={{ color: '#80cbc4', borderBottom: '1px solid #004d40', pb: 1, mb: 2, fontWeight: 600 }}>
                     Dispatch Request
                 </Typography>
                 <Box sx={{ maxHeight: 300, overflowY: 'auto', pr: 1 }}>
-                    {requests.map((drug) => (
-                        <Box key={drug.id} sx={{ mb: 2, p: 1.5, bgcolor: 'rgba(0, 61, 51, 0.5)', borderRadius: '8px' }}>
-                            <Typography sx={{ fontWeight: 600, color: 'white' }}>{drug.name}</Typography>
-                            <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
-                                <Chip label={`Qty: ${drug.quantity}`} size="small" variant="outlined" sx={{ color: '#b2dfdb', borderColor: '#004d40' }} />
-                                {drug.strength && <Chip label={drug.strength} size="small" variant="outlined" sx={{ color: '#b2dfdb', borderColor: '#004d40' }} />}
-                                {drug.form && <Chip label={drug.form} size="small" variant="outlined" sx={{ color: '#b2dfdb', borderColor: '#004d40' }} />}
+                    {requests.map((drug) => {
+                        const isImageBased = drug.name.startsWith('Prescription') || drug.name.startsWith('Image');
+                        return (
+                            <Box key={drug.id} sx={{ display: 'flex', alignItems: 'center', mb: 2, p: 1.5, bgcolor: 'rgba(0, 61, 51, 0.5)', borderRadius: '8px' }}>
+                                {drug.image && <Avatar src={drug.image} sx={{ width: 40, height: 40, mr: 2 }} />}
+                                <Box>
+                                    <Typography sx={{ fontWeight: 600, color: 'white' }}>{drug.name}</Typography>
+                                    {!isImageBased && (
+                                        <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                                            <Chip label={`Qty: ${drug.quantity}`} size="small" variant="outlined" sx={{ color: '#b2dfdb', borderColor: '#004d40' }} />
+                                            {drug.strength && <Chip label={drug.strength} size="small" variant="outlined" sx={{ color: '#b2dfdb', borderColor: '#004d40' }} />}
+                                            {drug.form && <Chip label={drug.form} size="small" variant="outlined" sx={{ color: '#b2dfdb', borderColor: '#004d40' }} />}
+                                        </Box>
+                                    )}
+                                </Box>
                             </Box>
-                        </Box>
-                    ))}
+                        )
+                    })}
                 </Box>
             </Grid>
         </Grid>
