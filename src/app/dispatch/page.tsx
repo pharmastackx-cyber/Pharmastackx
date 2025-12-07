@@ -26,6 +26,7 @@ import { debounce } from 'lodash';
 import Navbar from '../../components/Navbar';
 import OtherInfoInput from '../../components/dispatch/OtherInfoInput';
 import ConfirmationModal from '../../components/dispatch/ConfirmationModal';
+import SearchRadarModal from '../../components/dispatch/SearchRadarModal';
 
 const allFormTypes = [
     'Tablet', 'Capsule', 'Lozenge', 'Sachet', 'Powder', 'Granules',
@@ -85,6 +86,7 @@ export default function DispatchPage() {
   const [inputValue, setInputValue] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRadarModalOpen, setIsRadarModalOpen] = useState(false);
   const searchInputRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -198,10 +200,9 @@ export default function DispatchPage() {
   };
 
   const handleConfirmDispatch = () => {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-    setRequestedDrugs([]);
     setIsModalOpen(false);
-    alert("Search initiated! Your list has been cleared.");
+    setIsRadarModalOpen(true);
+    // The request list is not cleared here. It will persist until a pharmacy accepts the order.
   };
 
   return (
@@ -367,6 +368,11 @@ export default function DispatchPage() {
             onClose={handleCloseModal} 
             onConfirm={handleConfirmDispatch} 
             requests={requestedDrugs} 
+        />
+        <SearchRadarModal 
+            open={isRadarModalOpen} 
+            onClose={() => setIsRadarModalOpen(false)} 
+            requests={requestedDrugs}
         />
       </Container>
     </>
