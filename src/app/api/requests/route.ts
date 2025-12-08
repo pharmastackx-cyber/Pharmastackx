@@ -1,99 +1,101 @@
 
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
-import MedicineRequest from '@/models/MedicineRequest';
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
-import { sendMedicineNotFoundNotification } from '@/lib/whatsapp'; // Import the new function
+import RequestModel from '@/models/Request';
+import jwt from 'jsonwebtoken';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
-const generationConfig = {
-    temperature: 0.2,
-    topK: 1,
-    topP: 1,
-    maxOutputTokens: 2048,
-};
+// Helper to get session from the request cookies
+async function getSession(req: NextRequest) {
+  const token = req.cookies.get('session_token')?.value;
+  if (!token) return null;
 
-const safetySettings = [
-    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-];
+  try {
+    return jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+  } catch (error) {
+    console.error('Invalid token:', error);
+    return null;
+  }
+}
 
-async function runAiAnalysis(userInput: string, userName: string, notes?: string) {
-    const prompt = `
-    You are a highly intelligent pharmaceutical assistant AI. A user at a pharmacy website could not find the medicine they were looking for. Your task is to analyze their request, standardize it, and provide actionable insights for the pharmacy staff.
+export async function POST(req: NextRequest) {
+  console.log('\n--- [API /api/requests POST] ---');
+  await dbConnect();
+  console.log('[LOG] Database connected.');
 
-    USER'S SEARCH QUERY: "${userInput}"
-    USER'S NAME: "${userName}"
-    ADDITIONAL NOTES: "${notes || 'None'}"
+  const session = await getSession(req);
+  if (!session?.userId) {
+    console.error('[ERROR] Session validation failed. Session:', session);
+    return NextResponse.json({ message: 'Unauthorized: Session is invalid or missing user ID' }, { status: 401 });
+  }
 
-    Please analyze this request and return ONLY a single, valid JSON object with the following structure. Do not include any other text or markdown formatting.
+  console.log(`[LOG] Session validated for userId: ${session.userId}`);
 
-    **Required JSON Output Format:**
-    {
-      "aiStandardizedName": "string",
-      "aiSuggestedIngredients": ["string"],
-      "aiRequestCategory": "specific_product" | "symptom_based" | "general_inquiry" | "unknown",
-      "aiUrgency": "low" | "medium" | "high",
-      "aiSuggestedAlternatives": ["string"]
+  try {
+    const body = await req.json();
+    console.log('[LOG] Request body parsed:', body);
+
+    if (body.requestType === 'text') {
+      console.log("[LOG] Correction: Converted requestType from 'text' to 'drug-list'.");
+      body.requestType = 'drug-list';
     }
-    `;
 
+    const { requestType, items } = body;
+
+    if (!requestType) {
+      console.error('[ERROR] Validation failed: requestType is missing.');
+      return NextResponse.json({ message: 'Request type is required' }, { status: 400 });
+    }
+
+    const requestData = {
+      user: session.userId,
+      requestType,
+      items: items || [],
+      status: 'pending',
+    };
+
+    console.log('[LOG] Data prepared for database model:', requestData);
+    const newRequest = new RequestModel(requestData);
+
+    console.log('[LOG] Mongoose model created. About to save...');
+    await newRequest.save();
+
+    console.log('[LOG] Save successful! Document ID:', newRequest._id);
+    return NextResponse.json(newRequest, { status: 201 });
+
+  } catch (error) {
+    console.error('[FATAL] Error creating request in database:', error);
+    return NextResponse.json({ message: 'Internal Server Error while creating request.' }, { status: 500 });
+  }
+}
+
+
+// --- FIX STARTS HERE ---
+export async function GET(req: NextRequest) {
+    await dbConnect();
+    const session = await getSession(req);
+  
+    if (!session?.userId) {
+      return NextResponse.json({ message: 'Unauthorized: No valid session found' }, { status: 401 });
+    }
+  
     try {
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig,
-            safetySettings,
-        });
-        const responseText = result.response.text();
-        const cleanedJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(cleanedJson);
+      // Corrected Role-based authorization as requested.
+      // A user with one of these roles sees ALL requests.
+      // Any other authenticated user will only see their OWN requests.
+      const adminRoles = ['admin', 'pharmacist', 'pharmacy'];
+      const query = adminRoles.includes(session.role) 
+        ? {} // An empty query matches all documents
+        : { user: session.userId }; // Otherwise, filter by the user's ID
+
+      const requests = await RequestModel.find(query).populate('user', 'name email').sort({ createdAt: -1 });
+  
+      return NextResponse.json(requests, { status: 200 });
+
     } catch (error) {
-        console.error("Error calling Gemini API:", error);
-        return {
-            aiStandardizedName: "AI Analysis Failed",
-            aiSuggestedIngredients: [],
-            aiRequestCategory: "unknown",
-            aiUrgency: "low",
-            aiSuggestedAlternatives: [],
-        };
+      console.error('Error fetching requests:', error);
+      return NextResponse.json({ message: 'Internal Server Error while fetching requests.' }, { status: 500 });
     }
-}
-
-export async function POST(req: Request) {
-    try {
-        await dbConnect();
-        const body = await req.json();
-        const { medicineName, userName, contact, notes } = body;
-
-        if (!medicineName || !userName || !contact) {
-            return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
-        }
-
-        const aiData = await runAiAnalysis(medicineName, userName, notes);
-
-        const newRequest = new MedicineRequest({
-            rawMedicineName: medicineName,
-            userName,
-            contact,
-            notes,
-            status: 'pending',
-            ...aiData
-        });
-
-        await newRequest.save();
-
-        // --- Send WhatsApp Notification --- //
-        // This is a fire-and-forget operation, we don't need to wait for it.
-        sendMedicineNotFoundNotification(newRequest);
-
-        return NextResponse.json({ message: 'Request submitted successfully', request: newRequest }, { status: 201 });
-
-    } catch (error: any) {
-        console.error('Error in POST /api/requests:', error);
-        return NextResponse.json({ message: `Internal Server Error: ${error.message}` }, { status: 500 });
-    }
-}
+  }
+// --- FIX ENDS HERE ---

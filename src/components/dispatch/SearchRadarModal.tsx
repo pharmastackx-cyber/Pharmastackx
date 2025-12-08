@@ -1,7 +1,10 @@
 'use client';
 
-import React from 'react';
-import { Modal, Box, Typography, keyframes, Grid, Chip, Avatar } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Modal, Box, Typography, keyframes, Grid, Chip, Avatar, Button, Alert, Slide } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+
 
 // Define the shape of the drug request for the props
 interface DrugRequest {
@@ -38,6 +41,7 @@ const modalStyle = {
   borderRadius: '16px',
   color: '#e0f2f1',
   outline: 'none',
+  overflow: 'hidden', // To contain the slide animation
 };
 
 const radarContainerStyle = {
@@ -88,9 +92,54 @@ interface SearchRadarModalProps {
   open: boolean;
   onClose: () => void;
   requests: DrugRequest[];
+  // --- FIX: Add requestId to poll for status ---
+  requestId: string | null;
 }
 
-const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requests }) => {
+const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requests, requestId }) => {
+  const router = useRouter();
+  const [quoteFound, setQuoteFound] = useState(false);
+
+  useEffect(() => {
+    // Reset on open
+    if (open) {
+      setQuoteFound(false);
+    }
+
+    if (!open || !requestId || quoteFound) {
+      return;
+    }
+
+    // Poll every 5 seconds
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/requests/${requestId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'quoted') {
+            setQuoteFound(true);
+            clearInterval(intervalId); // Stop polling
+          }
+        }
+      } catch (error) {
+        console.error("Polling error:", error);
+        // Don't stop polling on network error
+      }
+    }, 5000);
+
+    // Cleanup on component unmount or when modal closes
+    return () => clearInterval(intervalId);
+
+  }, [open, requestId, quoteFound]);
+
+  const handleReviewClick = () => {
+    if (requestId) {
+        onClose(); // Close the modal
+        router.push(`/my-requests/${requestId}`);
+    }
+  };
+
+
   return (
     <Modal
       open={open}
@@ -98,10 +147,37 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
       aria-labelledby="searching-modal-title"
     >
       <Box sx={modalStyle}>
+        
+        {/* --- FIX: The notification that slides in --- */}
+        <Slide direction="down" in={quoteFound} mountOnEnter unmountOnExit>
+            <Alert
+                severity="success"
+                variant="filled"
+                icon={<CheckCircleIcon fontSize="inherit" />}
+                sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 10,
+                    borderRadius: 0,
+                    alignItems: 'center',
+                }}
+                action={
+                    <Button color="inherit" size="small" onClick={handleReviewClick}>
+                        REVIEW
+                    </Button>
+                }
+            >
+                <Typography sx={{fontWeight: 'bold'}}>Items Found!</Typography>
+                A pharmacy has responded. Click to review their quote.
+            </Alert>
+        </Slide>
+
         <Grid container spacing={3} alignItems="center">
             <Grid item xs={12} md={6}>
                  <Typography id="searching-modal-title" variant="h6" component="h2" sx={{ fontWeight: 700, mb: 1, color: '#4CAF50', textAlign: 'center' }}>
-                    Searching for Pharmacies...
+                    Searching for items...
                 </Typography>
                 <Box sx={radarContainerStyle}>
                     <Box sx={scannerBeamStyle} />
@@ -112,7 +188,7 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
                     <Box sx={detectionDotStyle('60%', '15%', '2s')} />
                 </Box>
                 <Typography variant="body2" sx={{ color: '#b2dfdb', textAlign: 'center' }}>
-                    Please wait while we connect with nearby pharmacies.
+                    You can close this window. We'll notify you on this page when a quote is ready.
                 </Typography>
             </Grid>
             

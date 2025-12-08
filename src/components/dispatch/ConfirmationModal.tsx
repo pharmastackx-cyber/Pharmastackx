@@ -13,7 +13,8 @@ import {
     Avatar,
     Typography,
     Box,
-    Chip
+    Chip,
+    CircularProgress
 } from '@mui/material';
 
 interface DrugRequest {
@@ -31,9 +32,10 @@ interface ConfirmationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   requests: DrugRequest[];
+  isSubmitting: boolean;
 }
 
-export default function ConfirmationModal({ open, onClose, onConfirm, requests }: ConfirmationModalProps) {
+export default function ConfirmationModal({ open, onClose, onConfirm, requests, isSubmitting }: ConfirmationModalProps) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 600, borderBottom: '1px solid #ddd' }}>Confirm Your Request</DialogTitle>
@@ -70,9 +72,9 @@ export default function ConfirmationModal({ open, onClose, onConfirm, requests }
         </List>
       </DialogContent>
       <DialogActions sx={{ p: '16px 24px', borderTop: '1px solid #ddd' }}>
-        <Button onClick={onClose} color="inherit">Go Back</Button>
-        <Button onClick={onConfirm} variant="contained" autoFocus sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' } }}>
-          Begin Search
+        <Button onClick={onClose} color="inherit" disabled={isSubmitting}>Go Back</Button>
+        <Button onClick={onConfirm} variant="contained" autoFocus sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' }, minWidth: 130 }} disabled={isSubmitting}>
+          {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Begin Search'}
         </Button>
       </DialogActions>
     </Dialog>

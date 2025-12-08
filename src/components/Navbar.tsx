@@ -48,6 +48,7 @@ export default function Navbar() {
   const isBusinessUser = user?.role && ['admin', 'pharmacy', 'vendor', 'stockManager'].includes(user.role);
   const isAgentOrAdmin = user?.role && ['admin', 'agent'].includes(user.role);
   const isPharmacyOrVendor = user?.role && ['pharmacy', 'vendor'].includes(user.role);
+  const isPharmacist = user?.role && ['admin', 'pharmacists', 'pharmacy', 'vendor'].includes(user.role);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const router = useRouter();
 
@@ -233,6 +234,12 @@ export default function Navbar() {
             <ListItemText primary="Orders" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
           </ListItemButton>
         </ListItem>
+        {isPharmacist && <ListItem disablePadding sx={{ mb: 0.5 }}>
+          <ListItemButton component={Link} href="/requests" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/requests') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+            <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><Article fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Requests" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
+          </ListItemButton>
+        </ListItem>}
         {isAdmin && <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton component={Link} href="/carechat" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, bgcolor: isActive('/carechat') ? 'rgba(255, 255, 255, 0.2)' : 'transparent', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
             <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><Chat fontSize="small" /></ListItemIcon>
@@ -317,6 +324,9 @@ export default function Navbar() {
             <Button color="inherit" startIcon={<ShoppingBag />} component={Link} href="/orders" sx={{ bgcolor: isActive('/orders') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
               Orders
             </Button>
+            {isPharmacist && <Button color="inherit" startIcon={<Article />} component={Link} href="/requests" sx={{ bgcolor: isActive('/requests') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
+              Requests
+            </Button>}
             <IconButton color="inherit" component={Link} href="/cart" sx={{ mx: 1, bgcolor: isActive('/cart') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' } }}>
               <Badge badgeContent={getTotalItems()} color="error" max={99}>
                 <ShoppingCart />
