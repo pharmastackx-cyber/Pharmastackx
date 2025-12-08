@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -26,13 +27,13 @@ import {
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'; // <<< Import back arrow
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'; 
 import Navbar from '@/components/Navbar';
 
 // Interfaces
 interface ManualItem { name: string; price: number; pharmacyQuantity: number; isAvailable: boolean; }
 interface ExistingItemDetail { name: string; form: string; strength: string; quantity: number; notes: string; image: string | null; isAvailable: boolean; price: number; pharmacyQuantity: number; }
-interface FullRequest { _id: string; createdAt: string; status: string; requestType: 'drug-list' | 'image-upload'; items: ExistingItemDetail[] | string[]; notes?: string; }
+interface FullRequest { _id: string; createdAt: string; status: string; requestType: 'drug-list' | 'image-upload'; items: ExistingItemDetail[] | string[]; notes?: string; prescriptionImage?: string; } // <<< FIX: Added prescriptionImage
 
 const modalStyle = { position: 'absolute' as 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', maxWidth: '90vw', maxHeight: '90vh', bgcolor: 'background.paper', boxShadow: 24, p: 2, outline: 'none', borderRadius: '12px' };
 
@@ -59,6 +60,10 @@ const ManageRequestPage: React.FC = () => {
           if (data.requestType === 'drug-list' && Array.isArray(data.items)) {
             data.items = (data.items as ExistingItemDetail[]).map(item => ({ ...item, pharmacyQuantity: item.pharmacyQuantity || item.quantity, isAvailable: item.isAvailable !== false }));
           }
+          // For image-upload requests that are already quoted, initialize manualItems with the existing quote.
+          if (data.requestType === 'image-upload' && data.prescriptionImage && Array.isArray(data.items) && data.items.length > 0 && typeof data.items[0] !== 'string') {
+            setManualItems(data.items as ManualItem[]);
+          }
           if(data.notes) setNotes(data.notes);
           setRequest(data);
         } catch (err) { setError(err instanceof Error ? err.message : 'An unknown error');
@@ -77,7 +82,10 @@ const ManageRequestPage: React.FC = () => {
     if (!request) return;
     setIsSubmitting(true);
     setError(null);
-    const itemsToSubmit = request.requestType === 'image-upload' ? manualItems.filter(item => item.name) : request.items;
+    // --- FIX: Correctly determine items to submit ---
+    const itemsToSubmit = request.requestType === 'image-upload' 
+      ? manualItems.filter(item => item.name.trim() !== '') 
+      : request.items;
 
     try {
       const response = await fetch(`/api/requests/${id}`, {
@@ -93,9 +101,21 @@ const ManageRequestPage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+  
+  // --- FIX: Determine the correct image URL to display ---
+  const getImageUrl = () => {
+    if (!request) return '';
+    if (request.prescriptionImage) return request.prescriptionImage;
+    if (request.requestType === 'image-upload' && Array.isArray(request.items) && typeof request.items[0] === 'string') {
+      return request.items[0];
+    }
+    return '';
+  };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
   if (error) return <Container sx={{ py: 4 }}><Alert severity="error">{error}</Alert></Container>;
+
+  const imageUrl = getImageUrl();
 
   return (
     <>
@@ -103,26 +123,21 @@ const ManageRequestPage: React.FC = () => {
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {!request ? <Alert severity="warning">Could not load request.</Alert> : (
           <Paper sx={{p: {xs: 2, md: 3}, borderRadius: '16px'}}>
-            {/* --- Add Back button and title --- */}
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <IconButton onClick={() => router.push('/requests')} aria-label="back to requests">
-                    <ArrowBackIcon />
-                </IconButton>
-                <Typography variant="h5" component="h1" sx={{ ml: 1, flexGrow: 1 }}>
-                    Manage Dispatch Request
-                </Typography>
+                <IconButton onClick={() => router.push('/requests')} aria-label="back to requests"><ArrowBackIcon /></IconButton>
+                <Typography variant="h5" component="h1" sx={{ ml: 1, flexGrow: 1 }}>Manage Dispatch Request</Typography>
             </Box>
             
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, pl: '48px' }}>
-                ID: {request._id}
-            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, pl: '48px' }}>ID: {request._id}</Typography>
 
             {request.requestType === 'image-upload' && (
               <Grid container spacing={3}>
                 <Grid item xs={12} md={5}>
                   <Typography variant="h6" gutterBottom>Uploaded Prescription</Typography>
-                  <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1, cursor: 'pointer' }} onClick={() => setSelectedImage(Array.isArray(request.items) ? request.items[0] : null)}>
-                     <img src={Array.isArray(request.items) ? request.items[0] : ''} alt="Prescription" style={{ width: '100%', height: 'auto', borderRadius: '8px' }} />
+                  {/* --- FIX: Corrected onClick handler and src --- */}
+                  <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1, cursor: imageUrl ? 'pointer' : 'default' }} onClick={() => imageUrl && setSelectedImage(imageUrl)}>
+                     <img src={imageUrl} alt="Prescription" style={{ width: '100%', height: 'auto', borderRadius: '8px', display: imageUrl ? 'block' : 'none' }} />
+                     {!imageUrl && <Alert severity="info">No prescription image found. This might be a quoted request where the image was not preserved.</Alert>}
                   </Box>
                 </Grid>
                 <Grid item xs={12} md={7}>
@@ -170,15 +185,7 @@ const ManageRequestPage: React.FC = () => {
 
             <Box sx={{ mt: 3, mb: 3 }}>
               <Typography variant="h6" gutterBottom>Notes for Patient</Typography>
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                label="Add general notes for the patient (e.g., delivery info, advice)"
-                variant="outlined"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
+              <TextField fullWidth multiline rows={3} label="Add general notes for the patient (e.g., delivery info, advice)" variant="outlined" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </Box>
 
             <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>

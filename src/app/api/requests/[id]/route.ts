@@ -55,14 +55,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             return NextResponse.json({ message: 'Request not found' }, { status: 404 });
         }
 
-        // --- THIS IS THE FIX ---
-        // Handle quote based on the original request type
+        // --- FIX: Correctly handle quote submissions for all request types ---
         if (originalRequest.requestType === 'image-upload') {
-            // For image uploads, the pharmacist builds a new list.
-            // We replace the original image string array with the new drug object array.
+            // When quoting an image-based request, preserve the original URL
+            // in a new `prescriptionImage` field before overwriting `items`.
+            if (Array.isArray(originalRequest.items) && typeof originalRequest.items[0] === 'string' && !originalRequest.prescriptionImage) {
+                originalRequest.prescriptionImage = originalRequest.items[0];
+            }
+            // Replace the original item (the URL string) with the new quote details.
             originalRequest.items = items;
         } else {
-            // For drug lists, we update the existing items with the pharmacy's data.
+            // For standard drug-list requests, update the existing items.
             originalRequest.items = originalRequest.items.map((originalItem: any) => {
                 const updatedItemData = items.find((item: any) => item.name === originalItem.name);
                 if (updatedItemData) {
@@ -70,14 +73,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
                         ...originalItem.toObject(),
                         isAvailable: updatedItemData.isAvailable,
                         price: updatedItemData.price,
-                        pharmacyQuantity: updatedItemData.pharmacyQuantity, // <<< Fixed the typo here
+                        pharmacyQuantity: updatedItemData.pharmacyQuantity,
                     };
                 }
                 return originalItem;
             });
         }
         
-        // Update status and notes
         if (status) {
             originalRequest.status = status;
         }
