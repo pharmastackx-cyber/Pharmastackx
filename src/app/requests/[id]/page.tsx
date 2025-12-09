@@ -186,7 +186,7 @@ const ManageRequestPage: React.FC = () => {
             <Box sx={{ mt: 3, mb: 3 }}>
               <Typography variant="h6" gutterBottom>Notes for Patient</Typography>
               <TextField fullWidth multiline rows={3} label="Add general notes for the patient (e.g., delivery info, advice)" variant="outlined" value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </Box>
+             </Box>
 
             <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
                  <Button variant="contained" color="primary" onClick={handleSubmitQuote} disabled={isSubmitting} sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' } }}>

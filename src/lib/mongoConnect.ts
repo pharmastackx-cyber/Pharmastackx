@@ -1,12 +1,13 @@
-import mongoose, { Mongoose } from 'mongoose'; // Keep the Mongoose type import
+import mongoose, { Mongoose } from 'mongoose';
 
+// --- FIX: Corrected environment variable name back to MONGO_URI to match Vercel settings ---
 const MONGO_URI = process.env.MONGO_URI;
 
 if (!MONGO_URI) {
-  throw new Error('Please define the MONGO_URI environment variable inside .env.local');
+  // This error will be thrown during the build process if the variable is missing.
+  throw new Error('FATAL: MONGO_URI environment variable is not defined.');
 }
 
-// 1. Declare the global cache structure
 declare global {
   var mongoose: {
     conn: Mongoose | null;
@@ -14,27 +15,43 @@ declare global {
   };
 }
 
-// 2. Initialize or retrieve the global cache
 let cached = global.mongoose;
-
 if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
 
 export async function dbConnect(): Promise<Mongoose> {
-  // 3. Return cached connection if available
+  console.log('[dbConnect] Attempting to connect to the database.');
+
   if (cached.conn) {
+    console.log('[dbConnect] Returning cached database connection.');
     return cached.conn;
   }
 
-  // 4. Create connection promise if it doesn't exist (simplified .then)
   if (!cached.promise) {
-    // Optional: Add configuration options here
-    cached.promise = mongoose.connect(MONGO_URI!); 
+    console.log('[dbConnect] No existing connection promise. Creating a new one.');
+    const opts = {
+      bufferCommands: false,
+    };
+    // Use the correct MONGO_URI variable
+    cached.promise = mongoose.connect(MONGO_URI!, opts).then((mongoose) => {
+      console.log('[dbConnect] Database connection successfully established.');
+      return mongoose;
+    }).catch(err => {
+        console.error('[dbConnect] Initial connection error:', err);
+        cached.promise = null; // Important: clear promise on error
+        throw err;
+    });
   }
 
-  // 5. Await and store the resolved connection
-  cached.conn = await cached.promise;
+  try {
+    console.log('[dbConnect] Awaiting existing connection promise.');
+    cached.conn = await cached.promise;
+  } catch(e) {
+      // This will catch the error thrown from the .catch block above
+      console.error("[dbConnect] Failed to await the connection promise.", e);
+      throw e;
+  }
   
   return cached.conn;
 }
