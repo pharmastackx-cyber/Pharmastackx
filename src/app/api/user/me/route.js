@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { dbConnect } from '@/lib/mongoConnect';
 import User from '@/models/User';
 
+export const dynamic = 'force-dynamic';
+
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
 export async function GET(req) {

@@ -1,6 +1,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 // A palette of professional and complementary colors
 const coolColors = [
     '#006D5B', // Main green

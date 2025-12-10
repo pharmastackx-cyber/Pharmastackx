@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
 import User from '@/models/User';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   await dbConnect();
 

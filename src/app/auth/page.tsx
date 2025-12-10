@@ -1,11 +1,11 @@
 "use client";
-import React, { useState } from "react";
-import { Box, Typography, Tabs, Tab, Alert } from "@mui/material";
+import React, { useState, Suspense } from "react";
+import { Box, Typography, Tabs, Tab, Alert, CircularProgress } from "@mui/material";
 import LoginForm from "./LoginForm";
 import SignupForm from "./SignupForm";
 import Navbar from "@/components/Navbar";
 
-export default function AuthPage() {
+function AuthContent() {
   const [tab, setTab] = useState(0);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
@@ -19,15 +19,13 @@ export default function AuthPage() {
   };
 
   return (
-    <>
-      <Navbar />
-      <Box
+    <Box
       sx={{
         width: '100%',
         maxWidth: 340,
         mx: 'auto',
-  mt: { xs: '50vh', sm: 8, md: 10 },
-  transform: { xs: 'translateY(-50%)', sm: 'none', md: 'none' },
+        mt: { xs: '50vh', sm: 8, md: 10 },
+        transform: { xs: 'translateY(-50%)', sm: 'none', md: 'none' },
         p: { xs: 2, sm: 3, md: 4 },
         background: '#f5f6fa', // darker off-white
         borderRadius: { xs: 4, sm: 5, md: 6 },
@@ -90,6 +88,16 @@ export default function AuthPage() {
         )}
       </Box>
     </Box>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <>
+      <Navbar />
+      <Suspense fallback={<CircularProgress />}>
+        <AuthContent />
+      </Suspense>
     </>
   );
 }

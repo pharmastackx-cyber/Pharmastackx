@@ -3,6 +3,8 @@ import { dbConnect } from '../../../lib/mongoConnect';
 import Product from '../../../../backend/models/Product';
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 // Helper to format the price into Nigerian Naira (NGN)
 const formatPrice = (price) => {
   const numericPrice = Number(price);
@@ -16,8 +18,8 @@ const formatPrice = (price) => {
 const parseCoordinatesString = (coordString) => {
   if (typeof coordString !== 'string') { return null; }
   try {
-    const latMatch = coordString.match(/Lat: ([\d.-]+)/);
-    const lonMatch = coordString.match(/Lon: ([\d.-]+)/);
+    const latMatch = coordString.match(/Lat: ([\\d.-]+)/);
+    const lonMatch = coordString.match(/Lon: ([\\d.-]+)/);
     if (latMatch && lonMatch) {
       const lat = parseFloat(latMatch[1]);
       const lon = parseFloat(lonMatch[1]);
