@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 // Corrected import path for useSession
 import { useSession } from '@/context/SessionProvider';
@@ -26,8 +26,8 @@ import {
   Avatar,
   Grid,
   InputAdornment,
-  Alert, // Keep Alert
-  
+  Alert,
+  Modal,
 } from '@mui/material';
 import {
     Delete as DeleteIcon,
@@ -38,13 +38,12 @@ import {
     Image as ImageIcon,
 } from '@mui/icons-material';
 import { debounce } from 'lodash';
-import Navbar from '@/components/Navbar'; // <<< FIX: Imported Navbar
+import Navbar from '@/components/Navbar';
 import OtherInfoInput from '@/components/dispatch/OtherInfoInput';
 import ConfirmationModal from '@/components/dispatch/ConfirmationModal';
 import SearchRadarModal from '@/components/dispatch/SearchRadarModal';
 import { styled } from '@mui/material/styles';
 import RequestHistory from '@/components/dispatch/RequestHistory';
-
 
 
 const VisuallyHiddenInput = styled('input')({
@@ -59,86 +58,77 @@ const VisuallyHiddenInput = styled('input')({
   width: 1,
 });
 
-interface Item {
+interface DrugRequest {
+  id: number;
   name: string;
   form: string;
   strength: string;
   quantity: number;
   notes: string;
-  image: File | null;
-}
-
-const allFormTypes = [
-  'Tablet', 'Capsule', 'Lozenge', 'Sachet', 'Powder', 'Granules',
-  'Syrup', 'Suspension', 'Emulsion', 'Elixir', 'Solution', 'Oral Drops',
-  'Cream', 'Ointment', 'Gel', 'Lotion', 'Paste', 'Transdermal Patch',
-  'Inhaler', 'Nebulizer Solution',
-  'Injection (IM/IV/SC)', 'Infusion',
-  'Suppository', 'Pessary', 'Eye Drops', 'Ear Drops', 'Nasal Spray',
-];
-
-const quantityOptions = Array.from({ length: 30 }, (_, i) => i + 1);
-
-// --- NOTE: These two AI functions are for the UI and can be expanded later ---
-const getAIFormSuggestions = (drugName: string): string[] => {
-  const lowerCaseDrug = drugName.toLowerCase();
-  if (lowerCaseDrug.includes('syrup') || lowerCaseDrug.includes('suspension')) return ['Syrup', 'Suspension', 'Oral Drops'];
-  if (lowerCaseDrug.includes('cream') || lowerCaseDrug.includes('gel')) return ['Cream', 'Ointment', 'Gel'];
-  return ['Tablet', 'Capsule'].filter(form => allFormTypes.includes(form));
-};
-
-const getAIStrengthSuggestions = (drugName: string): string[] => {
-  const lowerCaseDrug = drugName.toLowerCase();
-  if (lowerCaseDrug.includes('ibuprofen')) return ['200mg', '400mg', '600mg'];
-  if (lowerCaseDrug.includes('paracetamol')) return ['500mg', '650mg', '1g'];
-  return [];
-};
-
-
-// --- This replaces your old 'Item' interface ---
-interface DrugRequest {
-id: number;
-name: string;
-form: string;
-strength: string;
-quantity: number;
-notes: string;
-image: string | null;
-formSuggestions: string[];
-strengthSuggestions: string[];
-showAllForms: boolean;
-showOtherInfo: boolean;
-isEditing: boolean;
+  image: string | null;
+  formSuggestions: string[];
+  strengthSuggestions: string[];
+  showAllForms: boolean;
+  showOtherInfo: boolean;
+  isEditing: boolean;
 }
 
 interface Suggestion {
-label: string;
+  label: string;
 }
 
 const LOCAL_STORAGE_KEY = 'requestedDrugs';
 type UploadMode = 'prescription' | 'image';
 
+const allFormTypes = [
+    'Tablet', 'Capsule', 'Lozenge', 'Sachet', 'Powder', 'Granules',
+    'Syrup', 'Suspension', 'Emulsion', 'Elixir', 'Solution', 'Oral Drops',
+    'Cream', 'Ointment', 'Gel', 'Lotion', 'Paste', 'Transdermal Patch',
+    'Inhaler', 'Nebulizer Solution',
+    'Injection (IM/IV/SC)', 'Infusion',
+    'Suppository', 'Pessary', 'Eye Drops', 'Ear Drops', 'Nasal Spray',
+];
+
+const quantityOptions = Array.from({ length: 30 }, (_, i) => i + 1);
+
+const getAIFormSuggestions = (drugName: string): string[] => {
+    const lowerCaseDrug = drugName.toLowerCase();
+    if (lowerCaseDrug.includes('syrup') || lowerCaseDrug.includes('suspension')) return ['Syrup', 'Suspension', 'Oral Drops'];
+    if (lowerCaseDrug.includes('cream') || lowerCaseDrug.includes('gel')) return ['Cream', 'Ointment', 'Gel'];
+    return ['Tablet', 'Capsule'].filter(form => allFormTypes.includes(form));
+};
+
+const getAIStrengthSuggestions = (drugName: string): string[] => {
+    const lowerCaseDrug = drugName.toLowerCase();
+    if (lowerCaseDrug.includes('ibuprofen')) return ['200mg', '400mg', '600mg'];
+    if (lowerCaseDrug.includes('paracetamol')) return ['500mg', '650mg', '1g'];
+    return [];
+};
 
 const DispatchPage: React.FC = () => {
   const router = useRouter();
   const { user, isLoading: isSessionLoading } = useSession();
 
-    const [requestedDrugs, setRequestedDrugs] = useState<DrugRequest[]>([]);
-    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [globalError, setGlobalError] = useState<string | null>(null);
-    const [inputValue, setInputValue] = useState("");
-    const [isInitialLoad, setIsInitialLoad] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isRadarModalOpen, setIsRadarModalOpen] = useState(false);
-    const [activeRequestId, setActiveRequestId] = useState<string | null>(null); 
-    const [prescriptionCount, setPrescriptionCount] = useState(1);
-    const [imageCount, setImageCount] = useState(1);
-  
-    const [requestHistory, setRequestHistory] = useState<any[]>([]);
+  const [requestedDrugs, setRequestedDrugs] = useState<DrugRequest[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [inputValue, setInputValue] = useState("");
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false); // <<< New state for login modal
+  const [isRadarModalOpen, setIsRadarModalOpen] = useState(false);
+  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
+  const [prescriptionCount, setPrescriptionCount] = useState(1);
+  const [imageCount, setImageCount] = useState(1);
+  const [requestHistory, setRequestHistory] = useState<any[]>([]);
 
-    const fetchHistory = useCallback(async () => {
+  const uploadModeRef = useRef<UploadMode | null>(null);
+  const photoLibraryInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchHistory = useCallback(async () => {
+      if (!user) return; // Don't fetch history for guest users
       try {
           const response = await fetch('/api/requests');
           if (response.ok) {
@@ -149,179 +139,183 @@ const DispatchPage: React.FC = () => {
       } catch (error) {
           console.error('Failed to fetch request history:', error);
       }
-  }, []);
+  }, [user]);
 
-    useEffect(() => {
-      fetchHistory();
+  useEffect(() => {
+    fetchHistory();
   }, [fetchHistory]);
 
-    const uploadModeRef = useRef<UploadMode | null>(null);
-    const photoLibraryInputRef = useRef<HTMLInputElement>(null);
-  
-
-    useEffect(() => {
-      try {
-        const savedDrugs = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (savedDrugs) {
-          setRequestedDrugs(JSON.parse(savedDrugs));
-        }
-      } catch (error) {
-        console.error("Failed to load drugs from local storage", error);
+  useEffect(() => {
+    try {
+      const savedDrugs = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedDrugs) {
+        setRequestedDrugs(JSON.parse(savedDrugs));
       }
-      setIsInitialLoad(false);
-    }, []);
-  
-    useEffect(() => {
-      if (!isInitialLoad) {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(requestedDrugs));
-      }
-    }, [requestedDrugs, isInitialLoad]);
-
-    const handleRefillRequest = (itemsToRefill: any[]) => {
-      if (requestedDrugs.length > 0) {
-          if (!confirm('This action will replace your current list. Are you sure you want to continue?')) {
-              return;
-          }
-      }
-      setRequestedDrugs(itemsToRefill);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-  
-    const fetchSuggestions = async (input: string) => {
-      if (input.length < 2) {
-        setSuggestions([]);
-        return;
-      }
-      setLoading(true);
-      setSuggestions([]);
-      setLoading(false);
-    };
-  
-    const debouncedFetchSuggestions = useCallback(debounce(fetchSuggestions, 800), []);
-  
-    const handleInputChange = (_: any, newInputValue: string) => {
-      setInputValue(newInputValue);
-      debouncedFetchSuggestions(newInputValue);
-    };
-  
-    const handleAddDrug = (name: string, image: string | null = null, mode: UploadMode | null = null) => {
-      let finalName = name.trim();
-      if ((!finalName && !image) || (finalName && requestedDrugs.some(drug => drug.name.toLowerCase() === finalName.toLowerCase()))) return;
-  
-      if (image && !finalName) {
-          if (mode === 'prescription') {
-              finalName = `Prescription ${prescriptionCount}`;
-              setPrescriptionCount(prev => prev + 1);
-          } else {
-              finalName = `Image ${imageCount}`;
-              setImageCount(prev => prev + 1);
-          }
-      }
-  
-      const newDrug: DrugRequest = {
-        id: Date.now(),
-        name: finalName,
-        form: getAIFormSuggestions(finalName)[0] || '',
-        strength: getAIStrengthSuggestions(finalName)[0] || '',
-        quantity: 1,
-        notes: '',
-        image,
-        formSuggestions: getAIFormSuggestions(finalName),
-        strengthSuggestions: getAIStrengthSuggestions(finalName),
-        showAllForms: false,
-        showOtherInfo: false,
-        isEditing: !image,
-      };
-  
-      setRequestedDrugs(drugs => [newDrug, ...drugs.map(d => ({...d, isEditing: false}))]);
-      setInputValue("");
-      setSuggestions([]);
-    };
-    
-    const handleImageUpload = (file: File) => {
-        if (!file) return;
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => {
-            handleAddDrug('', reader.result as string, uploadModeRef.current);
-        };
-    };
-  
-    const triggerImageUpload = (mode: UploadMode) => {
-        uploadModeRef.current = mode;
-        photoLibraryInputRef.current?.click();
+    } catch (error) {
+      console.error("Failed to load drugs from local storage", error);
     }
-  
-    const handleUpdateDrug = (id: number, field: keyof DrugRequest, value: any) => {
-      setRequestedDrugs(drugs => drugs.map(drug => (drug.id === id ? { ...drug, [field]: value } : drug)));
+    setIsInitialLoad(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isInitialLoad) {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(requestedDrugs));
+    }
+  }, [requestedDrugs, isInitialLoad]);
+
+  const handleRefillRequest = (itemsToRefill: any[]) => {
+    if (requestedDrugs.length > 0 && !confirm('This action will replace your current list. Are you sure you want to continue?')) {
+        return;
+    }
+    setRequestedDrugs(itemsToRefill);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const fetchSuggestions = async (input: string) => {
+    if (input.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    setLoading(true);
+    // Mocking API call
+    setTimeout(() => {
+        const mockSuggestions = [
+            { label: `${input} 100mg` },
+            { label: `${input} 200mg` },
+        ];
+        setSuggestions(mockSuggestions);
+        setLoading(false);
+    }, 500);
+  };
+
+  const debouncedFetchSuggestions = useCallback(debounce(fetchSuggestions, 800), []);
+
+  const handleInputChange = (_: any, newInputValue: string) => {
+    setInputValue(newInputValue);
+    debouncedFetchSuggestions(newInputValue);
+  };
+
+  const handleAddDrug = (name: string, image: string | null = null, mode: UploadMode | null = null) => {
+    let finalName = name.trim();
+    if ((!finalName && !image) || (finalName && requestedDrugs.some(drug => drug.name.toLowerCase() === finalName.toLowerCase()))) return;
+
+    if (image && !finalName) {
+        finalName = mode === 'prescription' ? `Prescription ${prescriptionCount}` : `Image ${imageCount}`;
+        if (mode === 'prescription') setPrescriptionCount(prev => prev + 1);
+        else setImageCount(prev => prev + 1);
+    }
+
+    const newDrug: DrugRequest = {
+      id: Date.now(),
+      name: finalName,
+      form: getAIFormSuggestions(finalName)[0] || '',
+      strength: getAIStrengthSuggestions(finalName)[0] || '',
+      quantity: 1,
+      notes: '',
+      image,
+      formSuggestions: getAIFormSuggestions(finalName),
+      strengthSuggestions: getAIStrengthSuggestions(finalName),
+      showAllForms: false,
+      showOtherInfo: false,
+      isEditing: !image,
     };
-  
-    const handleSetEditing = (id: number, editing: boolean) => {
-      setRequestedDrugs(drugs => drugs.map(drug => (drug.id === id ? { ...drug, isEditing: editing } : { ...drug, isEditing: false })));
-    };
-  
-    const handleRemoveDrug = (id: number) => {
-      setRequestedDrugs(drugs => drugs.filter(drug => drug.id !== id));
-    };
-  
-    const toggleShowAllForms = (id: number) => {
-      setRequestedDrugs(drugs => drugs.map(drug => (drug.id === id ? { ...drug, showAllForms: !drug.showAllForms } : drug)));
-    };
-  
-    const toggleShowOtherInfo = (id: number) => {
-      setRequestedDrugs(drugs => drugs.map(drug => (drug.id === id ? { ...drug, showOtherInfo: !drug.showOtherInfo } : drug)));
-    };
-  
-    const handleConfirmDispatch = async () => {
-      setIsModalOpen(false); 
-      setGlobalError(null);
-      if (requestedDrugs.length === 0) {
-          setGlobalError("Cannot submit an empty list.");
-          return;
-      }
-      setIsSubmitting(true);
-  
-      const payload = {
-        requestType: 'drug-list', 
-        items: requestedDrugs.map(drug => ({ name: drug.name, form: drug.form, strength: drug.strength, quantity: drug.quantity, notes: drug.notes, image: drug.image }))
+
+    setRequestedDrugs(drugs => [newDrug, ...drugs.map(d => ({...d, isEditing: false}))]);
+    setInputValue("");
+    setSuggestions([]);
+  };
+
+  const handleImageUpload = (file: File) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+          handleAddDrug('', reader.result as string, uploadModeRef.current);
       };
-  
-      try {
-        const response = await fetch('/api/requests', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-  
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Submission failed');
-        }
-  
-        const newRequest = await response.json();
+  };
 
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
-        
-        setActiveRequestId(newRequest._id);
-        setIsRadarModalOpen(true);
+  const triggerImageUpload = (mode: UploadMode) => {
+      uploadModeRef.current = mode;
+      photoLibraryInputRef.current?.click();
+  };
 
-        fetchHistory();
+  const handleUpdateDrug = (id: number, field: keyof DrugRequest, value: any) => {
+    setRequestedDrugs(drugs => drugs.map(drug => (drug.id === id ? { ...drug, [field]: value } : drug)));
+  };
 
-      } catch (error) {
-        setGlobalError(error instanceof Error ? error.message : 'An unknown error occurred.');
-      } finally {
-        setIsSubmitting(false);
+  const handleSetEditing = (id: number, editing: boolean) => {
+    setRequestedDrugs(drugs => drugs.map(drug => (drug.id === id ? { ...drug, isEditing: editing } : { ...drug, isEditing: false })));
+  };
+
+  const handleRemoveDrug = (id: number) => {
+    setRequestedDrugs(drugs => drugs.filter(drug => drug.id !== id));
+  };
+
+  const toggleShowAllForms = (id: number) => {
+    setRequestedDrugs(drugs => drugs.map(drug => (drug.id === id ? { ...drug, showAllForms: !drug.showAllForms } : drug)));
+  };
+
+  const toggleShowOtherInfo = (id: number) => {
+    setRequestedDrugs(drugs => drugs.map(drug => (drug.id === id ? { ...drug, showOtherInfo: !drug.showOtherInfo } : drug)));
+  };
+
+  const handleFindMedicinesClick = () => {
+      if (!user) {
+          // User is not logged in, open the login prompt modal
+          setIsLoginModalOpen(true); 
+      } else {
+          // User is logged in, open the confirmation modal.
+          setIsModalOpen(true);
       }
+  };
+
+  const handleConfirmDispatch = async () => {
+    setIsModalOpen(false);
+    setGlobalError(null);
+    if (requestedDrugs.length === 0) {
+        setGlobalError("Cannot submit an empty list.");
+        return;
+    }
+    setIsSubmitting(true);
+
+    const payload = {
+      requestType: 'drug-list',
+      items: requestedDrugs.map(({ name, form, strength, quantity, notes, image }) => ({ name, form, strength, quantity, notes, image }))
     };
 
-    const handleCloseRadarModal = () => {
-      setIsRadarModalOpen(false);
-      setRequestedDrugs([]); 
-      setActiveRequestId(null);
-    };
-  
+    try {
+      const response = await fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-  if (isSessionLoading || !user) {
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Submission failed');
+      }
+
+      const newRequest = await response.json();
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      setActiveRequestId(newRequest._id);
+      setIsRadarModalOpen(true);
+      fetchHistory(); // Refetch history to include the new request
+
+    } catch (error) {
+      setGlobalError(error instanceof Error ? error.message : 'An unknown error occurred.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCloseRadarModal = () => {
+    setIsRadarModalOpen(false);
+    setRequestedDrugs([]);
+    setActiveRequestId(null);
+  };
+
+  // Show a loader while the session is being checked
+  if (isSessionLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
@@ -331,7 +325,7 @@ const DispatchPage: React.FC = () => {
 
   return (
     <>
-      <Navbar /> 
+      <Navbar />
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <input type="file" accept="image/*" ref={photoLibraryInputRef} onChange={(e) => { e.target.files && handleImageUpload(e.target.files[0]); e.target.value = ''; }} style={{ display: 'none' }} />
 
@@ -341,50 +335,51 @@ const DispatchPage: React.FC = () => {
               Dispatch Request
             </Typography>
             <Typography variant="body1" align="center" color="text.secondary" sx={{ mb: 4 }}>
-              Build your dispatch list. Your progress is saved automatically.
+              Build your dispatch list. Login will be required to submit.
             </Typography>
             
             {globalError && <Alert severity="error" sx={{ mb: 2 }}>{globalError}</Alert>}
 
+            {/* Search and Upload Buttons */}
             <Box sx={{ display: 'flex', gap: 1, mb: 4, alignItems: 'stretch' }}>
-              <Autocomplete
-                freeSolo
-                sx={{ flexGrow: 1 }}
-                options={suggestions}
-                getOptionLabel={(option) => (typeof option === 'string' ? option : option.label)}
-                onInputChange={handleInputChange}
-                onChange={(_, newValue) => {
-                  const drugName = typeof newValue === 'string' ? newValue : (newValue as Suggestion)?.label;
-                  if (drugName) handleAddDrug(drugName, null, null);
-                }}
-                inputValue={inputValue}
-                loading={loading}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Search by Medicine Name..."
-                    variant="outlined"
-                    InputProps={{
-                      ...params.InputProps,
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          {loading ? <CircularProgress color="inherit" size={20} /> : (
-                            <Button onClick={() => handleAddDrug(inputValue, null, null)} disabled={!inputValue.trim() || loading} sx={{ mr: -1 }}>Add</Button>
-                          )}
-                        </InputAdornment>
-                      ),
+                <Autocomplete
+                    freeSolo
+                    sx={{ flexGrow: 1 }}
+                    options={suggestions}
+                    getOptionLabel={(option) => (typeof option === 'string' ? option : option.label)}
+                    onInputChange={handleInputChange}
+                    onChange={(_, newValue) => {
+                        const drugName = typeof newValue === 'string' ? newValue : (newValue as Suggestion)?.label;
+                        if (drugName) handleAddDrug(drugName, null, null);
                     }}
-                  />
-                )}
-              />
-              <Box onClick={() => triggerImageUpload('prescription')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(0, 0, 0, 0.23)', borderRadius: '4px', cursor: 'pointer', textAlign: 'center', color: 'text.secondary', '&:hover': { backgroundColor: 'action.hover' } }}>
-                <DescriptionIcon />
-                <Typography variant="caption" sx={{ lineHeight: 1.2, mt: 0.5 }}>Prescription</Typography>
-              </Box>
-              <Box onClick={() => triggerImageUpload('image')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(0, 0, 0, 0.23)', borderRadius: '4px', cursor: 'pointer', textAlign: 'center', color: 'text.secondary', '&:hover': { backgroundColor: 'action.hover' } }}>
-                <ImageIcon />
-                <Typography variant="caption" sx={{ lineHeight: 1.2, mt: 0.5 }}>Image</Typography>
-              </Box>
+                    inputValue={inputValue}
+                    loading={loading}
+                    renderInput={(params) => (
+                    <TextField
+                        {...params}
+                        label="Search by Medicine Name..."
+                        variant="outlined"
+                        InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                            <InputAdornment position="end">
+                            {loading ? <CircularProgress color="inherit" size={20} /> : (
+                                <Button onClick={() => handleAddDrug(inputValue, null, null)} disabled={!inputValue.trim() || loading} sx={{ mr: -1 }}>Add</Button>
+                            )}
+                            </InputAdornment>
+                        ),
+                        }}
+                    />
+                    )}
+                />
+                <Box onClick={() => triggerImageUpload('prescription')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(0, 0, 0, 0.23)', borderRadius: '4px', cursor: 'pointer', textAlign: 'center', color: 'text.secondary', '&:hover': { backgroundColor: 'action.hover' } }}>
+                    <DescriptionIcon />
+                    <Typography variant="caption" sx={{ lineHeight: 1.2, mt: 0.5 }}>Prescription</Typography>
+                </Box>
+                <Box onClick={() => triggerImageUpload('image')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(0, 0, 0, 0.23)', borderRadius: '4px', cursor: 'pointer', textAlign: 'center', color: 'text.secondary', '&:hover': { backgroundColor: 'action.hover' } }}>
+                    <ImageIcon />
+                    <Typography variant="caption" sx={{ lineHeight: 1.2, mt: 0.5 }}>Image</Typography>
+                </Box>
             </Box>
 
             
@@ -478,11 +473,12 @@ const DispatchPage: React.FC = () => {
               </Card>
             ))}
             
+            {/* --- MODIFICATION: Use the new handler --- */}
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
               <Button
                 variant="contained"
                 color="primary"
-                onClick={() => setIsModalOpen(true)}
+                onClick={handleFindMedicinesClick} 
                 disabled={requestedDrugs.length === 0 || requestedDrugs.some(d => d.isEditing) || isSubmitting}
                 sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' }, borderRadius: '25px', padding: '10px 30px', fontSize: '1rem' }}
               >
@@ -490,7 +486,8 @@ const DispatchPage: React.FC = () => {
               </Button>
             </Box>
             
-            <RequestHistory history={requestHistory} onRefill={handleRefillRequest} />
+            {/* Only show request history if the user is logged in */}
+            {user && <RequestHistory history={requestHistory} onRefill={handleRefillRequest} />}
 
           </Grid>
         </Grid>
@@ -509,6 +506,42 @@ const DispatchPage: React.FC = () => {
           requests={requestedDrugs}
           requestId={activeRequestId} 
         />
+
+        {/* <<< New Login Prompt Modal >>> */}
+        <Modal
+            open={isLoginModalOpen}
+            onClose={() => setIsLoginModalOpen(false)}
+            aria-labelledby="login-prompt-title"
+            aria-describedby="login-prompt-description"
+        >
+            <Box sx={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: 400,
+                bgcolor: 'background.paper',
+                borderRadius: '16px',
+                boxShadow: 24,
+                p: 4,
+                textAlign: 'center'
+            }}>
+                <Typography id="login-prompt-title" variant="h6" component="h2" sx={{ fontWeight: 600 }}>
+                    Login Recommended
+                </Typography>
+                <Typography id="login-prompt-description" sx={{ mt: 2 }}>
+                    To continue with your request, please log in or create an account. Your current list will be saved.
+                </Typography>
+                <Link href="/auth?redirect=/dispatch" passHref>
+                    <Button 
+                        variant="contained" 
+                        sx={{ mt: 3, bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' } }}
+                    >
+                        Login / Sign Up
+                    </Button>
+                </Link>
+            </Box>
+        </Modal>
 
       </Container>
     </>

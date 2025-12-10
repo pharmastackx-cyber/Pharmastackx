@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from 'next/navigation';
 import { TextField, Button, InputAdornment, IconButton, Box, Typography } from "@mui/material";
 import { Visibility, VisibilityOff } from '@mui/icons-material'; 
 import Link from 'next/link';
@@ -21,6 +22,8 @@ export default function LoginForm({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false); 
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect');
 
 
   useEffect(() => {
@@ -48,6 +51,11 @@ export default function LoginForm({
       Cookies.set("session_token", res.data.token, { expires: 7 });
       setSuccess("Login successful!");
       
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+        return;
+      }
+
       const userRole = res.data.user?.role;
       if (userRole === 'pharmacy' || userRole === 'vendor') {
         window.location.href = '/store-management';

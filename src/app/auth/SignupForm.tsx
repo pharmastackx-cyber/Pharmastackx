@@ -1,8 +1,10 @@
 'use client';
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from 'next/navigation';
 import { TextField, Button, MenuItem, Box, Typography, InputAdornment, IconButton, ListSubheader } from "@mui/material";
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from "axios";
+import Cookies from "js-cookie";
 import CreatePharmacyModal from "../components/CreatePharmacyModal";
 
 const nigerianStates = [
@@ -51,6 +53,8 @@ export default function SignupForm({
 
   const [providerLoading, setProviderLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect');
 
   const fetchPharmacies = useCallback(async () => {
     try {
@@ -97,7 +101,10 @@ export default function SignupForm({
     setLoading(true);
     try {
       await axios.post("/api/auth/signup", { ...form, role: "customer" });
-      onSignupSuccess(form.email, form.password);
+      const res = await axios.post("/api/auth/login", { email: form.email, password: form.password });
+      Cookies.set("session_token", res.data.token, { expires: 7 });
+      setSuccess("Signup successful!");
+      window.location.href = redirectUrl || '/';
     } catch (err: any) {
       setError(err.response?.data?.error || "Signup failed");
     } finally {
@@ -139,7 +146,22 @@ export default function SignupForm({
 
     try {
       await axios.post("/api/auth/signup", payload);
-      onSignupSuccess(form.email, form.password);
+      const res = await axios.post("/api/auth/login", { email: form.email, password: form.password });
+      Cookies.set("session_token", res.data.token, { expires: 7 });
+      setSuccess("Signup successful!");
+      
+      if(redirectUrl) {
+          window.location.href = redirectUrl;
+          return;
+      }
+
+      const userRole = res.data.user?.role;
+      if (userRole === 'pharmacy' || userRole === 'vendor') {
+        window.location.href = '/store-management';
+      } else {
+        window.location.href = '/';
+      }
+
     } catch (err: any) {
       setError(err.response?.data?.error || "Signup failed");
     } finally {
