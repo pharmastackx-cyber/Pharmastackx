@@ -19,7 +19,8 @@ import {
   Avatar
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import Navbar from '@/components/Navbar'; // Assuming you have a Navbar component
+import Navbar from '@/components/Navbar';
+import { useCart } from '@/contexts/CartContext'; // <<< IMPORTING THE CART HOOK
 
 // Interfaces
 interface QuotedItem {
@@ -45,6 +46,7 @@ const ReviewQuotePage: React.FC = () => {
   const router = useRouter();
   const params = useParams();
   const { id } = params;
+  const { addToCart, updateQuantity } = useCart(); // <<< USING THE CART HOOK
 
   const [request, setRequest] = useState<QuoteRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,22 +72,70 @@ const ReviewQuotePage: React.FC = () => {
     }
   }, [id]);
 
+  // --- MODIFIED: This function now handles adding items to the cart ---
   const handleDecision = async (decision: 'awaiting-confirmation' | 'rejected') => {
-    setIsSubmitting(decision === 'awaiting-confirmation' ? 'accept' : 'reject');
-    setError(null);
-    try {
-      const response = await fetch(`/api/requests/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: decision }),
-      });
-      if (!response.ok) throw new Error(`Failed to ${decision === 'rejected' ? 'reject' : 'accept'} the quote.`);
-      // Refresh the page to show the final status
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
-    } finally {
-      setIsSubmitting(null);
+    // If rejecting, just update status and refresh.
+    if (decision === 'rejected') {
+      setIsSubmitting('reject');
+      setError(null);
+      try {
+        const response = await fetch(`/api/requests/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'rejected' }),
+        });
+        if (!response.ok) throw new Error('Failed to reject the quote.');
+        router.refresh(); // Show the "Rejected" status
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      } finally {
+        setIsSubmitting(null);
+      }
+      return;
+    }
+
+    // If accepting, add items to cart, update status, and redirect to cart.
+    if (decision === 'awaiting-confirmation') {
+      setIsSubmitting('accept');
+      setError(null);
+
+      try {
+        // 1. Add available items from the quote to the shopping cart
+        const itemsToAdd = request?.items.filter(item => item.isAvailable) || [];
+        itemsToAdd.forEach((item, index) => {
+          const numericId = Date.now() + index; // Create a unique numeric ID for the cart
+          
+          const cartItemPayload = {
+            id: numericId,
+            name: item.name,
+            price: item.price,
+            image: item.image || '',
+            activeIngredients: item.strength || '', // Use strength if available
+            drugClass: 'From Quote', // Placeholder
+            pharmacy: 'From Quote' // Placeholder
+          };
+
+          addToCart(cartItemPayload); // This adds the item to the cart with a quantity of 1
+          updateQuantity(numericId, item.pharmacyQuantity); // This updates the item to the correct quoted quantity
+        });
+
+        // 2. Update the request status on the backend
+        const response = await fetch(`/api/requests/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'awaiting-confirmation' }),
+        });
+        if (!response.ok) {
+           throw new Error('Failed to accept the quote. Your cart has been updated, but please try again to confirm.');
+        }
+
+        // 3. Redirect to the cart page to complete the checkout
+        router.push('/cart');
+
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        setIsSubmitting(null); // Stop loading indicator on error to allow user to try again
+      }
     }
   };
 
@@ -123,7 +173,6 @@ const ReviewQuotePage: React.FC = () => {
 
             <Divider sx={{ mb: 3 }} />
 
-            {/* Pharmacist's Notes */}
             {request.notes && (
               <Box sx={{ mb: 3, p: 2, bgcolor: 'primary.lighter', borderRadius: '12px' }}>
                 <Typography variant="h6" gutterBottom>Notes from the Pharmacist</Typography>
@@ -131,7 +180,6 @@ const ReviewQuotePage: React.FC = () => {
               </Box>
             )}
 
-            {/* Items List */}
             <Typography variant="h6" gutterBottom>Quoted Items</Typography>
             <Grid container spacing={2}>
               {availableItems.length > 0 ? availableItems.map((item, index) => (
@@ -154,7 +202,6 @@ const ReviewQuotePage: React.FC = () => {
               )}
             </Grid>
             
-            {/* Total and Action Buttons */}
             {availableItems.length > 0 && (
               <Box>
                   <Divider sx={{ my: 3 }} />
@@ -163,7 +210,6 @@ const ReviewQuotePage: React.FC = () => {
                       <Typography variant="h5" component="p" sx={{fontWeight: 'bold'}}>₦{totalPrice.toLocaleString()}</Typography>
                   </Box>
 
-                  {/* Show buttons only if a decision hasn't been made */}
                   {request.status === 'quoted' && (
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
                           <Button 

@@ -1067,46 +1067,43 @@ useEffect(() => {
     };
 
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    const reader = new FileReader();
 
-    if (fileExtension === 'csv' || fileExtension === 'txt') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const fileText = e.target?.result as string;
-        rawFileContentRef.current = fileText; // Use ref
-        Papa.parse(fileText, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (result) => processData(result.data),
-          error: (error: any) => { console.error("CSV parsing error:", error); alert("Failed to parse CSV file."); }
-        });
-      };
-      reader.onerror = (error) => { console.error("Error reading file:", error); alert("Could not read the selected file."); };
-      reader.readAsText(file);
-    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
+    reader.onload = (e) => {
         try {
-          const data = e.target?.result;
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          
-          const csvString = XLSX.utils.sheet_to_csv(worksheet);
-          rawFileContentRef.current = csvString; // Use ref
-          
-          const json = XLSX.utils.sheet_to_json(worksheet);
-          processData(json);
+            const data = e.target?.result;
+            // Use SheetJS for all supported file types
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            
+            // This will hold the raw text content, regardless of original format
+            const csvString = XLSX.utils.sheet_to_csv(worksheet);
+            rawFileContentRef.current = csvString; 
+            
+            // This converts the sheet to a JSON object array for processing
+            const json = XLSX.utils.sheet_to_json(worksheet);
+            processData(json);
+
         } catch (error: any) {
-          console.error("Excel parsing error:", error);
-          alert("Failed to parse Excel file. It might be corrupted or in an unsupported format.");
+            console.error("File parsing error:", error);
+            alert(`Failed to parse file. It might be corrupted or in an unsupported format. Error: ${error.message}`);
         }
-      };
-      reader.onerror = (error) => { console.error("Error reading file:", error); alert("Could not read the selected Excel file."); };
-      reader.readAsArrayBuffer(file);
+    };
+    
+    reader.onerror = (error) => {
+        console.error("Error reading file:", error);
+        alert("Could not read the selected file.");
+    };
+
+    // Read all file types as an ArrayBuffer, as it's the most robust method for SheetJS
+    if (fileExtension === 'csv' || fileExtension === 'txt' || fileExtension === 'xlsx' || fileExtension === 'xls') {
+        reader.readAsArrayBuffer(file);
     } else {
-      alert(`Unsupported file type: .${fileExtension}. Please upload a CSV, TXT, XLS, or XLSX file.`);
+        alert(`Unsupported file type: .${fileExtension}. Please upload a CSV, TXT, XLS, or XLSX file.`);
     }
   };
+
 
   const handleConfirmBulkUpload = async () => {
     console.log("--- [FRONTEND DEBUG] 1. Confirm button clicked. ---");

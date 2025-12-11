@@ -6,6 +6,11 @@ const RequestSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  // --- FIX: Add pharmacy field to link to the quoting pharmacy ---
+  pharmacy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Pharmacy' 
+  },
   items: [{
     _id: false, 
     name: { type: String, required: true },
@@ -27,7 +32,6 @@ const RequestSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    // --- FIX: Corrected statuses to avoid the word 'order' ---
     enum: ['pending', 'quoted', 'awaiting-confirmation', 'confirmed', 'dispatched', 'rejected', 'cancelled'], 
     default: 'pending',
   },

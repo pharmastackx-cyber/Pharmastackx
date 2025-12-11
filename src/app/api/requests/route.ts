@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
+// Helper to get session from the request cookies
 async function getSession(req: NextRequest) {
   const token = req.cookies.get('session_token')?.value;
   if (!token) return null;
@@ -69,6 +70,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
+
+// --- FIX STARTS HERE ---
 export async function GET(req: NextRequest) {
     await dbConnect();
     const session = await getSession(req);
@@ -78,18 +81,13 @@ export async function GET(req: NextRequest) {
     }
   
     try {
-      const source = req.nextUrl.searchParams.get('source');
-
-      let query: any;
-
-      if (source === 'dispatch') {
-        query = { user: session.userId };
-      } else {
-        const adminRoles = ['admin', 'pharmacist', 'pharmacy'];
-        query = adminRoles.includes(session.role) 
-          ? {} 
-          : { user: session.userId };
-      }
+      // Corrected Role-based authorization as requested.
+      // A user with one of these roles sees ALL requests.
+      // Any other authenticated user will only see their OWN requests.
+      const adminRoles = ['admin', 'pharmacist', 'pharmacy'];
+      const query = adminRoles.includes(session.role) 
+        ? {} // An empty query matches all documents
+        : { user: session.userId }; // Otherwise, filter by the user's ID
 
       const requests = await RequestModel.find(query).populate('user', 'name email').sort({ createdAt: -1 });
   
@@ -100,3 +98,4 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'Internal Server Error while fetching requests.' }, { status: 500 });
     }
   }
+// --- FIX ENDS HERE ---

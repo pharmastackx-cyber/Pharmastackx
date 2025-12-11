@@ -18,13 +18,14 @@ async function getSession(req: NextRequest) {
 }
 
 // GET a single dispatch request
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params: paramsPromise }: { params: Promise<{ id: string }> }) {
     const session = await getSession(req);
     if (!session?.userId) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
     await dbConnect();
     try {
+        const params = await paramsPromise;
         const dispatchRequest = await RequestModel.findById(params.id);
         if (!dispatchRequest) {
             return NextResponse.json({ message: 'Request not found' }, { status: 404 });
@@ -37,8 +38,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 
-// UPDATE a dispatch request (for pharmacy quotes)
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+// UPDATE a dispatch request (for pharmacy quotes OR patient decisions)
+export async function PATCH(req: NextRequest, { params: paramsPromise }: { params: Promise<{ id: string }> }) {
     const session = await getSession(req);
     if (!session?.userId) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
@@ -50,36 +51,37 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         const body = await req.json();
         const { items, status, notes } = body;
 
+        const params = await paramsPromise;
         const originalRequest = await RequestModel.findById(params.id);
+
         if (!originalRequest) {
             return NextResponse.json({ message: 'Request not found' }, { status: 404 });
         }
 
-        // --- FIX: Correctly handle quote submissions for all request types ---
-        if (originalRequest.requestType === 'image-upload') {
-            // When quoting an image-based request, preserve the original URL
-            // in a new `prescriptionImage` field before overwriting `items`.
-            if (Array.isArray(originalRequest.items) && typeof originalRequest.items[0] === 'string' && !originalRequest.prescriptionImage) {
-                originalRequest.prescriptionImage = originalRequest.items[0];
-            }
-            // Replace the original item (the URL string) with the new quote details.
-            originalRequest.items = items;
-        } else {
-            // For standard drug-list requests, update the existing items.
-            originalRequest.items = originalRequest.items.map((originalItem: any) => {
-                const updatedItemData = items.find((item: any) => item.name === originalItem.name);
-                if (updatedItemData) {
-                    return {
-                        ...originalItem.toObject(),
-                        isAvailable: updatedItemData.isAvailable,
-                        price: updatedItemData.price,
-                        pharmacyQuantity: updatedItemData.pharmacyQuantity,
-                    };
+        // --- THE FIX: Only process items if they are included in the request ---
+        if (items && Array.isArray(items)) {
+            if (originalRequest.requestType === 'image-upload') {
+                if (Array.isArray(originalRequest.items) && typeof originalRequest.items[0] === 'string' && !originalRequest.prescriptionImage) {
+                    originalRequest.prescriptionImage = originalRequest.items[0];
                 }
-                return originalItem;
-            });
+                originalRequest.items = items;
+            } else {
+                originalRequest.items = originalRequest.items.map((originalItem: any) => {
+                    const updatedItemData = items.find((item: any) => item.name === originalItem.name);
+                    if (updatedItemData) {
+                        return {
+                            ...originalItem.toObject(),
+                            isAvailable: updatedItemData.isAvailable,
+                            price: updatedItemData.price,
+                            pharmacyQuantity: updatedItemData.pharmacyQuantity,
+                        };
+                    }
+                    return originalItem;
+                });
+            }
         }
         
+        // Always allow status and notes to be updated independently
         if (status) {
             originalRequest.status = status;
         }
