@@ -128,9 +128,9 @@ const DispatchPage: React.FC = () => {
   const photoLibraryInputRef = useRef<HTMLInputElement>(null);
 
   const fetchHistory = useCallback(async () => {
-      if (!user) return; // Don't fetch history for guest users
+      if (!user) return;
       try {
-          const response = await fetch('/api/requests');
+          const response = await fetch('/api/requests?source=dispatch');
           if (response.ok) {
               const data = await response.json();
               data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -332,10 +332,10 @@ const DispatchPage: React.FC = () => {
         <Grid container spacing={4} justifyContent="center">
           <Grid item xs={12} md={8}>
             <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 700, color: '#006D5B' }}>
-              Dispatch Request
+              Find Medicines
             </Typography>
             <Typography variant="body1" align="center" color="text.secondary" sx={{ mb: 4 }}>
-              Build your dispatch list. Login will be required to submit.
+              Search medicines from pharmacies nearest to you.
             </Typography>
             
             {globalError && <Alert severity="error" sx={{ mb: 2 }}>{globalError}</Alert>}
