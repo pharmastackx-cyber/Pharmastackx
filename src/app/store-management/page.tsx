@@ -560,66 +560,75 @@ export default function StoreManagementPage() {
 
 
 
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      setLoadingUser(true);
-      try {
-        const userRes = await fetch('/api/user/me');
-        if (!userRes.ok) throw new Error('Failed to fetch user');
-        const userData = await userRes.json();
-        
-        const role = userData.user?.role || 'vendor';
-        const isAdminUser = role === 'admin';
-        const isStockManagerUser = role === 'stockManager';
-
-        setIsAdmin(isAdminUser);
-        setUserRole(role);
-        setIsStockManager(isStockManagerUser);
-
-        // Treat both 'admin' and 'stockManager' as having admin-level data access
-        const hasAdminDataPermissions = isAdminUser || isStockManagerUser;
-
-        // If the user is a Stock Manager, force their view to the Stock tab.
-        if (isStockManagerUser) {
-          setSelectedTab(2); // The index for the "Stock" tab
-        }
-
-        let currentBusinessName: string | null = null;
-        if (userData.user?.businessName) {
-            currentBusinessName = userData.user.businessName;
-            setUserBusinessName(currentBusinessName);
-            setFormValues(prev => ({ ...prev, businessName: currentBusinessName! }));
-        }
-        if (userData.user?.slug) setUserSlug(userData.user.slug);
-
-        if (userData.user?.businessCoordinates) {
-          const { latitude, longitude } = userData.user.businessCoordinates;
-          if (latitude && longitude) {
-            const currentCoordinates = `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
-            setBusinessCoordinates({ latitude, longitude });
-            setLocation(currentCoordinates);
-            setFormValues(prev => ({ ...prev, coordinates: currentCoordinates! }));
-            setIsLocationSet(true);
+    useEffect(() => {
+      const fetchInitialData = async () => {
+        setLoadingUser(true);
+        try {
+          const userRes = await fetch('/api/auth/session');
+          if (!userRes.ok) throw new Error('Failed to fetch user session');
+          
+          // --- THIS IS THE CRITICAL FIX ---
+          // The user data is nested inside a 'user' object in the response.
+          const { user } = await userRes.json();
+          
+          if (!user) {
+            throw new Error('User data not found in session.');
+          }
+  
+          const role = user?.role || 'vendor';
+          const isAdminUser = role === 'admin';
+          const isStockManagerUser = role === 'stockManager';
+  
+          setIsAdmin(isAdminUser);
+          setUserRole(role);
+          setIsStockManager(isStockManagerUser);
+  
+          const hasAdminDataPermissions = isAdminUser || isStockManagerUser;
+  
+          if (isStockManagerUser) {
+            setSelectedTab(2);
+          }
+  
+          let currentBusinessName: string | null = null;
+          if (user?.businessName) {
+              currentBusinessName = user.businessName;
+              setUserBusinessName(currentBusinessName);
+              setFormValues(prev => ({ ...prev, businessName: currentBusinessName! }));
+          }
+          if (user?.slug) {
+              setUserSlug(user.slug);
+          }
+  
+          if (user?.businessCoordinates) {
+            const { latitude, longitude } = user.businessCoordinates;
+            if (latitude && longitude) {
+              const currentCoordinates = `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
+              setBusinessCoordinates({ latitude, longitude });
+              setLocation(currentCoordinates);
+              setFormValues(prev => ({ ...prev, coordinates: currentCoordinates! }));
+              setIsLocationSet(true);
+            } else {
+              setIsLocationSet(false);
+            }
           } else {
             setIsLocationSet(false);
           }
-        } else {
-          setIsLocationSet(false);
+  
+          await Promise.all([
+            fetchStockData(currentBusinessName, hasAdminDataPermissions),
+            fetchOrders(currentBusinessName, hasAdminDataPermissions)
+          ]);
+        
+        } catch (error) {
+          console.error('Error fetching initial data:', error);
+          // Optionally: Show an error message to the user in the UI
         }
-
-        // Fetch data using admin permissions if the user is an admin OR a stock manager
-        await Promise.all([
-          fetchStockData(currentBusinessName, hasAdminDataPermissions),
-          fetchOrders(currentBusinessName, hasAdminDataPermissions)
-        ]);
-      
-      } catch (error) {
-        console.error('Error fetching initial data:', error);
-      }
-      setLoadingUser(false);
-    };
-    fetchInitialData();
-  }, [fetchStockData, fetchOrders]);
+        setLoadingUser(false);
+      };
+      fetchInitialData();
+    }, [fetchStockData, fetchOrders]);
+  
+  
 
 
 
@@ -860,18 +869,20 @@ useEffect(() => {
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => setSelectedTab(newValue);
 
   const handleGetLocation = () => {
-    if (businessCoordinates?.latitude && businessCoordinates?.longitude) {
-      if (!window.confirm('Are you sure you want to overwrite your existing store location? This action is required for accurate tracking but please ensure you are at your store location.')) {
-        logAction('UPDATE_LOCATION', 'INFO', 'User cancelled overwriting their location.');
-        return;
-      }
+    // This confirmation will now appear every time the button is clicked.
+    if (!window.confirm('For accurate results, please ensure you are at your pharmacy before setting the location. Proceed?')) {
+      logAction('UPDATE_LOCATION', 'INFO', 'User cancelled setting the location.');
+      return;
     }
+
     if (!navigator.geolocation) {
       logAction('UPDATE_LOCATION', 'FAILURE', 'User attempted to get location, but Geolocation is not supported by their browser.');
       alert('Geolocation is not supported by your browser.');
       return;
     }
+
     alert('Getting your location... Please accept the browser prompt.');
+
     navigator.geolocation.getCurrentPosition(
       async pos => {
         const { latitude, longitude } = pos.coords;
@@ -883,10 +894,13 @@ useEffect(() => {
             body: JSON.stringify({ coordinates: { latitude, longitude } }),
           });
           if (!res.ok) throw new Error('Failed to update location on the server.');
+          
+          // Manually update the UI without waiting for a full page reload
           setBusinessCoordinates({ latitude, longitude });
           setLocation(coordsString);
           setFormValues(prev => ({ ...prev, coordinates: coordsString }));
           setIsLocationSet(true);
+
           alert('Location updated successfully!');
           logAction('UPDATE_LOCATION', 'SUCCESS', `User updated their location to: ${coordsString}`);
         } catch (e) {
@@ -900,11 +914,12 @@ useEffect(() => {
         alert(`Error getting location: ${err.message}. Please ensure you have enabled location services.`);
         logAction('UPDATE_LOCATION', 'FAILURE', `User denied geolocation permission or an error occurred: ${err.message}`);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      // --- THIS IS THE FIX ---
+      // We set `enableHighAccuracy` to `false` for a much faster response.
+      // I also slightly reduced the timeout.
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
     );
   };
-
-
 
   const handleStoreInfoClick = async () => {
     setLoadingUser(true);

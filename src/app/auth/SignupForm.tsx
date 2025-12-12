@@ -59,7 +59,14 @@ export default function SignupForm({
   const fetchPharmacies = useCallback(async () => {
     try {
       const { data } = await axios.get('/api/pharmacies');
-      setPharmacies(data);
+      if (data && Array.isArray(data.pharmacies)) {
+        const sortedPharmacies = data.pharmacies.sort((a: Pharmacy, b: Pharmacy) =>
+          a.businessName.localeCompare(b.businessName)
+        );
+        setPharmacies(sortedPharmacies);
+      } else {
+        setError("Failed to load pharmacies list.");
+      }
     } catch (error) {
       console.error("Failed to fetch pharmacies", error);
       setError("Failed to load pharmacies list.");
@@ -122,10 +129,9 @@ export default function SignupForm({
   ];
 
   const handlePharmacyCreated = (newPharmacy: Pharmacy) => {
-    fetchPharmacies().then(() => {
-        setForm((prevForm) => ({ ...prevForm, pharmacy: newPharmacy._id }));
-        setCreatePharmacyModalOpen(false);
-    });
+    setPharmacies(prevPharmacies => [newPharmacy, ...prevPharmacies]);
+    setForm((prevForm) => ({ ...prevForm, pharmacy: newPharmacy._id }));
+    setCreatePharmacyModalOpen(false);
   };
 
   const handleProviderSignup = async (e: React.FormEvent) => {

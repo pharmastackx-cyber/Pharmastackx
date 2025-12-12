@@ -71,7 +71,7 @@ const CreatePharmacyModal: React.FC<CreatePharmacyModalProps> = ({ open, onClose
     <Modal open={open} onClose={onClose}>
       <Box sx={style}>
         <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
-          Create a New Pharmacy
+          Add your Pharmacy
         </Typography>
         <TextField label="Business Name" name="businessName" value={form.businessName} onChange={handleChange} fullWidth margin="normal" required />
         <TextField select label="State" name="state" value={form.state} onChange={handleChange} fullWidth margin="normal" required>

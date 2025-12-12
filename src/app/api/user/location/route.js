@@ -29,10 +29,26 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Coordinates object with latitude and longitude are missing' }, { status: 400 });
     }
 
-    const user = await User.findByIdAndUpdate(
-      payload.userId,
+    // --- START OF THE FIX ---
+
+    // 1. Fetch the currently logged-in user
+    const loggedInUser = await User.findById(payload.userId);
+
+    if (!loggedInUser) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // 2. Determine which user ID to update
+    let targetUserId = payload.userId; // Default to the logged-in user
+    if (loggedInUser.role === 'pharmacist' && loggedInUser.pharmacy) {
+        // If the user is a pharmacist, target their associated pharmacy instead
+        targetUserId = loggedInUser.pharmacy;
+    }
+
+    // 3. Update the target user's record (either the pharmacist or the pharmacy)
+    const updatedUser = await User.findByIdAndUpdate(
+      targetUserId,
       {
-        
         $set: {
           businessCoordinates: {
             latitude: coordinates.latitude,
@@ -43,12 +59,16 @@ export async function POST(req) {
       { new: true }
     ).select('slug businessCoordinates');
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // --- END OF THE FIX ---
+
+
+    if (!updatedUser) {
+      // This might happen if the pharmacist has a pharmacy ID that doesn't exist
+      return NextResponse.json({ error: 'Target user for location update not found' }, { status: 404 });
     }
     
     
-    return NextResponse.json({ success: true, user });
+    return NextResponse.json({ success: true, user: updatedUser });
   } catch (error) {
     console.error('API /user/location error:', error);
     if (error instanceof jwt.JsonWebTokenError) {
