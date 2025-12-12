@@ -8,6 +8,9 @@ import { PromoProvider } from "@/contexts/PromoContext";
 import { OrderProvider } from "@/contexts/OrderContext";
 import Script from "next/script";
 import { Suspense } from "react";
+import { AuthModalProvider } from "@/contexts/AuthModalContext"; // Import the provider
+import AuthModal from "./components/AuthModal";
+import Navbar from "./components/Navbar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -48,17 +51,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className={inter.className}>
-        <SessionProvider>
-          <PromoProvider>
-            <OrderProvider>
-              <CartProvider>
-                <Suspense fallback={null}>
-                </Suspense>
-                {children}
-              </CartProvider>
-            </OrderProvider>
-          </PromoProvider>
-        </SessionProvider>
+        <Suspense fallback={null}>
+          <SessionProvider>
+            {/* Wrap with AuthModalProvider */}
+            <AuthModalProvider>
+              <PromoProvider>
+                <OrderProvider>
+                  <CartProvider>
+                    <Navbar />
+                    <AuthModal />
+                    {children}
+                  </CartProvider>
+                </OrderProvider>
+              </PromoProvider>
+            </AuthModalProvider>
+          </SessionProvider>
+        </Suspense>
 
         <script
           dangerouslySetInnerHTML={{

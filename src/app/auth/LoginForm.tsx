@@ -1,30 +1,24 @@
 'use client';
 import React, { useState, useEffect } from "react";
-import { useSearchParams } from 'next/navigation';
-import { TextField, Button, InputAdornment, IconButton, Box, Typography } from "@mui/material";
-import { Visibility, VisibilityOff } from '@mui/icons-material'; 
+import { TextField, Button, InputAdornment, IconButton, Box, Typography, Alert } from "@mui/material";
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import Link from 'next/link';
-
 import axios from "axios";
-import Cookies from "js-cookie"; 
+import Cookies from "js-cookie";
 
 export default function LoginForm({
-  setError,
-  setSuccess,
+  redirectUrl,
   prefilledCredentials,
 }: {
-  setError: (msg: string) => void;
-  setSuccess: (msg: string) => void;
+  redirectUrl: string | null;
   prefilledCredentials?: { email: string; password: string };
 }) {
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); 
-  const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect');
-
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (prefilledCredentials?.email) {
@@ -37,9 +31,8 @@ export default function LoginForm({
 
   const handleClickShowPassword = () => setShowPassword((show) => !show);
   const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
-  event.preventDefault();
-};
-
+    event.preventDefault();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,28 +42,27 @@ export default function LoginForm({
     try {
       const res = await axios.post("/api/auth/login", { email, password });
       Cookies.set("session_token", res.data.token, { expires: 7 });
-      setSuccess("Login successful!");
+      setSuccess("Login successful! Redirecting...");
       
-      if (redirectUrl) {
-        window.location.href = redirectUrl;
-        return;
-      }
+      // Redirect after a short delay to allow user to see success message
+      setTimeout(() => {
+        if (redirectUrl) {
+          window.location.href = redirectUrl;
+        } else {
+          window.location.href = '/';
+        }
+      }, 1000);
 
-      const userRole = res.data.user?.role;
-      if (userRole === 'pharmacy' || userRole === 'vendor') {
-        window.location.href = '/store-management';
-      } else {
-        window.location.href = '/';
-      }
     } catch (err: any) {
-      setError(err.response?.data?.error || "Login failed");
-    } finally {
+      setError(err.response?.data?.error || "Login failed. Please check your credentials.");
       setLoading(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit}>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
       <TextField
         label="Email"
         type="email"
@@ -79,16 +71,18 @@ export default function LoginForm({
         fullWidth
         margin="normal"
         required
+        disabled={loading}
       />
-            <TextField
+      <TextField
         label="Password"
-        type={showPassword ? 'text' : 'password'} 
+        type={showPassword ? 'text' : 'password'}
         value={password}
         onChange={e => setPassword(e.target.value)}
         fullWidth
         margin="normal"
         required
-        InputProps={{ 
+        disabled={loading}
+        InputProps={{
           endAdornment: (
             <InputAdornment position="end">
               <IconButton
@@ -103,22 +97,20 @@ export default function LoginForm({
           ),
         }}
       />
-
       <Box sx={{ textAlign: 'right', mb: 2 }}>
         <Link href="/auth/forgot-password" passHref>
-          <Typography color="secondary" sx={{ textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
+          <Typography color="primary" sx={{ textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
             Forgot Password?
           </Typography>
         </Link>
       </Box>
-
       <Button
         type="submit"
         variant="contained"
-        color="secondary"
+        color="primary"
         fullWidth
         disabled={loading}
-        sx={{ mt: 2 }}
+        sx={{ mt: 1, py: 1.5 }}
       >
         {loading ? "Logging in..." : "Login"}
       </Button>

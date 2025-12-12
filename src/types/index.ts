@@ -6,6 +6,7 @@ export interface User {
   firstName: string;
   lastName: string;
   name?: string; // for user.name access
+  businessName?: string;
   phone: string;
   role: string; // Made more generic to support more roles
   isVerified: boolean;
