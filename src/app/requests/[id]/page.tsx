@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Container,
   Typography,
@@ -82,7 +83,6 @@ const ManageRequestPage: React.FC = () => {
     if (!request) return;
     setIsSubmitting(true);
     setError(null);
-    // --- FIX: Correctly determine items to submit ---
     const itemsToSubmit = request.requestType === 'image-upload' 
       ? manualItems.filter(item => item.name.trim() !== '') 
       : request.items;
@@ -91,9 +91,16 @@ const ManageRequestPage: React.FC = () => {
       const response = await fetch(`/api/requests/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: itemsToSubmit, status: 'quoted', notes: notes }),
+        body: JSON.stringify({ 
+          action: 'submit-quote', 
+          items: itemsToSubmit, 
+          notes: notes 
+        }),
       });
-      if (!response.ok) throw new Error('Failed to submit quote');
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to submit quote');
+      }
       router.push('/requests');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -102,7 +109,6 @@ const ManageRequestPage: React.FC = () => {
     }
   };
   
-  // --- FIX: Determine the correct image URL to display ---
   const getImageUrl = () => {
     if (!request) return '';
     if (request.prescriptionImage) return request.prescriptionImage;
@@ -112,15 +118,33 @@ const ManageRequestPage: React.FC = () => {
     return '';
   };
 
+  // This error is for the initial page load
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
-  if (error) return <Container sx={{ py: 4 }}><Alert severity="error">{error}</Alert></Container>;
-
+  if (!request && !loading) return <Container sx={{ py: 4 }}><Alert severity="error">{error || 'Could not load the request.'}</Alert></Container>;
+  
   const imageUrl = getImageUrl();
 
   return (
     <>
       <Navbar />
       <Container maxWidth="lg" sx={{ py: 4 }}>
+        
+        {/* --- FIXED: Improved error display for submission errors --- */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+            {error.includes('Store Management') && (
+              <Box sx={{ mt: 1 }}>
+                <Link href="/dashboard/store-management" passHref>
+                  <Button variant="outlined" color="inherit" size="small">
+                    Click here to update your profile
+                  </Button>
+                </Link>
+              </Box>
+            )}
+          </Alert>
+        )}
+
         {!request ? <Alert severity="warning">Could not load request.</Alert> : (
           <Paper sx={{p: {xs: 2, md: 3}, borderRadius: '16px'}}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -134,10 +158,9 @@ const ManageRequestPage: React.FC = () => {
               <Grid container spacing={3}>
                 <Grid item xs={12} md={5}>
                   <Typography variant="h6" gutterBottom>Uploaded Prescription</Typography>
-                  {/* --- FIX: Corrected onClick handler and src --- */}
                   <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1, cursor: imageUrl ? 'pointer' : 'default' }} onClick={() => imageUrl && setSelectedImage(imageUrl)}>
                      <img src={imageUrl} alt="Prescription" style={{ width: '100%', height: 'auto', borderRadius: '8px', display: imageUrl ? 'block' : 'none' }} />
-                     {!imageUrl && <Alert severity="info">No prescription image found. This might be a quoted request where the image was not preserved.</Alert>}
+                     {!imageUrl && <Alert severity="info">No prescription image found.</Alert>}
                   </Box>
                 </Grid>
                 <Grid item xs={12} md={7}>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Container,
@@ -12,56 +12,151 @@ import {
   Paper,
   Chip,
   Divider,
-  Card,
-  CardContent,
-  IconButton,
   Grid,
-  Avatar
+  Card, 
+  CardContent,
+  List, 
+  ListItem, 
+  ListItemText,
+  Skeleton
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Navbar from '@/components/Navbar';
-import { useCart } from '@/contexts/CartContext'; // <<< IMPORTING THE CART HOOK
+import { useCart } from '@/contexts/CartContext';
 
-// Interfaces
-interface QuotedItem {
+// --- INTERFACES ---
+
+interface Pharmacy {
+  _id: string;
   name: string;
-  price: number;
-  pharmacyQuantity: number;
-  isAvailable: boolean;
-  image?: string | null;
+  address?: string;
+  distance?: string; // For holding the calculated distance
+}
+
+interface QuoteItem {
+  name: string;
+  price?: number;
+  pharmacyQuantity?: number;
+  isAvailable?: boolean;
+}
+
+interface Quote {
+  _id: string;
+  pharmacy: Pharmacy;
+  items: QuoteItem[];
+  notes?: string;
+  status: 'offered' | 'accepted' | 'rejected';
+  quotedAt: string;
+}
+
+interface OriginalItem {
+  name: string;
   form?: string;
   strength?: string;
-  quantity?: number; // Original requested quantity
+  quantity: number;
+  image?: string | null;
 }
 
-interface QuoteRequest {
+interface Request {
   _id: string;
   createdAt: string;
-  status: string;
-  items: QuotedItem[];
-  notes?: string; // Pharmacist's notes
+  status: 'pending' | 'quoted' | 'awaiting-confirmation' | 'confirmed' | 'dispatched' | 'rejected' | 'cancelled';
+  items: OriginalItem[];
+  quotes: Quote[];
 }
 
-const ReviewQuotePage: React.FC = () => {
+
+const getStatusChip = (status: Request['status']) => {
+    switch (status) {
+      case 'pending': return <Chip label="Waiting for Quotes" color="default" />;
+      case 'quoted': return <Chip label="Quotes Received" color="primary" />; 
+      case 'awaiting-confirmation': return <Chip label="Quote Accepted" color="success" variant="filled" />;
+      case 'confirmed': return <Chip label="Order Confirmed" color="success" variant="filled" />;
+      case 'rejected':
+      case 'cancelled': return <Chip label="Request Cancelled" color="error" variant="filled" />;
+      default: return <Chip label={status.replace('-', ' ')} />;
+    }
+};
+
+// --- QUOTE CARD COMPONENT --- 
+
+const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, items: any[]) => void; isActionDisabled: boolean; isFetchingDistance: boolean; }> = 
+({ quote, onRequestDecision, isActionDisabled, isFetchingDistance }) => {
+
+    const availableItems = quote.items.filter(item => item.isAvailable);
+    const totalPrice = availableItems.reduce((acc, item) => acc + (item.price! * item.pharmacyQuantity!), 0);
+
+    return (
+        <Card variant="outlined" sx={{ mb: 2, borderRadius: '16px', border: quote.status === 'accepted' ? '2px solid' : '', borderColor: 'success.main' }}>
+            <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box>
+                        <Typography variant="h6">{quote.pharmacy.name}</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <Typography variant="body2" color="text.secondary" component="span">{quote.pharmacy.address}</Typography>
+                          {isFetchingDistance && <Skeleton width={80} sx={{ ml: 1, display: 'inline-block' }} />}
+                          {quote.pharmacy.distance && (
+                            <Typography variant="body2" color="text.secondary" component="span" sx={{ fontWeight: 'bold', ml: 1 }}>
+                              • {quote.pharmacy.distance}
+                            </Typography>
+                          )}
+                        </Box>
+                    </Box>
+                    {quote.status === 'accepted' && <Chip label="Accepted" color="success" />}
+                </Box>
+
+                {quote.notes && <Alert severity="info" sx={{ mt: 2, whiteSpace: 'pre-wrap' }}>{quote.notes}</Alert>}
+                
+                <Divider sx={{ my: 2 }} />
+
+                <List dense>
+                    {availableItems.map((item, index) => (
+                        <ListItem key={index} disableGutters secondaryAction={<Typography variant="body1" fontWeight="bold">₦{item.price?.toLocaleString()}</Typography>}>
+                           <ListItemText primary={item.name} secondary={`Quantity: ${item.pharmacyQuantity}`} />
+                        </ListItem>
+                    ))}
+                </List>
+
+                 {availableItems.length === 0 && (
+                     <Typography color="text.secondary" sx={{mt: 1}}>The pharmacy did not have any of the requested items in stock.</Typography>
+                 )}
+
+            </CardContent>
+            <Divider />
+            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="h6" component="p">Total: <span style={{fontWeight: 'bold'}}>₦{totalPrice.toLocaleString()}</span></Typography>
+                {!isActionDisabled && (
+                    <Button variant="contained" color="success" onClick={() => onRequestDecision(quote._id, availableItems)} disabled={availableItems.length === 0} sx={{color: 'white'}}>Accept Quote</Button>
+                )}
+            </Box>
+        </Card>
+    )
+}
+
+// --- MAIN PAGE COMPONENT --- 
+
+const ReviewRequestPage: React.FC = () => {
   const router = useRouter();
   const params = useParams();
   const { id } = params;
-  const { addToCart, updateQuantity } = useCart(); // <<< USING THE CART HOOK
+  const { addToCart, updateQuantity } = useCart();
 
-  const [request, setRequest] = useState<QuoteRequest | null>(null);
+  const [request, setRequest] = useState<Request | null>(null);
+  const [distances, setDistances] = useState<{ [pharmacyId: string]: string }>({});
+  const [isFetchingDistances, setIsFetchingDistances] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState<'accept' | 'reject' | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Effect to fetch the main request data
   useEffect(() => {
     if (id) {
       const fetchRequest = async () => {
         try {
           setLoading(true);
           const response = await fetch(`/api/requests/${id}`);
-          if (!response.ok) throw new Error('Failed to fetch your quote. Please try again later.');
-          const data: QuoteRequest = await response.json();
-          setRequest(data);
+          if (!response.ok) throw new Error('Failed to fetch your request details.');
+          setRequest(await response.json());
         } catch (err) {
           setError(err instanceof Error ? err.message : 'An unknown error occurred');
         } finally {
@@ -72,173 +167,155 @@ const ReviewQuotePage: React.FC = () => {
     }
   }, [id]);
 
-  // --- MODIFIED: This function now handles adding items to the cart ---
-  const handleDecision = async (decision: 'awaiting-confirmation' | 'rejected') => {
-    // If rejecting, just update status and refresh.
-    if (decision === 'rejected') {
-      setIsSubmitting('reject');
+  // Effect to fetch distances after the request is loaded
+  useEffect(() => {
+    if (request && request.status === 'quoted' && request.quotes.length > 0) {
+      setIsFetchingDistances(true);
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          try {
+            const response = await fetch(`/api/distance?requestId=${id}&lat=${latitude}&lon=${longitude}`);
+            if (response.ok) {
+              setDistances(await response.json());
+            }
+          } catch (err) {
+            console.error("Failed to fetch distances:", err);
+          } finally {
+            setIsFetchingDistances(false);
+          }
+        },
+        (geoError) => {
+          console.error("Geolocation error:", geoError.message);
+          setError("Couldn't get your location. Please enable location services in your browser to see pharmacy distances.");
+          setIsFetchingDistances(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+  }, [request, id]);
+
+  const handleAcceptQuote = async (quoteId: string, itemsToAdd: any[]) => {
+      setIsSubmitting(true);
       setError(null);
       try {
-        const response = await fetch(`/api/requests/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'rejected' }),
-        });
-        if (!response.ok) throw new Error('Failed to reject the quote.');
-        router.refresh(); // Show the "Rejected" status
+          const response = await fetch(`/api/requests/${id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'accept-quote', quoteId }),
+          });
+          if (!response.ok) throw new Error((await response.json()).message || 'Failed to accept the quote.');
+
+          itemsToAdd.forEach((item, index) => {
+              const numericId = Date.now() + index;
+              addToCart({
+                  id: numericId,
+                  name: item.name,
+                  price: item.price,
+                  image: request?.items.find(i => i.name === item.name)?.image || '',
+                  activeIngredients: request?.items.find(i => i.name === item.name)?.strength || '',
+                  pharmacy: enrichedQuotes.find(q => q._id === quoteId)?.pharmacy.name || 'Pharmacy',
+                  drugClass: 'From Quote',
+              });
+              updateQuantity(numericId, item.pharmacyQuantity);
+          });
+          router.push('/cart');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+          setError(err instanceof Error ? err.message : 'An unknown error occurred');
+          setIsSubmitting(false);
+      }
+  };
+
+  const handleCancelRequest = async () => {
+      if (!window.confirm('Are you sure you want to cancel this entire request?')) return;
+      setIsSubmitting(true);
+      setError(null);
+      try {
+          await fetch(`/api/requests/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cancel-request' }) });
+          // Re-fetch data to show updated status
+          const fetchResponse = await fetch(`/api/requests/${id}`);
+          setRequest(await fetchResponse.json());
+      } catch (err) {
+          setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
-        setIsSubmitting(null);
+          setIsSubmitting(false);
       }
-      return;
-    }
+  };
+  
+  const isActionDisabled = useMemo(() => isSubmitting || request?.status !== 'quoted', [isSubmitting, request?.status]);
+  const acceptedQuote = useMemo(() => request?.quotes.find(q => q.status === 'accepted'), [request]);
 
-    // If accepting, add items to cart, update status, and redirect to cart.
-    if (decision === 'awaiting-confirmation') {
-      setIsSubmitting('accept');
-      setError(null);
-
-      try {
-        // 1. Add available items from the quote to the shopping cart
-        const itemsToAdd = request?.items.filter(item => item.isAvailable) || [];
-        itemsToAdd.forEach((item, index) => {
-          const numericId = Date.now() + index; // Create a unique numeric ID for the cart
-          
-          const cartItemPayload = {
-            id: numericId,
-            name: item.name,
-            price: item.price,
-            image: item.image || '',
-            activeIngredients: item.strength || '', // Use strength if available
-            drugClass: 'From Quote', // Placeholder
-            pharmacy: 'From Quote' // Placeholder
-          };
-
-          addToCart(cartItemPayload); // This adds the item to the cart with a quantity of 1
-          updateQuantity(numericId, item.pharmacyQuantity); // This updates the item to the correct quoted quantity
-        });
-
-        // 2. Update the request status on the backend
-        const response = await fetch(`/api/requests/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'awaiting-confirmation' }),
-        });
-        if (!response.ok) {
-           throw new Error('Failed to accept the quote. Your cart has been updated, but please try again to confirm.');
-        }
-
-        // 3. Redirect to the cart page to complete the checkout
-        router.push('/cart');
-
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-        setIsSubmitting(null); // Stop loading indicator on error to allow user to try again
+  // Merge the distance data into the quotes for rendering
+  const enrichedQuotes = useMemo(() => {
+    if (!request?.quotes) return [];
+    return request.quotes.map(quote => ({
+      ...quote,
+      pharmacy: {
+        ...quote.pharmacy,
+        distance: distances[quote.pharmacy._id] || ''
       }
-    }
-  };
-
-  const getStatusChip = (status: string) => {
-    switch (status) {
-      case 'quoted': return <Chip label="Quote Ready for Review" color="primary" />; 
-      case 'awaiting-confirmation': return <Chip label="You Accepted This Quote" color="success" variant="filled" />;
-      case 'confirmed': return <Chip label="Order Confirmed by Pharmacy" color="success" variant="filled" />;
-      case 'rejected': return <Chip label="You Rejected This Quote" color="error" variant="filled" />;
-      default: return <Chip label={status.replace('-', ' ')} />;
-    }
-  };
-
-  const availableItems = request?.items.filter(item => item.isAvailable) || [];
-  const totalPrice = availableItems.reduce((acc, item) => acc + (item.price * item.pharmacyQuantity), 0);
+    }));
+  }, [request?.quotes, distances]);
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
 
   return (
     <>
       <Navbar />
-      <Container maxWidth="md" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        {!request ? (
-          <Alert severity="warning">Could not load your request details.</Alert>
-        ) : (
-          <Paper sx={{ p: { xs: 2, md: 4 }, borderRadius: '16px' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <IconButton onClick={() => router.back()} aria-label="go back">
-                    <ArrowBackIcon />
-                </IconButton>
-                <Typography variant="h5" component="h1" sx={{ ml: 1, flexGrow: 1 }}>Review Your Quote</Typography>
-                {getStatusChip(request.status)}
-            </Box>
+        {!request ? <Alert severity="warning">Could not load your request details.</Alert> : (
+          <Grid container spacing={4}>
+              <Grid item xs={12} md={4}>
+                  <Paper sx={{ p: 2, borderRadius: '16px', position: 'sticky', top: '80px' }}>
+                      <Typography variant="h6" gutterBottom>Your Request</Typography>
+                      <List dense>{request.items.map((item, i) => <ListItem key={i} disableGutters><ListItemText primary={item.name} secondary={`Qty: ${item.quantity}`} /></ListItem>)}</List>
+                  </Paper>
+              </Grid>
 
-            <Divider sx={{ mb: 3 }} />
-
-            {request.notes && (
-              <Box sx={{ mb: 3, p: 2, bgcolor: 'primary.lighter', borderRadius: '12px' }}>
-                <Typography variant="h6" gutterBottom>Notes from the Pharmacist</Typography>
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>{request.notes}</Typography>
-              </Box>
-            )}
-
-            <Typography variant="h6" gutterBottom>Quoted Items</Typography>
-            <Grid container spacing={2}>
-              {availableItems.length > 0 ? availableItems.map((item, index) => (
-                <Grid item xs={12} key={index}>
-                  <Card variant="outlined">
-                    <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        {item.image && <Avatar src={item.image} variant="rounded" sx={{ mr: 2 }} />} 
-                        <Box>
-                          <Typography variant="body1" sx={{fontWeight: 'bold'}}>{item.name}</Typography>
-                          <Typography variant="body2" color="text.secondary">{`Available: ${item.pharmacyQuantity} unit(s)`}</Typography>
-                        </Box>
+              <Grid item xs={12} md={8}>
+                  <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: '16px' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                          <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold' }}>Review Quotes</Typography>
+                          {getStatusChip(request.status)}
                       </Box>
-                      <Typography variant="h6">₦{item.price.toLocaleString()}</Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              )) : (
-                <Grid item xs={12}><Alert severity="info" sx={{width: '100%'}}> Medicine search ongoing, you will be notified when found.</Alert></Grid>
-              )}
-            </Grid>
-            
-            {availableItems.length > 0 && (
-              <Box>
-                  <Divider sx={{ my: 3 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
-                      <Typography variant="h5" component="p">Total:&nbsp;</Typography>
-                      <Typography variant="h5" component="p" sx={{fontWeight: 'bold'}}>₦{totalPrice.toLocaleString()}</Typography>
-                  </Box>
+                      <Divider sx={{ mb: 3 }} />
 
-                  {request.status === 'quoted' && (
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                          <Button 
-                              variant="outlined"
-                              color="error"
-                              onClick={() => handleDecision('rejected')} 
-                              disabled={!!isSubmitting}
-                          >
-                              {isSubmitting === 'reject' ? <CircularProgress size={24} /> : 'Reject Quote'}
-                          </Button>
-                          <Button 
-                              variant="contained" 
-                              color="success" 
-                              onClick={() => handleDecision('awaiting-confirmation')} 
-                              disabled={!!isSubmitting}
-                              sx={{color: 'white'}}
-                          >
-                              {isSubmitting === 'accept' ? <CircularProgress size={24} /> : 'Accept & Proceed'}
-                          </Button>
-                      </Box>
-                  )}
-              </Box>
-            )}
-            
-          </Paper>
+                      {acceptedQuote && (
+                          <Box>
+                              <Typography variant="h6" color="success.main" sx={{mb: 2}}>You have accepted this quote:</Typography>
+                              <QuoteCard quote={enrichedQuotes.find(q=>q._id === acceptedQuote._id)!} onRequestDecision={() => {}} isActionDisabled={true} isFetchingDistance={false} />
+                          </Box>
+                      )}
+
+                      {request.status === 'pending' && <Alert severity="info">Waiting for pharmacies to respond to your request...</Alert>}
+                      
+                      {request.status === 'quoted' && enrichedQuotes.length > 0 && (
+                          <Box>
+                              {enrichedQuotes.map(quote => (
+                                  <QuoteCard 
+                                      key={quote._id} 
+                                      quote={quote} 
+                                      onRequestDecision={handleAcceptQuote} 
+                                      isActionDisabled={isActionDisabled}
+                                      isFetchingDistance={isFetchingDistances}
+                                  />
+                              ))}
+                          </Box>
+                      )}
+
+                      {request.status === 'quoted' && (
+                          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+                              <Button variant="outlined" color="error" onClick={handleCancelRequest} disabled={isSubmitting}>Cancel Entire Request</Button>
+                          </Box>
+                      )}
+                  </Paper>
+              </Grid>
+          </Grid>
         )}
       </Container>
     </>
   );
 };
 
-export default ReviewQuotePage;
+export default ReviewRequestPage;

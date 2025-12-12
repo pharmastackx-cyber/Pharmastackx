@@ -1,4 +1,36 @@
+
 import mongoose from 'mongoose';
+
+// This sub-schema represents a single quote from a pharmacy.
+const QuoteSchema = new mongoose.Schema({
+  pharmacy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', // CORRECTED: This now correctly refers to the User model.
+    required: true,
+  },
+  // The pharmacy's version of the items, with their pricing and availability
+  items: [{
+    _id: false,
+    name: { type: String, required: true },
+    form: { type: String },
+    strength: { type: String },
+    // These fields are specific to the pharmacy's quote
+    price: { type: Number, default: 0 },
+    isAvailable: { type: Boolean, default: true },
+    pharmacyQuantity: { type: Number }
+  }],
+  notes: { type: String }, // Notes from the pharmacy
+  status: {
+      type: String,
+      enum: ['offered', 'accepted', 'rejected'],
+      default: 'offered'
+  },
+  quotedAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
 
 const RequestSchema = new mongoose.Schema({
   user: {
@@ -6,24 +38,18 @@ const RequestSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
-  // --- FIX: Add pharmacy field to link to the quoting pharmacy ---
-  pharmacy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Pharmacy' 
-  },
+  // The user's original requested items.
   items: [{
-    _id: false, 
+    _id: false,
     name: { type: String, required: true },
     form: { type: String },
     strength: { type: String },
     quantity: { type: Number, required: true },
     notes: { type: String },
     image: { type: String },
-    // --- FIELDS FOR PHARMACY --- 
-    price: { type: Number, default: 0 },
-    isAvailable: { type: Boolean, default: true },
-    pharmacyQuantity: { type: Number }
   }],
+  // An array to hold all quotes from different pharmacies.
+  quotes: [QuoteSchema],
 
   requestType: {
     type: String,
@@ -40,6 +66,15 @@ const RequestSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
+// When a quote is added, update the main request status to 'quoted'
+RequestSchema.pre('save', function(next) {
+  if (this.isModified('quotes') && this.quotes.length > 0 && this.status === 'pending') {
+    this.status = 'quoted';
+  }
+  next();
+});
+
 
 const Request = mongoose.models.Request || mongoose.model('Request', RequestSchema);
 
