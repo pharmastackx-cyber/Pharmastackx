@@ -117,9 +117,10 @@ const DispatchPage: React.FC = () => {
   const [inputValue, setInputValue] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false); // <<< New state for login modal
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isRadarModalOpen, setIsRadarModalOpen] = useState(false);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
+  const [isQuoteReady, setIsQuoteReady] = useState(false);
   const [prescriptionCount, setPrescriptionCount] = useState(1);
   const [imageCount, setImageCount] = useState(1);
   const [requestHistory, setRequestHistory] = useState<any[]>([]);
@@ -144,6 +145,33 @@ const DispatchPage: React.FC = () => {
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
+
+  useEffect(() => {
+    if (!activeRequestId || isQuoteReady) {
+      return;
+    }
+
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/requests/${activeRequestId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'quoted') {
+            setIsQuoteReady(true);
+            clearInterval(intervalId);
+          }
+        } else {
+            if(response.status === 404) {
+                clearInterval(intervalId);
+            }
+        }
+      } catch (error) {
+        console.error("Polling error:", error);
+      }
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [activeRequestId, isQuoteReady]);
 
   useEffect(() => {
     try {
@@ -261,10 +289,8 @@ const DispatchPage: React.FC = () => {
 
   const handleFindMedicinesClick = () => {
       if (!user) {
-          // User is not logged in, open the login prompt modal
-          setIsLoginModalOpen(true); 
+          setIsLoginModalOpen(true);
       } else {
-          // User is logged in, open the confirmation modal.
           setIsModalOpen(true);
       }
   };
@@ -297,6 +323,7 @@ const DispatchPage: React.FC = () => {
 
       const newRequest = await response.json();
       localStorage.removeItem(LOCAL_STORAGE_KEY);
+      setIsQuoteReady(false); // Reset for the new request
       setActiveRequestId(newRequest._id);
       setIsRadarModalOpen(true);
       fetchHistory(); // Refetch history to include the new request
@@ -314,7 +341,14 @@ const DispatchPage: React.FC = () => {
     setActiveRequestId(null);
   };
 
-  // Show a loader while the session is being checked
+  const handleReviewQuote = () => {
+      if (activeRequestId) {
+          router.push(`/my-requests/${activeRequestId}`);
+          handleCloseRadarModal();
+          setIsQuoteReady(false);
+      }
+  };
+
   if (isSessionLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -329,6 +363,20 @@ const DispatchPage: React.FC = () => {
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <input type="file" accept="image/*" ref={photoLibraryInputRef} onChange={(e) => { e.target.files && handleImageUpload(e.target.files[0]); e.target.value = ''; }} style={{ display: 'none' }} />
 
+        {isQuoteReady && !isRadarModalOpen && activeRequestId && (
+            <Alert
+                severity="success"
+                action={
+                    <Button color="inherit" size="small" onClick={handleReviewQuote}>
+                        REVIEW QUOTE
+                    </Button>
+                }
+                sx={{ mb: 2 }}
+            >
+                A quote for your request is ready
+            </Alert>
+        )}
+
         <Grid container spacing={4} justifyContent="center">
           <Grid item xs={12} md={8}>
             <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 700, color: '#006D5B' }}>
@@ -340,7 +388,6 @@ const DispatchPage: React.FC = () => {
             
             {globalError && <Alert severity="error" sx={{ mb: 2 }}>{globalError}</Alert>}
 
-            {/* Search and Upload Buttons */}
             <Box sx={{ display: 'flex', gap: 1, mb: 4, alignItems: 'stretch' }}>
                 <Autocomplete
                     freeSolo
@@ -473,12 +520,11 @@ const DispatchPage: React.FC = () => {
               </Card>
             ))}
             
-            {/* --- MODIFICATION: Use the new handler --- */}
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
               <Button
                 variant="contained"
                 color="primary"
-                onClick={handleFindMedicinesClick} 
+                onClick={handleFindMedicinesClick}
                 disabled={requestedDrugs.length === 0 || requestedDrugs.some(d => d.isEditing) || isSubmitting}
                 sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' }, borderRadius: '25px', padding: '10px 30px', fontSize: '1rem' }}
               >
@@ -486,13 +532,11 @@ const DispatchPage: React.FC = () => {
               </Button>
             </Box>
             
-            {/* Only show request history if the user is logged in */}
             {user && <RequestHistory history={requestHistory} onRefill={handleRefillRequest} />}
 
           </Grid>
         </Grid>
 
-        {/* The Modals */}
         <ConfirmationModal 
             open={isModalOpen} 
             onClose={() => setIsModalOpen(false)} 
@@ -503,11 +547,12 @@ const DispatchPage: React.FC = () => {
         <SearchRadarModal 
           open={isRadarModalOpen} 
           onClose={handleCloseRadarModal} 
-          requests={requestedDrugs}
-          requestId={activeRequestId} 
+          requests={requestedDrugs.map(({ id, name, form, strength, quantity, image }) => ({ id, name, form, strength, quantity, image, notes: '' }))}
+          requestId={activeRequestId}
+          isQuoteReady={isQuoteReady}
+          onReview={handleReviewQuote}
         />
 
-        {/* <<< New Login Prompt Modal >>> */}
         <Modal
             open={isLoginModalOpen}
             onClose={() => setIsLoginModalOpen(false)}

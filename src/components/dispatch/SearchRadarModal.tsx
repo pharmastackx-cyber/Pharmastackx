@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Modal, Box, Typography, keyframes, Grid, Chip, Avatar, Button, Alert, Slide } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -92,51 +93,14 @@ interface SearchRadarModalProps {
   open: boolean;
   onClose: () => void;
   requests: DrugRequest[];
-  // --- FIX: Add requestId to poll for status ---
   requestId: string | null;
+  isQuoteReady: boolean;
+  onReview: () => void;
 }
 
-const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requests, requestId }) => {
-  const router = useRouter();
-  const [quoteFound, setQuoteFound] = useState(false);
-
-  useEffect(() => {
-    // Reset on open
-    if (open) {
-      setQuoteFound(false);
-    }
-
-    if (!open || !requestId || quoteFound) {
-      return;
-    }
-
-    // Poll every 5 seconds
-    const intervalId = setInterval(async () => {
-      try {
-        const response = await fetch(`/api/requests/${requestId}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.status === 'quoted') {
-            setQuoteFound(true);
-            clearInterval(intervalId); // Stop polling
-          }
-        }
-      } catch (error) {
-        console.error("Polling error:", error);
-        // Don't stop polling on network error
-      }
-    }, 5000);
-
-    // Cleanup on component unmount or when modal closes
-    return () => clearInterval(intervalId);
-
-  }, [open, requestId, quoteFound]);
-
+const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requests, isQuoteReady, onReview }) => {
   const handleReviewClick = () => {
-    if (requestId) {
-        onClose(); // Close the modal
-        router.push(`/my-requests/${requestId}`);
-    }
+    onReview();
   };
 
 
@@ -148,8 +112,7 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
     >
       <Box sx={modalStyle}>
         
-        {/* --- FIX: The notification that slides in --- */}
-        <Slide direction="down" in={quoteFound} mountOnEnter unmountOnExit>
+        <Slide direction="down" in={isQuoteReady} mountOnEnter unmountOnExit>
             <Alert
                 severity="success"
                 variant="filled"
@@ -170,7 +133,7 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
                 }
             >
                 <Typography sx={{fontWeight: 'bold'}}>Items Found!</Typography>
-                A pharmacy has responded. Click to review their quote.
+                A pharmacist has responded. Click to review their quote.
             </Alert>
         </Slide>
 
@@ -207,8 +170,8 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
                                     {!isImageBased && (
                                         <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
                                             <Chip label={`Qty: ${drug.quantity}`} size="small" variant="outlined" sx={{ color: '#b2dfdb', borderColor: '#004d40' }} />
-                                            {drug.strength && <Chip label={drug.strength} size="small" variant="outlined" sx={{ color: '#b2dfdb', borderColor: '#004d40' }} />}
-                                            {drug.form && <Chip label={drug.form} size="small" variant="outlined" sx={{ color: '#b2dfdb', borderColor: '#004d40' }} />}
+                                            {drug.strength && <Chip label={drug.strength} size="small" variant="outlined" sx={{ color: '#b2dfdb', borderColor: '#004d40' }} /> }
+                                            {drug.form && <Chip label={drug.form} size="small" variant="outlined" sx={{ color: '#b2dfdb', borderColor: '#004d40' }} /> }
                                         </Box>
                                     )}
                                 </Box>
