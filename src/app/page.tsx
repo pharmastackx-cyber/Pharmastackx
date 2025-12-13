@@ -117,42 +117,6 @@ export default function HomePage() {
           What would you like to do today?
         </Typography>
       </motion.div>
-
-      <motion.div variants={itemVariants}>
-        <MotionPaper
-          elevation={3}
-          sx={{
-            p: '8px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            borderRadius: '50px',
-            background: 'rgba(255, 255, 255, 0.95)',
-            mb: { xs: 4, sm: 6 },
-          }}
-          animate={{
-            boxShadow: [
-              '0 0 8px rgba(150, 255, 222, 0.4)',
-              '0 0 24px rgba(150, 255, 222, 0.8)',
-              '0 0 8px rgba(150, 255, 222, 0.4)',
-            ],
-          }}
-          transition={{
-            duration: 3,
-            ease: 'easeInOut',
-            repeat: Infinity,
-          }}
-        >
-          <SearchIcon sx={{ color: 'grey.500', mr: 1.5 }} />
-          <TextField
-            fullWidth
-            placeholder="Search for medicines, pharmacies..."
-            variant="standard"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            InputProps={{ disableUnderline: true, sx: { fontSize: { xs: '1rem', sm: '1.1rem' } } }}
-          />
-        </MotionPaper>
-      </motion.div>
       
       {!isLoading && (
         user && ['pharmacy', 'pharmacist'].includes(user.role) ? (
@@ -374,57 +338,99 @@ export default function HomePage() {
             </LayoutGroup>
         </Box>
 
-      </Box>
+      {/* Bottom Section: Search + Links */}
+{view === 'home' && (
+    <Box sx={{
+        position: 'relative',
+        zIndex: 2,
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 3,
+        mt: 'auto', // Pushes this section to the bottom
+        px: 3,
+        pb: 4,
+    }}>
+        {/* Search Bar */}
+        <Box sx={{ width: '100%', maxWidth: '800px' }}>
+        <motion.div variants={itemVariants}>
+        <MotionPaper
+          elevation={3}
+          sx={{
+            p: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            borderRadius: '12px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            marginBottom: 4,
+          }}
+          animate={{
+            boxShadow: [
+              '0 0 8px rgba(150, 255, 222, 0.4)',
+              '0 0 24px rgba(150, 255, 222, 0.8)',
+              '0 0 8px rgba(150, 255, 222, 0.4)',
+            ],
+          }}
+          transition={{
+            duration: 3,
+            ease: 'easeInOut',
+            repeat: Infinity,
+          }}
+        >
+          <SearchIcon sx={{ color: 'grey.500', mr: 1.5 }} />
+          <TextField
+            fullWidth
+            placeholder="Find medicines, pharmacies, pharmacists ..."
+            variant="standard"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            InputProps={{ disableUnderline: true, sx: { fontSize: { xs: '1rem', sm: '1.1rem' } } }}
+          />
+        </MotionPaper>
+      </motion.div>
+        </Box>
 
-
-      <Box 
-        component="footer" 
-        sx={{ 
-          textAlign: 'center',
-          py: 3,
-          px: 2,
-          bgcolor: '#002d24',
-          borderTop: '1px solid rgba(255, 255, 255, 0.1)'
-        }}
-      >
-        <Container maxWidth="md">
-          <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)', fontStyle: 'italic', fontSize: { xs: '0.75rem', sm: '0.875rem' }, mb: 2 }}>
-            Ensuring that no patient is left untreated because a drug is unavailable, unfindable, or inaccessible.
-          </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: { xs: 2, sm: 4 } }}>
+        {/* About and Contact Links */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: { xs: 2, sm: 4 } }}>
             <motion.div layoutId="about-us-header">
-              <Button 
+            <Button 
                 onClick={() => setView('about')} 
                 sx={{ 
-                  color: 'rgba(255, 255, 255, 0.9)', 
-                  textDecoration: 'none', 
-                  '&:hover': { textDecoration: 'underline' },
-                  fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                  p: 0, 
-                  minWidth: 'auto'
+                color: 'rgba(255, 255, 255, 0.9)', 
+                textTransform: 'none',
+                '&:hover': { textDecoration: 'underline' },
+                fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                p: 0, 
+                minWidth: 'auto'
                 }}
-              >
-                About
-              </Button>
+            >
+                About Us
+            </Button>
             </motion.div>
             <motion.div layoutId="contact-us-header">
-              <Button 
+            <Button 
                 onClick={() => setView('contact')} 
                 sx={{ 
-                  color: 'rgba(255, 255, 255, 0.9)', 
-                  textDecoration: 'none', 
-                  '&:hover': { textDecoration: 'underline' },
-                  fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                  p: 0, 
-                  minWidth: 'auto'
+                color: 'rgba(255, 255, 255, 0.9)', 
+                textTransform: 'none',
+                '&:hover': { textDecoration: 'underline' },
+                fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                p: 0, 
+                minWidth: 'auto'
                 }}
-              >
+            >
                 Contact Us
-              </Button>
+            </Button>
             </motion.div>
-          </Box>
-        </Container>
+        </Box>
+    </Box>
+)}
+
+
       </Box>
+
+      
     </Box>
 
   );
