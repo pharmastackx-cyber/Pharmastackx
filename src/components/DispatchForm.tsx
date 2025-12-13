@@ -103,7 +103,8 @@ const getAIStrengthSuggestions = (drugName: string): string[] => {
     return [];
 };
 
-const DispatchForm: React.FC = () => {
+const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearchValue }) => {
+
   const router = useRouter();
   const { user, isLoading: isSessionLoading } = useSession();
 
@@ -112,7 +113,7 @@ const DispatchForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const [inputValue, setInputValue] = useState("");
+  const [inputValue, setInputValue] = useState(initialSearchValue || ""); 
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -125,6 +126,9 @@ const DispatchForm: React.FC = () => {
 
   const uploadModeRef = useRef<UploadMode | null>(null);
   const photoLibraryInputRef = useRef<HTMLInputElement>(null);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
 
   const fetchHistory = useCallback(async () => {
       if (!user) return;
@@ -203,7 +207,7 @@ const DispatchForm: React.FC = () => {
       return;
     }
     setLoading(true);
-    // Mocking API call
+    
     setTimeout(() => {
         const mockSuggestions = [
             { label: `${input} 100mg` },
@@ -215,6 +219,16 @@ const DispatchForm: React.FC = () => {
   };
 
   const debouncedFetchSuggestions = useCallback(debounce(fetchSuggestions, 800), []);
+
+  useEffect(() => {
+    if (initialSearchValue && searchInputRef.current) {
+      // Timeout ensures the element is ready for focus after the transition animation.
+      setTimeout(() => {
+          searchInputRef.current?.focus();
+      }, 100); 
+      debouncedFetchSuggestions(initialSearchValue);
+    }
+  }, [initialSearchValue, debouncedFetchSuggestions]);
 
   const handleInputChange = (_: any, newInputValue: string) => {
     setInputValue(newInputValue);
@@ -403,6 +417,7 @@ const DispatchForm: React.FC = () => {
                     renderInput={(params) => (
                     <TextField
                         {...params}
+                        inputRef={searchInputRef}
                         label="Search by Medicine Name..."
                         variant="outlined"
                         InputProps={{
@@ -483,7 +498,12 @@ const DispatchForm: React.FC = () => {
                             "& .MuiInputLabel-root": { color: "rgba(255, 255, 255, 0.7)" },
                             "& .MuiInputBase-input": { color: "white" }
                         }}
-                        renderInput={(params) => <TextField {...params} label="Strength (e.g., 200mg)" />}
+                        renderInput={(params) => 
+                        <TextField 
+                        {...params} 
+                        label="Strength (e.g., 200mg)"
+                        variant="outlined"
+                        />}
                       />
 
                       <FormControl sx={{ width: { xs: '100%', sm: '120px' }, "& .MuiInputLabel-root": { color: "rgba(255, 255, 255, 0.7)" }, "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: "rgba(255, 255, 255, 0.3)" } } }}>

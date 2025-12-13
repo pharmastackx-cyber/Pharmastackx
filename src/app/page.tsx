@@ -64,6 +64,15 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [wordIndex]);
 
+  const handleSearchInitiation = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const value = event.target.value;
+    // As soon as the user types, set the input value and switch the view
+    if (value) {
+      setInputValue(value);
+      setView('orderMedicines');
+    }
+  };
+
   const containerVariants: Variants = {
     hidden: { opacity: 0, scale: 0.98 },
     visible: {
@@ -192,7 +201,7 @@ export default function HomePage() {
                     borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
                 }}
             >
-                <IconButton onClick={() => setView('home')} sx={{ color: 'white' }}>
+                <IconButton onClick={() => { setView('home'); setInputValue(''); }} sx={{ color: 'white' }}>
                     <ArrowBackIcon />
                 </IconButton>
                 <Typography variant="h6" sx={{ ml: 2, fontWeight: 500 }}>
@@ -209,7 +218,7 @@ export default function HomePage() {
   const renderActiveView = () => {
     switch (view) {
       case 'orderMedicines':
-        return renderPageView('Order Medicines', 'order-medicines-header', <DispatchForm />);
+        return renderPageView('Order Medicines', 'order-medicines-header', <DispatchForm initialSearchValue={inputValue} />);
       case 'storeManagement':
         return renderPageView('Store Management', 'store-management-header');
       case 'orderRequests':
@@ -384,7 +393,7 @@ export default function HomePage() {
             placeholder="Find medicines, pharmacies, pharmacists ..."
             variant="standard"
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={handleSearchInitiation}
             InputProps={{ disableUnderline: true, sx: { fontSize: { xs: '1rem', sm: '1.1rem' } } }}
           />
         </MotionPaper>
