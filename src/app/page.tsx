@@ -16,6 +16,10 @@ import AboutContent from "@/components/AboutContent";
 import ContactContent from "@/components/ContactContent";
 import FindPharmacyContent from "@/components/FindPharmacyContent";
 import OrderRequestsContent from "@/components/OrderRequestsContent"; // Import the new component
+import ConsultContent from "@/components/ConsultContent";
+import AccountContent from "@/components/AccountContent";
+import { Home as HomeIcon, Chat as ChatIcon, Person as PersonIcon, LocalPharmacy as PharmacyIcon } from '@mui/icons-material';
+
 const MapBackground = dynamic(() => import('@/components/MapBackground'), {
   ssr: false,
   loading: () => <Box sx={{ height: '100%', width: '100%', bgcolor: '#002d24' }}/>
@@ -32,6 +36,8 @@ export default function HomePage() {
   const [wordIndex, setWordIndex] = useState(0);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [view, setView] = useState('home');
+
+  const bottomPadding = view === 'home' ? { xs: '140px', sm: '150px' } : { xs: '70px', sm: '80px' };
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -183,11 +189,11 @@ export default function HomePage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      sx={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', pt: { xs: 8, sm: 12 }, color: 'white' }}
+      sx={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', pt: { xs: 8, sm: 10 }, pb: bottomPadding, color: 'white' }}
     >
         <motion.div 
           layoutId={layoutId}
-          transition={{ duration: 1.2, ease: "easeInOut" }}
+          transition={{ duration: 0.8, ease: "easeInOut" }}
         >
             <Paper
                 elevation={0}
@@ -229,33 +235,26 @@ export default function HomePage() {
         return renderPageView('About Us', 'about-us-header', <AboutContent />);
       case 'contact':
         return renderPageView('Contact Us', 'contact-us-header', <ContactContent />);
+      case 'consult':
+        return renderPageView('Consult', 'consult-header', <ConsultContent />);
+      case 'account':
+        return renderPageView('Account', 'account-header', <AccountContent setView={setView} />);
       default:
         return renderWelcomeView();
     }
   };
-
- 
 
   return (
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
       minHeight: '100vh',
-      bgcolor: '#121212',
+      
+      pb: bottomPadding,
     }}>
-            <Box sx={{
-          position: 'relative',
-          flexGrow: 1,
-          display: "flex",
-          flexDirection: 'column',
-          alignItems: "center",
-          justifyContent: "center",
-          p: { xs: 2, sm: 3 },
-          overflow: 'hidden'
-        }}>
 
-        {/* Background Map and Overlay */}
-        <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
+      {/* Background Map and Overlay */}
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
           <MapBackground />
         </Box>
         <Box sx={{
@@ -268,74 +267,87 @@ export default function HomePage() {
           background: "linear-gradient(135deg, rgba(3, 28, 24, 0.85) 0%, rgba(0, 45, 36, 0.95) 100%)",
         }} />
 
-        {/* Header */}
-<Box
-  component={Paper}
-  elevation={0}
-  sx={{
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    p: 2,
-    zIndex: 1301,
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    // Apply a semi-transparent background with a blur effect
-    backgroundColor: ' rgba(3, 28, 24, 0.85)', 
-    backdropFilter: 'blur(8px)',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
-  }}
->
-  {/* Logo */}
-  <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
-    PharmaStack<span style={{ color: '#00E6A4' }}>X</span>
-  </Typography>
 
-  {/* User/Login Section */}
-  {isLoading ? (
-    <CircularProgress size={24} sx={{ color: 'white' }} />
-  ) : user ? (
-    <>
-      <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
-        <Avatar sx={{ bgcolor: 'rgba(59, 4, 66, 0.88)', color: 'white', fontWeight: 'bold' }}>
-          {userInitial}
-        </Avatar>
-      </IconButton>
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        sx={{ mt: 1 }}
-      >
-        <MenuItem disabled>{user.email}</MenuItem>
-        <MenuItem onClick={handleLogout}>Logout</MenuItem>
-      </Menu>
-    </>
-  ) : (
-    <Button
-      variant="outlined"
-      component={Link}
-      href="/auth"
-      sx={{
-        borderRadius: '20px',
-        borderColor: 'rgba(255, 255, 255, 0.8)',
-        color: 'white',
-        textTransform: 'uppercase', // "SIGN IN"
-        fontWeight: 'bold',
-        '&:hover': {
-          borderColor: 'white',
-          backgroundColor: 'rgba(255, 255, 255, 0.1)'
-        }
-      }}
-    >
-      Sign In
-    </Button>
-  )}
-</Box>
+      <Box sx={{
+          position: 'relative',
+          flexGrow: 1,
+          display: "flex",
+          flexDirection: 'column',
+          alignItems: "center",
+          justifyContent: "center",
+          p: { xs: 2, sm: 3 },
+          overflow: 'hidden'
+        }}>
+
+        
+
+        {/* Header */}
+        <Box
+          component={Paper}
+          elevation={0}
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            p: 2,
+            zIndex: 1301,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: ' rgba(3, 28, 24, 0.85)', 
+            backdropFilter: 'blur(8px)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+          }}
+        >
+          {/* Logo */}
+          <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
+            PharmaStack<span style={{ color: '#00E6A4' }}>X</span>
+          </Typography>
+
+          {/* User/Login Section */}
+          {isLoading ? (
+            <CircularProgress size={24} sx={{ color: 'white' }} />
+          ) : user ? (
+            <>
+              <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
+                <Avatar sx={{ bgcolor: 'rgba(59, 4, 66, 0.88)', color: 'white', fontWeight: 'bold' }}>
+                  {userInitial}
+                </Avatar>
+              </IconButton>
+              <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                sx={{ mt: 1 }}
+              >
+                <MenuItem disabled>{user.email}</MenuItem>
+                <MenuItem onClick={handleLogout}>Logout</MenuItem>
+              </Menu>
+            </>
+          ) : (
+            <Button
+              variant="outlined"
+              component={Link}
+              href="/auth"
+              sx={{
+                borderRadius: '20px',
+                borderColor: 'rgba(255, 255, 255, 0.8)',
+                color: 'white',
+                textTransform: 'uppercase',
+                fontWeight: 'bold',
+                '&:hover': {
+                  borderColor: 'white',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                }
+              }}
+            >
+              Sign In
+            </Button>
+          )}
+        </Box>
 
         
         {/* Main Content Area */}
@@ -346,101 +358,90 @@ export default function HomePage() {
               </AnimatePresence>
             </LayoutGroup>
         </Box>
-
-      {/* Bottom Section: Search + Links */}
-{view === 'home' && (
-    <Box sx={{
-        position: 'relative',
-        zIndex: 2,
-        width: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 3,
-        mt: 'auto', // Pushes this section to the bottom
-        px: 3,
-        pb: 4,
-    }}>
-        {/* Search Bar */}
-        <Box sx={{ width: '100%', maxWidth: '800px' }}>
-        <motion.div variants={itemVariants}>
-        <MotionPaper
-          elevation={3}
-          sx={{
-            p: '8px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            borderRadius: '12px',
-            background: 'rgba(255, 255, 255, 0.95)',
-            marginBottom: 4,
-          }}
-          animate={{
-            boxShadow: [
-              '0 0 8px rgba(150, 255, 222, 0.4)',
-              '0 0 24px rgba(150, 255, 222, 0.8)',
-              '0 0 8px rgba(150, 255, 222, 0.4)',
-            ],
-          }}
-          transition={{
-            duration: 3,
-            ease: 'easeInOut',
-            repeat: Infinity,
-          }}
-        >
-          <SearchIcon sx={{ color: 'grey.500', mr: 1.5 }} />
-          <TextField
-            fullWidth
-            placeholder="Find medicines, pharmacies, pharmacists ..."
-            variant="standard"
-            value={inputValue}
-            onChange={handleSearchInitiation}
-            InputProps={{ disableUnderline: true, sx: { fontSize: { xs: '1rem', sm: '1.1rem' } } }}
-          />
-        </MotionPaper>
-      </motion.div>
-        </Box>
-
-        {/* About and Contact Links */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: { xs: 2, sm: 4 } }}>
-            <motion.div layoutId="about-us-header">
-            <Button 
-                onClick={() => setView('about')} 
-                sx={{ 
-                color: 'rgba(255, 255, 255, 0.9)', 
-                textTransform: 'none',
-                '&:hover': { textDecoration: 'underline' },
-                fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                p: 0, 
-                minWidth: 'auto'
-                }}
-            >
-                About Us
-            </Button>
-            </motion.div>
-            <motion.div layoutId="contact-us-header">
-            <Button 
-                onClick={() => setView('contact')} 
-                sx={{ 
-                color: 'rgba(255, 255, 255, 0.9)', 
-                textTransform: 'none',
-                '&:hover': { textDecoration: 'underline' },
-                fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                p: 0, 
-                minWidth: 'auto'
-                }}
-            >
-                Contact Us
-            </Button>
-            </motion.div>
-        </Box>
-    </Box>
-)}
-
-
       </Box>
 
-      
-    </Box>
+      {/* Persistent Bottom Bar (Search + Nav) */}
+      <Box
+        sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1300,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 1,
+            px: 2,
+            pb: 2
+        }}
+      >
+        <AnimatePresence>
+        {view === 'home' && (
+            <motion.div
+                initial={{ y: 30, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 30, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                style={{ width: '100%', maxWidth: '800px' }}
+            >
+                <MotionPaper
+                    elevation={3}
+                    sx={{
+                        p: '8px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        borderRadius: '12px',
+                        background: 'rgba(255, 255, 255, 0.98)',
+                    }}
+                >
+                    <SearchIcon sx={{ color: 'grey.500', mr: 1.5 }} />
+                    <TextField
+                        fullWidth
+                        placeholder="Find medicines, pharmacies, pharmacists ..."
+                        variant="standard"
+                        value={inputValue}
+                        onChange={handleSearchInitiation}
+                        InputProps={{ disableUnderline: true, sx: { fontSize: { xs: '1rem', sm: '1.1rem' } } }}
+                    />
+                </MotionPaper>
+            </motion.div>
+        )}
+        </AnimatePresence>
+        
+        <Paper
+            elevation={3}
+            sx={{
+                display: 'flex',
+                justifyContent: 'space-around',
+                alignItems: 'center',
+                p: 1,
+                width: '100%',
+                maxWidth: '800px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.98)',
+                borderTop: '1px solid rgba(0,0,0,0.1)',
+            }}
+        >
+            <Button onClick={() => setView('home')} sx={{ flexDirection: 'column', color: view === 'home' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
+                <HomeIcon />
+                Home
+            </Button>
+            <Button onClick={() => setView('findPharmacy')} sx={{ flexDirection: 'column', color: view === 'findPharmacy' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
+                <PharmacyIcon />
+                Pharmacies
+            </Button>
+            <Button onClick={() => setView('consult')} sx={{ flexDirection: 'column', color: view === 'consult' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
+                <ChatIcon />
+                Consult
+            </Button>
+            <Button onClick={() => setView('account')} sx={{ flexDirection: 'column', color: view === 'account' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
+                <PersonIcon />
+                Account
+            </Button>
+        </Paper>
 
+      </Box>
+    </Box>
   );
 }
