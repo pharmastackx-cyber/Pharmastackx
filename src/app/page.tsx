@@ -1,6 +1,8 @@
 
 "use client";
 import { useState, useEffect } from "react";
+import dynamic from 'next/dynamic';
+
 import { useRouter } from 'next/navigation'; // Import useRouter
 import { Box, Typography, Paper, TextField, IconButton, Avatar, Menu, MenuItem, Button, Grid, CircularProgress, Container } from "@mui/material";
 import { motion, AnimatePresence, Variants, LayoutGroup } from "framer-motion";
@@ -14,6 +16,10 @@ import AboutContent from "@/components/AboutContent";
 import ContactContent from "@/components/ContactContent";
 import FindPharmacyContent from "@/components/FindPharmacyContent";
 import OrderRequestsContent from "@/components/OrderRequestsContent"; // Import the new component
+const MapBackground = dynamic(() => import('@/components/MapBackground'), {
+  ssr: false,
+  loading: () => <Box sx={{ height: '100%', width: '100%', bgcolor: '#002d24' }}/>
+});
 
 const MotionPaper = motion(Paper);
 
@@ -255,6 +261,8 @@ export default function HomePage() {
     }
   };
 
+ 
+
   return (
     <Box sx={{
       display: 'flex',
@@ -262,10 +270,9 @@ export default function HomePage() {
       minHeight: '100vh',
       bgcolor: '#121212',
     }}>
-      <Box sx={{
+            <Box sx={{
           position: 'relative',
           flexGrow: 1,
-          background: "linear-gradient(135deg, #004c3f 0%, #002d24 100%)",
           display: "flex",
           flexDirection: 'column',
           alignItems: "center",
@@ -274,8 +281,22 @@ export default function HomePage() {
           overflow: 'hidden'
         }}>
 
-<Box sx={{ position: 'fixed', top: 24, right: 24, zIndex: 1301 }}>
+        {/* Background Map and Overlay */}
+        <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
+          <MapBackground />
+        </Box>
+        <Box sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1,
+          background: "linear-gradient(135deg, rgba(3, 28, 24, 0.85) 0%, rgba(0, 45, 36, 0.95) 100%)",
+        }} />
 
+        {/* User Menu */}
+        <Box sx={{ position: 'fixed', top: 24, right: 24, zIndex: 1301 }}>
             {isLoading ? (
               <CircularProgress size={24} sx={{ color: 'white' }} />
             ) : user ? (
@@ -310,13 +331,17 @@ export default function HomePage() {
              ) }
         </Box>
         
-        <LayoutGroup>
-          <AnimatePresence mode="wait">
-            {renderActiveView()}
-          </AnimatePresence>
-        </LayoutGroup>
+        {/* Main Content Area */}
+        <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', flex: 1 }}>
+            <LayoutGroup>
+              <AnimatePresence mode="wait">
+                {renderActiveView()}
+              </AnimatePresence>
+            </LayoutGroup>
+        </Box>
 
       </Box>
+
 
       <Box 
         component="footer" 
