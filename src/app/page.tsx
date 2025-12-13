@@ -295,41 +295,75 @@ export default function HomePage() {
           background: "linear-gradient(135deg, rgba(3, 28, 24, 0.85) 0%, rgba(0, 45, 36, 0.95) 100%)",
         }} />
 
-        {/* User Menu */}
-        <Box sx={{ position: 'fixed', top: 24, right: 24, zIndex: 1301 }}>
-            {isLoading ? (
-              <CircularProgress size={24} sx={{ color: 'white' }} />
-            ) : user ? (
-                <>
-                    <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
-                      <Avatar sx={{ bgcolor: 'secondary.main', color: 'white', fontWeight: 'bold' }}>
-                        {userInitial}
-                      </Avatar>
-                    </IconButton>
-                    <Menu
-                      anchorEl={anchorEl}
-                      open={Boolean(anchorEl)}
-                      onClose={handleMenuClose}
-                      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                      transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                      sx={{ mt: 1 }}
-                    >
-                      <MenuItem disabled>{user.email}</MenuItem>
-                      <MenuItem onClick={handleLogout}>Logout</MenuItem>
-                    </Menu>
-                </>
-            ) : (
-              <Button
-                  variant="contained"
-                  color="secondary"
-                  startIcon={<Person />}
-                  component={Link}
-                  href="/auth"
-              >
-                  Sign In
-              </Button>
-             ) }
-        </Box>
+        {/* Header */}
+<Box
+  component={Paper}
+  elevation={0}
+  sx={{
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    p: 2,
+    zIndex: 1301,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    // Apply a semi-transparent background with a blur effect
+    backgroundColor: ' rgba(3, 28, 24, 0.85)', 
+    backdropFilter: 'blur(8px)',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+  }}
+>
+  {/* Logo */}
+  <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
+    PharmaStack<span style={{ color: '#00E6A4' }}>X</span>
+  </Typography>
+
+  {/* User/Login Section */}
+  {isLoading ? (
+    <CircularProgress size={24} sx={{ color: 'white' }} />
+  ) : user ? (
+    <>
+      <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
+        <Avatar sx={{ bgcolor: 'rgba(59, 4, 66, 0.88)', color: 'white', fontWeight: 'bold' }}>
+          {userInitial}
+        </Avatar>
+      </IconButton>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        sx={{ mt: 1 }}
+      >
+        <MenuItem disabled>{user.email}</MenuItem>
+        <MenuItem onClick={handleLogout}>Logout</MenuItem>
+      </Menu>
+    </>
+  ) : (
+    <Button
+      variant="outlined"
+      component={Link}
+      href="/auth"
+      sx={{
+        borderRadius: '20px',
+        borderColor: 'rgba(255, 255, 255, 0.8)',
+        color: 'white',
+        textTransform: 'uppercase', // "SIGN IN"
+        fontWeight: 'bold',
+        '&:hover': {
+          borderColor: 'white',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)'
+        }
+      }}
+    >
+      Sign In
+    </Button>
+  )}
+</Box>
+
         
         {/* Main Content Area */}
         <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', flex: 1 }}>
