@@ -3,37 +3,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
 import User from '@/models/User';
 
-export const dynamic = 'force-dynamic';
+const PHARMACIES_PER_PAGE = 5;
 
 export async function GET(req: NextRequest) {
-  await dbConnect();
-
   try {
-    // Get search query from URL parameters
-    const url = new URL(req.url);
-    const searchQuery = url.searchParams.get('search') || '';
+    await dbConnect();
 
-    // Build the query object
-    const query = {
-      role: 'pharmacy',
-      // Add search functionality if a query is provided
-      ...(searchQuery && {
-        $or: [
-          { businessName: { $regex: searchQuery, $options: 'i' } },
-          { businessAddress: { $regex: searchQuery, $options: 'i' } },
-        ],
-      }),
-    };
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get('page') || '0', 10);
+    const searchQuery = searchParams.get('search') || '';
+    const query: any = { role: 'pharmacy' };
+    if (searchQuery) {
+      query.businessName = { $regex: searchQuery, $options: 'i' };
+    }
+    const pharmacies = await User.find(query)
+      .select('_id businessName slug businessAddress city state')
+  
+      .skip(page * PHARMACIES_PER_PAGE)
+      .limit(PHARMACIES_PER_PAGE)
+      .lean();
 
-    const pharmacies = await User.find(query).select(
-      'businessName businessAddress slug' // Select the fields you need
-    );
+    return NextResponse.json({ pharmacies }, { status: 200 });
 
-    console.log('Fetched Pharmacies:', pharmacies); // Log the results
-
-    return NextResponse.json({ pharmacies });
   } catch (error) {
     console.error('Error fetching pharmacies:', error);
-    return NextResponse.json({ error: 'Failed to fetch pharmacies' }, { status: 500 });
+    return NextResponse.json({ message: 'An internal server error occurred.' }, { status: 500 });
   }
 }

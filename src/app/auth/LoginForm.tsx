@@ -99,7 +99,7 @@ export default function LoginForm({
       />
       <Box sx={{ textAlign: 'right', mb: 2 }}>
         <Link href="/auth/forgot-password" passHref>
-          <Typography color="primary" sx={{ textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
+          <Typography color="secondary" sx={{ textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
             Forgot Password?
           </Typography>
         </Link>
@@ -107,10 +107,9 @@ export default function LoginForm({
       <Button
         type="submit"
         variant="contained"
-        color="primary"
         fullWidth
         disabled={loading}
-        sx={{ mt: 1, py: 1.5 }}
+        sx={{ mt: 1, py: 1.5, backgroundColor: 'teal', '&:hover': { backgroundColor: 'darkcyan' } }}
       >
         {loading ? "Logging in..." : "Login"}
       </Button>

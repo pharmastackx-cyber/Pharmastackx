@@ -11,9 +11,9 @@ export const theme = createTheme({
       contrastText: '#FFFFFF',
     },
     secondary: {
-      main: '#E91E63', // Magenta
-      light: '#F8BBD9',
-      dark: '#AD1457',
+      main: '#7B1FA2', // Darker Magenta/Purple
+      light: '#9c27b0',
+      dark: '#4A148C',
       contrastText: '#FFFFFF',
     },
     background: {
@@ -73,9 +73,9 @@ export const theme = createTheme({
           },
         },
         containedSecondary: {
-          backgroundColor: '#E91E63',
+          backgroundColor: '#7B1FA2',
           '&:hover': {
-            backgroundColor: '#D81B60',
+            backgroundColor: '#4A148C',
           },
         },
       },

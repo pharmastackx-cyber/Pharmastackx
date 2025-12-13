@@ -57,10 +57,9 @@ export default function LoginPage() {
         <Button
           type="submit"
           variant="contained"
-          color="primary"
           fullWidth
           disabled={loading}
-          sx={{ mt: 2 }}
+          sx={{ mt: 2, backgroundColor: 'teal', '&:hover': { backgroundColor: 'darkcyan' } }}
         >
           {loading ? "Logging in..." : "Login"}
         </Button>

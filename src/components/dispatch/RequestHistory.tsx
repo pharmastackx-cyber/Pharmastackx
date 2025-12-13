@@ -1,153 +1,132 @@
+'use client';
 
-import React, { useState } from 'react';
-import {
-  Box,
-  Typography,
-  List,
-  ListItem,
-  ListItemText,
-  Button,
-  Collapse,
-  Chip,
-  IconButton,
-  Tooltip,
-  Divider,
-} from '@mui/material';
-import { History as HistoryIcon, ExpandMore as ExpandMoreIcon, Replay as RefillIcon, Visibility as ViewIcon } from '@mui/icons-material';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, Typography, Button, Chip, Box, Grid } from '@mui/material';
+import { useState } from 'react';
 
-// A simplified version of the DrugRequest type for props
-interface RefillItem {
-    name: string;
-    form: string;
-    strength: string;
-    quantity: number;
-    notes: string | null;
-    image: string | null;
-}
-
-// The structure of a single historical request fetched from the API
-interface RequestHistoryItem {
-    _id: string;
-    createdAt: string;
-    items: RefillItem[];
-    status: string;
-}
-
-interface RequestHistoryProps {
-  history: RequestHistoryItem[];
-  onRefill: (items: (RefillItem & { id: number; isEditing: boolean; showOtherInfo: boolean; formSuggestions: string[]; strengthSuggestions: string[] })[]) => void;
-}
-
-// --- Function to determine the status chip's appearance ---
-const getStatusChip = (status: string) => {
+const getStatusChipColor = (status: string) => {
     switch (status) {
-        case 'pending': return <Chip label="Searching..." color="warning" variant="outlined" size="small" />;
-        case 'quoted': return <Chip label="Items Found" color="primary" variant="filled" size="small" />;
-        case 'awaiting-confirmation': return <Chip label="Accepted" color="success" variant="outlined" size="small" />;
-        case 'confirmed': return <Chip label="Confirmed" color="success" variant="filled" size="small" />;
-        case 'rejected': return <Chip label="Rejected" color="error" variant="outlined" size="small" />;
-        default: return <Chip label={status.replace(/-/g, ' ')} size="small" />;
+        case 'pending': return { bgcolor: 'rgba(255, 193, 7, 0.2)', color: '#ffc107' }; // Amber
+        case 'quoted': return { bgcolor: 'rgba(33, 150, 243, 0.2)', color: '#2196f3' }; // Blue
+        case 'confirmed': return { bgcolor: 'rgba(76, 175, 80, 0.2)', color: '#4caf50' }; // Green
+        case 'declined': return { bgcolor: 'rgba(244, 67, 54, 0.2)', color: '#f44336' }; // Red
+        default: return { bgcolor: 'rgba(255, 255, 255, 0.2)', color: 'white' };
     }
 };
 
-const RequestHistory: React.FC<RequestHistoryProps> = ({ history, onRefill }) => {
-  const [expanded, setExpanded] = useState(false);
+const RequestHistory = ({ history, onRefill }: { history: any[], onRefill: (items: any[]) => void }) => {
+    const router = useRouter();
+    const [visibleCount, setVisibleCount] = useState(1);
+    const [increment, setIncrement] = useState(3);
 
-  if (!history || history.length === 0) {
-    return null;
-  }
+    const handleShowMore = () => {
+        setVisibleCount(prev => prev + increment);
+        setIncrement(prev => prev + 2);
+    };
 
-  const displayedHistory = expanded ? history : history.slice(0, 2);
+    const handleShowLess = () => {
+        setVisibleCount(1);
+        setIncrement(3);
+    };
 
-  const handleRefillClick = (items: RefillItem[]) => {
-      const refillItems = items.map(item => ({
-          ...item,
-          id: Date.now() + Math.random(),
-          isEditing: false,
-          showOtherInfo: Boolean(item.notes || item.image),
-          formSuggestions: [], 
-          strengthSuggestions: [],
-      }));
-      onRefill(refillItems);
-  }
+    if (history.length === 0) return null;
 
-  return (
-    <Box sx={{ mt: 5, mb: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          <HistoryIcon sx={{ color: 'text.secondary', mr: 1 }} />
-          <Typography variant="h6" component="h3" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-            Recent Requests
-          </Typography>
-      </Box>
-      <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'grey.200', borderRadius: '12px' }}>
-          <List dense>
-              {displayedHistory.map((request) => (
-              <ListItem
-                  key={request._id}
-                  divider
-                  sx={{
-                      display: 'flex',
-                      flexDirection: { xs: 'column', sm: 'row' },
-                      alignItems: { xs: 'flex-start', sm: 'center' },
-                      py: 1.5,
-                      // --- Make 'quoted' items stand out ---
-                      ...(request.status === 'quoted' && {
-                          bgcolor: 'primary.lighter',
-                          borderRadius: '8px',
-                      })
-                  }}
-              >
-                  <ListItemText
-                      primary={
-                          <Typography variant="body1" component="span" sx={{ fontWeight: 500 }}>
-                              {new Date(request.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                          </Typography>
-                      }
-                      secondary={
-                          <Box component="span" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                              {request.items.slice(0, 3).map((item, index) => (
-                                  <Chip key={index} label={item.name} size="small" variant="outlined" />
-                              ))}
-                              {request.items.length > 3 && <Chip label={`+${request.items.length - 3}`} size="small" />}
-                          </Box>
-                      }
-                  />
-                  <Box sx={{ mt: { xs: 1, sm: 0 }, ml: { sm: 'auto' }, display: 'flex', gap: 2, alignItems: 'center' }}>
-                      {/* --- Display the status chip --- */}
-                      {getStatusChip(request.status)}
+    const visibleHistory = history.slice(0, visibleCount);
 
-                      <Tooltip title={request.status === 'quoted' ? "Review Quote" : "View Details"}>
-                          {/* --- FIX: Link to the patient-facing review page --- */}
-                          <Link href={`/my-requests/${request._id}`} passHref>
-                              <Button component="a" variant="text" size="small" startIcon={<ViewIcon />}>
-                                  {request.status === 'quoted' ? "Review" : "View"}
-                              </Button>
-                          </Link>
-                      </Tooltip>
-                       <Tooltip title="Refill this list">
-                          <Button variant="text" size="small" startIcon={<RefillIcon />} onClick={() => handleRefillClick(request.items)}>
-                              Refill
-                          </Button>
-                      </Tooltip>
-                  </Box>
-              </ListItem>
-              ))}
-          </List>
-          {history.length > 2 && (
-            <Box sx={{mt: 1, textAlign: 'center'}}>
-                <Button
-                size="small"
-                onClick={() => setExpanded(!expanded)}
-                endIcon={<ExpandMoreIcon sx={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />}
-                >
-                {expanded ? 'Show Less' : `Show ${history.length - 2} More`}
-                </Button>
-            </Box>
-          )}
-      </Box>
-    </Box>
-  );
+    return (
+        <Box sx={{ mt: 5 }}>
+            <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: 'white' }}>Recent Requests</Typography>
+            <Grid container spacing={2}>
+                {visibleHistory.map((request) => (
+                    <Grid item xs={12} key={request._id}>
+                        <Card sx={{ background: 'rgba(255, 255, 255, 0.05)', color: 'white', borderRadius: '16px' }}>
+                            <CardContent>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <Box>
+                                        <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>{new Date(request.createdAt).toLocaleString()}</Typography>
+                                        <Chip label={request.status} size="small" sx={{ mt: 1, ...getStatusChipColor(request.status) }} />
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        {['confirmed', 'declined', 'cancelled'].includes(request.status) && (
+                                            <Button 
+                                                size="small" 
+                                                variant="outlined"
+                                                onClick={() => onRefill(request.items)}
+                                                sx={{ 
+                                                    color: '#96ffde', 
+                                                    borderColor: 'rgba(150, 255, 222, 0.5)', 
+                                                    '&:hover': { 
+                                                        backgroundColor: 'rgba(150, 255, 222, 0.1)', 
+                                                        borderColor: '#96ffde' 
+                                                    }
+                                                }}
+                                            >
+                                                Refill
+                                            </Button>
+                                        )}
+                                        <Button 
+                                            size="small" 
+                                            variant="outlined"
+                                            onClick={() => router.push(`/my-requests/${request._id}`)}
+                                            sx={{ 
+                                                color: 'white', 
+                                                borderColor: 'rgba(255, 255, 255, 0.3)',
+                                                '&:hover': { 
+                                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                                    borderColor: 'white'
+                                                }
+                                            }}
+                                        >
+                                            View
+                                        </Button>
+                                    </Box>
+                                </Box>
+                                <Box sx={{ mt: 2 }}>
+                                    {request.items.map((item: any, index: number) => (
+                                        <Typography key={index} variant="body1" sx={{ display: 'block' }}>
+                                            - {item.name} {item.strength && `(${item.strength})`}, Qty: {item.quantity}
+                                        </Typography>
+                                    ))}
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
+            {(history.length > 1) && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, gap: 2 }}>
+                    {visibleCount > 1 && (
+                        <Button
+                            onClick={handleShowLess}
+                            sx={{
+                                color: '#96ffde',
+                                textTransform: 'none',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(150, 255, 222, 0.1)',
+                                }
+                            }}
+                        >
+                            Show Less
+                        </Button>
+                    )}
+                    {visibleCount < history.length && (
+                        <Button
+                            onClick={handleShowMore}
+                            sx={{
+                                color: '#96ffde',
+                                textTransform: 'none',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(150, 255, 222, 0.1)',
+                                }
+                            }}
+                        >
+                            Show More
+                        </Button>
+                    )}
+                </Box>
+            )}
+        </Box>
+    );
 };
 
 export default RequestHistory;

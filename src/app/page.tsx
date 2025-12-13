@@ -1,13 +1,19 @@
 
 "use client";
 import { useState, useEffect } from "react";
-import { Box, Typography, Paper, TextField, IconButton, Avatar, Menu, MenuItem, Button, Grid, CircularProgress } from "@mui/material";
+import { useRouter } from 'next/navigation'; // Import useRouter
+import { Box, Typography, Paper, TextField, IconButton, Avatar, Menu, MenuItem, Button, Grid, CircularProgress, Container } from "@mui/material";
 import { motion, AnimatePresence, Variants, LayoutGroup } from "framer-motion";
 import SearchIcon from "@mui/icons-material/Search";
 import Person from '@mui/icons-material/Person';
 import Link from 'next/link';
 import { useSession } from "@/context/SessionProvider";
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import DispatchForm from "@/components/DispatchForm";
+import AboutContent from "@/components/AboutContent";
+import ContactContent from "@/components/ContactContent";
+import FindPharmacyContent from "@/components/FindPharmacyContent";
+import OrderRequestsContent from "@/components/OrderRequestsContent"; // Import the new component
 
 const MotionPaper = motion(Paper);
 
@@ -15,6 +21,7 @@ const animatedWords = ["pharmacies", "pharmacists", "medicines"];
 
 export default function HomePage() {
   const { user, isLoading } = useSession();
+  const router = useRouter(); // Initialize router
   const [inputValue, setInputValue] = useState("");
   const [wordIndex, setWordIndex] = useState(0);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -79,7 +86,7 @@ export default function HomePage() {
     >
       <motion.div variants={itemVariants}>
         <Typography variant="h4" sx={{ color: "white", fontWeight: 500, mb: 1, fontSize: { xs: '1.75rem', sm: '2.5rem' } }}>
-        {user ? `Welcome, ${user.role === 'pharmacy' || user.role === 'clinic' ? user.businessName : user.name}!` : "Welcome!"}
+        {user ? `Welcome, ${user.role === 'pharmacy' || user.role === 'clinic' ? user.businessName : user.username}!` : "Welcome!"}
         </Typography>
 
         <Box sx={{ minHeight: { xs: '60px', sm: '80px' }, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
@@ -147,7 +154,7 @@ export default function HomePage() {
               <Grid container spacing={1} sx={{ justifyContent: 'center', flexWrap: 'nowrap' }}>
                   <Grid item xs="auto">
                     <motion.div layoutId="store-management-header">
-                      <Button variant="contained" size="small" onClick={() => setView('storeManagement')} sx={{ borderRadius: '20px', fontSize: '0.75rem', px: 2, whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: '#9c27b0', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: '#7b1fa2' } }}>
+                      <Button variant="contained" size="small" onClick={() => router.push('/store-management')} sx={{ borderRadius: '20px', fontSize: '0.75rem', px: 2, whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
                           Store Management
                       </Button>
                     </motion.div>
@@ -170,7 +177,7 @@ export default function HomePage() {
                             variant="contained"
                             size="small"
                             onClick={() => setView('orderMedicines')}
-                            sx={{ borderRadius: '20px', fontSize: '0.75rem', px: 2, whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: '#9c27b0', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: '#7b1fa2' } }}
+                            sx={{ borderRadius: '20px', fontSize: '0.75rem', px: 2, whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}
                         >
                             Order Medicines
                         </Button>
@@ -190,14 +197,14 @@ export default function HomePage() {
     </Box>
   );
 
-  const renderPageView = (title: string, layoutId: string) => (
+  const renderPageView = (title: string, layoutId: string, children?: React.ReactNode) => (
     <Box
       key={layoutId}
       component={motion.div}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      sx={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', pt: 16 }}
+      sx={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', pt: { xs: 8, sm: 12 }, color: 'white' }}
     >
         <motion.div 
           layoutId={layoutId}
@@ -223,47 +230,58 @@ export default function HomePage() {
                 </Typography>
             </Paper>
         </motion.div>
+        <Box sx={{ flexGrow: 1, overflowY: 'auto', p: { xs: 2, sm: 3 } }}>
+            {children}
+        </Box>
     </Box>
   );
 
   const renderActiveView = () => {
     switch (view) {
       case 'orderMedicines':
-        return renderPageView('Order Medicines', 'order-medicines-header');
+        return renderPageView('Order Medicines', 'order-medicines-header', <DispatchForm />);
       case 'storeManagement':
         return renderPageView('Store Management', 'store-management-header');
       case 'orderRequests':
-        return renderPageView('Order Requests', 'order-requests-header');
+        return renderPageView('Order Requests', 'order-requests-header', <OrderRequestsContent />);
       case 'findPharmacy':
-        return renderPageView('Find a Pharmacy', 'find-pharmacy-header');
+        return renderPageView('Find a Pharmacy', 'find-pharmacy-header', <FindPharmacyContent />);
+      case 'about':
+        return renderPageView('About Us', 'about-us-header', <AboutContent />);
+      case 'contact':
+        return renderPageView('Contact Us', 'contact-us-header', <ContactContent />);
       default:
         return renderWelcomeView();
     }
   };
 
   return (
-    <LayoutGroup>
+    <Box sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: '100vh',
+      bgcolor: '#121212',
+    }}>
       <Box sx={{
           position: 'relative',
-          minHeight: "100vh",
+          flexGrow: 1,
           background: "linear-gradient(135deg, #004c3f 0%, #002d24 100%)",
           display: "flex",
           flexDirection: 'column',
           alignItems: "center",
           justifyContent: "center",
           p: { xs: 2, sm: 3 },
-          pt: '100px',
-          pb: '120px',
           overflow: 'hidden'
         }}>
 
-        <Box sx={{ position: 'absolute', top: 24, right: 24, zIndex: 10 }}>
+<Box sx={{ position: 'fixed', top: 24, right: 24, zIndex: 1301 }}>
+
             {isLoading ? (
               <CircularProgress size={24} sx={{ color: 'white' }} />
             ) : user ? (
                 <>
                     <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
-                      <Avatar sx={{ bgcolor: '#9c27b0', color: 'white', fontWeight: 'bold' }}>
+                      <Avatar sx={{ bgcolor: 'secondary.main', color: 'white', fontWeight: 'bold' }}>
                         {userInitial}
                       </Avatar>
                     </IconButton>
@@ -291,17 +309,64 @@ export default function HomePage() {
               </Button>
              ) }
         </Box>
+        
+        <LayoutGroup>
+          <AnimatePresence mode="wait">
+            {renderActiveView()}
+          </AnimatePresence>
+        </LayoutGroup>
 
-        <AnimatePresence mode="wait">
-          {renderActiveView()}
-        </AnimatePresence>
-
-        <Box sx={{ position: 'absolute', bottom: 24, left: 0, right: 0, px: { xs: 2, sm: 3 }, textAlign: 'center' }}>
-          <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', fontStyle: 'italic', maxWidth: '600px', mx: 'auto', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-            ensuring that no patient is left untreated because a drug is unavailable, unfindable, or inaccessible.
-          </Typography>
-        </Box>
       </Box>
-    </LayoutGroup>
+
+      <Box 
+        component="footer" 
+        sx={{ 
+          textAlign: 'center',
+          py: 3,
+          px: 2,
+          bgcolor: '#002d24',
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+        }}
+      >
+        <Container maxWidth="md">
+          <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)', fontStyle: 'italic', fontSize: { xs: '0.75rem', sm: '0.875rem' }, mb: 2 }}>
+            Ensuring that no patient is left untreated because a drug is unavailable, unfindable, or inaccessible.
+          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: { xs: 2, sm: 4 } }}>
+            <motion.div layoutId="about-us-header">
+              <Button 
+                onClick={() => setView('about')} 
+                sx={{ 
+                  color: 'rgba(255, 255, 255, 0.9)', 
+                  textDecoration: 'none', 
+                  '&:hover': { textDecoration: 'underline' },
+                  fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                  p: 0, 
+                  minWidth: 'auto'
+                }}
+              >
+                About
+              </Button>
+            </motion.div>
+            <motion.div layoutId="contact-us-header">
+              <Button 
+                onClick={() => setView('contact')} 
+                sx={{ 
+                  color: 'rgba(255, 255, 255, 0.9)', 
+                  textDecoration: 'none', 
+                  '&:hover': { textDecoration: 'underline' },
+                  fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                  p: 0, 
+                  minWidth: 'auto'
+                }}
+              >
+                Contact Us
+              </Button>
+            </motion.div>
+          </Box>
+        </Container>
+      </Box>
+    </Box>
+
   );
 }

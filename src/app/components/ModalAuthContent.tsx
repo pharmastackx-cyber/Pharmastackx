@@ -35,9 +35,19 @@ function AuthViewSwitcher() {
                 value={tabIndex}
                 onChange={handleTabChange}
                 variant="fullWidth"
-                indicatorColor="primary"
-                textColor="primary"
-                sx={{ mb: 3, position: 'sticky', top: 0, background: 'white', zIndex: 1 }} // Make tabs sticky
+                sx={{ 
+                    mb: 3, 
+                    position: 'sticky', 
+                    top: 0, 
+                    background: 'white', 
+                    zIndex: 1,
+                    '& .MuiTabs-indicator': {
+                        backgroundColor: 'teal',
+                    },
+                    '& .MuiTab-root.Mui-selected': {
+                        color: 'teal',
+                    },
+                }} // Make tabs sticky
             >
                 <Tab label="Login" />
                 <Tab label="Sign Up" />

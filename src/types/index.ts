@@ -3,6 +3,7 @@ export interface User {
   _id?: string; // from mongodb
   id: string;
   email: string;
+  username: string;
   firstName: string;
   lastName: string;
   name?: string; // for user.name access

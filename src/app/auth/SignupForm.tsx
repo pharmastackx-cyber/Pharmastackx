@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useCallback, useEffect } from "react";
-import { TextField, Button, MenuItem, Box, Typography, InputAdornment, IconButton, ListSubheader, Alert } from "@mui/material";
+import { TextField, Button, MenuItem, Box, Typography, InputAdornment, IconButton, ListSubheader, Alert, CircularProgress } from "@mui/material";
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from "axios";
 import Cookies from "js-cookie";
@@ -110,7 +110,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
     setSuccess("");
     setLoading(true);
     try {
-      const signupResponse = await axios.post("/api/auth/signup", { ...form, role: "customer" });
+      await axios.post("/api/auth/signup", { ...form, role: "customer" });
       const loginResponse = await axios.post("/api/auth/login", { email: form.email, password: form.password });
       Cookies.set("session_token", loginResponse.data.token, { expires: 7 });
       setSuccess("Signup successful! Redirecting...");
@@ -150,7 +150,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
   };
 
   const handlePharmacyCreated = (newPharmacy: Pharmacy) => {
-    setPharmacies(prevPharmacies => [newPharmacy, ...prevPharmacies]);
+    setPharmacies(prevPharmacies => [newPharmacy, ...prevPharmacies].sort((a,b) => a.businessName.localeCompare(b.businessName)));
     setForm((prevForm) => ({ ...prevForm, pharmacy: newPharmacy._id }));
     setCreatePharmacyModalOpen(false);
   };
@@ -194,12 +194,33 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
               ),
             }}
           />
-          <Button type="submit" variant="contained" color="primary" fullWidth disabled={loading || !form.username || !form.email || !form.password} sx={{ mt: 2, py: 1.5 }}>
-            {loading ? "Signing up..." : "Sign Up as a Customer"}
-          </Button>
-          <Button variant="outlined" color="secondary" fullWidth sx={{ mt: 1, py: 1.5 }} onClick={() => setShowProviderStep(true)}>
-             Join as a Service Provider
-          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            disabled={loading || !form.username || !form.email || !form.password}
+            sx={{
+                mt: 2,
+                py: 1.5,
+                fontWeight: 'bold',
+                bgcolor: 'teal',
+                color: 'white',
+                '&:hover': { bgcolor: 'darkcyan' }
+            }}
+            >
+            {loading ? <CircularProgress size={24} sx={{ color: 'white' }}/> : "Sign Up as a Customer"}
+            </Button>
+            <Typography variant="body2" sx={{ textAlign: 'center', my: 2, color: 'text.secondary' }}>
+                Are you a pharmacy, clinic, or other service provider?
+            </Typography>
+            <Button 
+                variant="outlined" 
+                color="secondary"
+                fullWidth sx={{ mt: 1, py: 1.5 }} 
+                onClick={() => setShowProviderStep(true)}
+            >
+                Join as a Service Provider
+            </Button>
         </form>
       ) : (
         <Box sx={{ px: { xs: 0, sm: 1 } }}>
@@ -229,7 +250,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
                 ),
               }}
             />
-            <TextField select label="Provider Type" name="providerType" value={providerType} onChange={(e) => setProviderType(e.target.value)} fullWidth margin="normal" required disabled={providerLoading}>
+            <TextField select label="Provider Type" name="providerType" value={providerType} onChange={(e) => setProviderType(e.target.value)} fullWidth margin="normal" required disabled={providerLoading} >
               {providerTypes.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
             </TextField>
             
@@ -237,12 +258,12 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
               <>
                 <TextField label="Mobile" name="mobile" value={form.mobile || ""} onChange={handleChange} fullWidth margin="normal" required />
                 <TextField label="License Number (optional)" name="licenseNumber" value={form.licenseNumber || ""} onChange={handleChange} fullWidth margin="normal" />
-                <TextField select label="State of Practice" name="stateOfPractice" value={form.stateOfPractice || ""} onChange={handleChange} fullWidth margin="normal" required>
+                <TextField select label="State of Practice" name="stateOfPractice" value={form.stateOfPractice || ""} onChange={handleChange} fullWidth margin="normal" required >
                   {nigerianStates.map((state) => <MenuItem key={state} value={state}>{state}</MenuItem>)}
                 </TextField>
-                <TextField select label="Pharmacy" name="pharmacy" value={form.pharmacy} onChange={handleChange} fullWidth margin="normal" required>
+                <TextField select label="Pharmacy" name="pharmacy" value={form.pharmacy} onChange={handleChange} fullWidth margin="normal" required >
                   <ListSubheader>
-                    <TextField size="small" autoFocus placeholder="Type to search..." fullWidth value={pharmacySearch} onChange={handlePharmacySearchChange} onKeyDown={(e) => e.stopPropagation()} />
+                    <TextField size="small" autoFocus placeholder="Type to search..." fullWidth value={pharmacySearch} onChange={handlePharmacySearchChange} onKeyDown={(e) => e.stopPropagation()} variant="standard" />
                   </ListSubheader>
                   <MenuItem value="create-new">+ Create New Pharmacy</MenuItem>
                   {filteredPharmacies.map((p) => <MenuItem key={p._id} value={p._id}>{p.businessName}</MenuItem>)}
@@ -253,7 +274,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
             {providerType && providerType !== 'pharmacist' && (
               <>
                 <TextField label="Business Name" name="businessName" value={form.businessName || ""} onChange={handleChange} fullWidth margin="normal" required />
-                <TextField select label="State" name="state" value={form.state || ""} onChange={handleChange} fullWidth margin="normal" required>
+                <TextField select label="State" name="state" value={form.state || ""} onChange={handleChange} fullWidth margin="normal" required >
                   {nigerianStates.map((state) => <MenuItem key={state} value={state}>{state}</MenuItem>)}
                 </TextField>
                 <TextField label="City" name="city" value={form.city || ""} onChange={handleChange} fullWidth margin="normal" required />
@@ -263,10 +284,23 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
               </>
             )}
 
-            <Button type="submit" variant="contained" color="primary" fullWidth disabled={providerLoading || !providerType} sx={{ mt: 2, py: 1.5 }}>
-              {providerLoading ? `Signing up...` : `Sign Up as ${providerType.charAt(0).toUpperCase() + providerType.slice(1)}`}
+            <Button 
+                type="submit" 
+                variant="contained" 
+                fullWidth 
+                disabled={providerLoading || !providerType} 
+                sx={{
+                    mt: 2,
+                    py: 1.5,
+                    fontWeight: 'bold',
+                    bgcolor: 'teal',
+                    color: 'white',
+                    '&:hover': { bgcolor: 'darkcyan' }
+                }}
+            >
+              {providerLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : `Sign Up as ${providerType.charAt(0).toUpperCase() + providerType.slice(1)}`}
             </Button>
-            <Button variant="text" color="secondary" fullWidth sx={{ mt: 1 }} onClick={() => setShowProviderStep(false)}>
+            <Button variant="text" sx={{ mt: 1 }} fullWidth onClick={() => setShowProviderStep(false)}>
               Back
             </Button>
           </form>
@@ -274,7 +308,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
             open={isCreatePharmacyModalOpen}
             onClose={() => setCreatePharmacyModalOpen(false)}
             onPharmacyCreated={handlePharmacyCreated}
-            setError={setError} // Pass the internal setError function
+            setError={setError}
           />
         </Box>
       )}
