@@ -104,7 +104,8 @@ export default function HomePage() {
       initial="hidden"
       animate="visible"
       exit="exit"
-      sx={{ width: '100%', ml: 'auto', textAlign: 'center', p: 2 }}
+      sx={{ width: '100%', ml: 'auto', textAlign: 'center', p: 2,  }}
+
 
 
 
@@ -113,10 +114,15 @@ export default function HomePage() {
     >
       <motion.div variants={itemVariants}>
         
-      <Typography variant="h5" sx={{ color: "rgba(7, 6,- 6, 0.9)", fontWeight: 1000, fontSize: { xs: '1.5rem', sm: '2.2rem' }, flexWrap: 'wrap',  }}
+      <Typography variant="h5" sx={{ 
+        color: "rgba(244, 239, 239, 0.9)", 
+        fontWeight: 1000, 
+        fontSize: { xs: '1.3rem', sm: '2.9rem' }, 
+        flexWrap: 'wrap',
+         
+       }}
       >
-         <>Ensuring that no patient is left untreated because a drug is  
-         <Box component="br" sx={{ display: { xs: 'block', sm: 'none' } }} /> unavailable, unfindable or inaccessible.</>
+         <>Ensuring that no patient is left untreated because a drug is unavailable, unfindable or inaccessible.</>
 
       </Typography>
 
@@ -275,10 +281,11 @@ export default function HomePage() {
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
-      minHeight: '100vh',
-      
+      height: '100vh', // Use height instead of minHeight
+      overflow: 'hidden', // Prevent any internal scrolling
       pb: bottomPadding,
     }}>
+    
 
       {/* Background Map and Overlay */}
       <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60vh', zIndex: 0 }}>
