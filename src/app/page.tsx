@@ -19,6 +19,7 @@ import OrderRequestsContent from "@/components/OrderRequestsContent"; // Import 
 import ConsultContent from "@/components/ConsultContent";
 import AccountContent from "@/components/AccountContent";
 import { Home as HomeIcon, Chat as ChatIcon, Person as PersonIcon, LocalPharmacy as PharmacyIcon } from '@mui/icons-material';
+import { wrap } from "lodash";
 
 const MapBackground = dynamic(() => import('@/components/MapBackground'), {
   ssr: false,
@@ -103,15 +104,55 @@ export default function HomePage() {
       initial="hidden"
       animate="visible"
       exit="exit"
-      sx={{ maxWidth: '800px', width: '100%', textAlign: 'center' }}
+      sx={{ width: '100%', ml: 'auto', textAlign: 'center', p: 2 }}
+
+
+
+
+
     >
       <motion.div variants={itemVariants}>
-        <Typography variant="h4" sx={{ color: "white", fontWeight: 500, mb: 1, fontSize: { xs: '1.75rem', sm: '2.5rem' } }}>
-        {user ? `Welcome, ${user.role === 'pharmacy' || user.role === 'clinic' ? user.businessName : user.username}!` : "Welcome!"}
-        </Typography>
+        
+      <Typography variant="h5" sx={{ color: "rgba(7, 6,- 6, 0.9)", fontWeight: 1000, fontSize: { xs: '1.5rem', sm: '2.2rem' }, flexWrap: 'wrap',  }}
+      >
+         <>Ensuring that no patient is left untreated because a drug is  
+         <Box component="br" sx={{ display: { xs: 'block', sm: 'none' } }} /> unavailable, unfindable or inaccessible.</>
 
-        <Box sx={{ minHeight: { xs: '60px', sm: '80px' }, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
-            <Typography variant="h5" sx={{ color: "rgba(255, 255, 255, 0.9)", fontWeight: 500, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', columnGap: '0.5rem', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>
+      </Typography>
+
+
+        
+
+        
+      </motion.div>
+
+      <Box 
+      sx={{ 
+        position: 'absolute', 
+        bottom: { xs: 24, sm: 24 }, // Position it at the bottom
+        left: '50%', // Center horizontally
+        transform: 'translateX(-50%)', // Ensure perfect centering
+        minHeight: { xs: '40px', sm: '60px' }, 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        textAlign: 'center'
+    }}>
+
+            <Typography variant="h5" 
+            sx={{ color: "rgba(8, 2, 2, 0.9)", 
+              fontWeight: 1000, 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                alignItems: 'left',
+                justifyContent: 'center', 
+                columnGap: '0.5rem', 
+                maxWidth: '100%',
+                fontSize: { xs: '0.9rem', sm: '1.5rem' } 
+            }}
+            
+              
+              >
                 <span>PharmaStackX connects you to</span>
                 <AnimatePresence mode="wait">
                     <motion.span
@@ -120,18 +161,13 @@ export default function HomePage() {
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: -20, opacity: 0 }}
                         transition={{ duration: 0.4, ease: "easeInOut" }}
-                        style={{ color: '#96ffde', display: 'inline-block' }}
+                        style={{ color: "rgba(2, 58, 58, 0.9)", display: 'inline-block' }}
                     >
                         {animatedWords[wordIndex]}
                     </motion.span>
                 </AnimatePresence>
             </Typography>
         </Box>
-
-        <Typography sx={{ color: "white", fontSize: { xs: '1rem', sm: '1.2rem' }, mt: 2, mb: 4 }}>
-          What would you like to do today?
-        </Typography>
-      </motion.div>
       
       {!isLoading && (
         user && ['pharmacy', 'pharmacist'].includes(user.role) ? (
@@ -158,21 +194,12 @@ export default function HomePage() {
               <Grid container spacing={1} sx={{ justifyContent: 'center', flexWrap: 'nowrap' }}>
                   <Grid item xs="auto">
                     <motion.div layoutId="order-medicines-header">
-                        <Button
-                            variant="contained"
-                            size="small"
-                            onClick={() => setView('orderMedicines')}
-                            sx={{ borderRadius: '20px', fontSize: '0.75rem', px: 2, whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}
-                        >
-                            Order Medicines
-                        </Button>
+                        
                     </motion.div>
                   </Grid>
                   <Grid item xs="auto">
                     <motion.div layoutId="find-pharmacy-header">
-                      <Button variant="outlined" size="small" onClick={() => setView('findPharmacy')} sx={{ borderRadius: '20px', fontSize: '0.75rem', px: 2, whiteSpace: 'nowrap', borderColor: 'rgba(150, 255, 222, 0.5)', color: 'white', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.05)', borderColor: '#96ffde', backgroundColor: 'rgba(150, 255, 222, 0.1)' } }}>
-                          Find a Pharmacy
-                      </Button>
+                      
                     </motion.div>
                   </Grid>
               </Grid>
@@ -254,18 +281,10 @@ export default function HomePage() {
     }}>
 
       {/* Background Map and Overlay */}
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60vh', zIndex: 0 }}>
           <MapBackground />
         </Box>
-        <Box sx={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 1,
-          background: "linear-gradient(135deg, rgba(3, 28, 24, 0.85) 0%, rgba(0, 45, 36, 0.95) 100%)",
-        }} />
+        
 
 
       <Box sx={{
@@ -278,6 +297,61 @@ export default function HomePage() {
           p: { xs: 2, sm: 3 },
           overflow: 'hidden'
         }}>
+
+                               {/* Wavy Animated Gradient Background */}
+            <style>
+              {`
+                @keyframes wavyGradient {
+                  0% { background-position: 0% 50%; }
+                  50% { background-position: 100% 50%; }
+                  100% { background-position: 0% 50%; }
+                }
+              `}
+            </style>
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 1, // Sits on top of the map, but behind the white slant
+                background: 'linear-gradient(120deg, #e43a5a,rgb(134, 3, 112),rgb(16, 172, 157), rgb(61, 149, 249),rgb(170, 73, 244))',
+                backgroundSize: '300% 300%',
+                animation: 'wavyGradient 8s ease infinite',
+                opacity: 0.7, // Adjust opacity to control map visibility
+              }}
+            />
+
+
+
+
+                  {/* New Slanted White Background */}
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '40%', // Adjust the height to control how much of the page is white
+            bgcolor: 'white',
+            zIndex: 1, // This places it above the map but below your content
+            clipPath: `polygon(
+               0% 10%, 2.5% 10.7%, 5% 11.5%, 7.5% 12.2%, 10% 13%, 12.5% 13.7%, 15% 14.4%, 17.5% 14.8%, 
+                    20% 15%, 22.5% 14.9%, 25% 14.5%, 27.5% 14.1%, 30% 13%, 32.5% 12.3%, 35% 11.5%, 37.5% 10.7%, 
+                    40% 10%, 42.5% 9.3%, 45% 8.5%, 47.5% 8.2%, 50% 8%, 52.5% 7.8%, 55% 7.5%, 57.5% 7.2%, 
+                    60% 7%, 62.5% 7.2%, 65% 7.5%, 67.5% 7.8%, 70% 8%, 72.5% 8.7%, 75% 9.5%, 77.5% 10.3%, 
+                    80% 11%, 82.5% 11.8%, 85% 12.5%, 87.5% 13.3%, 90% 14%, 92.5% 14.5%, 95% 14.8%, 97.5% 14.9%, 
+                    100% 15%, 
+                    100% 100%, 0 100%
+            )`,
+            
+            
+            
+            
+          }}
+        />
+
 
         
 
@@ -295,9 +369,9 @@ export default function HomePage() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            backgroundColor: ' rgba(3, 28, 24, 0.85)', 
+            backgroundColor: ' rgba(3, 28, 24, 0)', 
             backdropFilter: 'blur(8px)',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+            borderBottom: '1px solid rgb(2, 38, 34)'
           }}
         >
           {/* Logo */}
@@ -348,6 +422,8 @@ export default function HomePage() {
             </Button>
           )}
         </Box>
+
+        
 
         
         {/* Main Content Area */}

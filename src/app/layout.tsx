@@ -1,6 +1,6 @@
 
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Poppins } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/context/SessionProvider";
 import { CartProvider } from "@/contexts/CartContext";
@@ -12,7 +12,7 @@ import { AuthModalProvider } from "@/contexts/AuthModalContext"; // Import the p
 import AuthModal from "./components/AuthModal";
 import Navbar from "./components/Navbar";
 
-const inter = Inter({ subsets: ["latin"] });
+const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
   title: "Pharmastackx",
@@ -50,7 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className={inter.className}>
+      <body className={poppins.className}>
         <Suspense fallback={null}>
           <SessionProvider>
             {/* Wrap with AuthModalProvider */}
