@@ -64,7 +64,13 @@ export default function HomePage() {
 
   const userInitial = user?.email?.charAt(0)?.toUpperCase() || '';
 
-  useEffect(() => {
+
+    useEffect(() => {
+      window.scrollTo(0, document.body.scrollHeight);
+    }, []);
+    useEffect(() => {
+    
+
     const timer = setTimeout(() => {
       setWordIndex((prevIndex) => (prevIndex + 1) % animatedWords.length);
     }, 2500);
@@ -281,10 +287,9 @@ export default function HomePage() {
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
-      height: '100vh', // Use height instead of minHeight
-      overflow: 'hidden', // Prevent any internal scrolling
+      minHeight: '100vh',
       pb: bottomPadding,
-      boxSizing: 'border-box'
+      
     }}>
     
 
