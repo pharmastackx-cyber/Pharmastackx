@@ -115,7 +115,7 @@ export default function HomePage() {
       <motion.div variants={itemVariants}>
         
       <Typography variant="h5" sx={{ 
-        color: "rgba(244, 239, 239, 0.9)", 
+        color: "rgba(248, 247, 247, 0.9)", 
         fontWeight: 1000, 
         fontSize: { xs: '1.3rem', sm: '2.9rem' }, 
         flexWrap: 'wrap',
@@ -284,6 +284,7 @@ export default function HomePage() {
       height: '100vh', // Use height instead of minHeight
       overflow: 'hidden', // Prevent any internal scrolling
       pb: bottomPadding,
+      boxSizing: 'border-box'
     }}>
     
 
