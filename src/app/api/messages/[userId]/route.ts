@@ -7,17 +7,27 @@ import Message from "@/models/Message";
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
-// Define the shape of a message object that the frontend expects
 interface FrontendMessage {
   _id: string;
-  sender: string; // The ID of the sender
-  receiver: string; // The ID of the receiver
+  sender: string;
+  receiver: string;
   content: string;
   createdAt: string;
 }
 
-export async function GET(request: NextRequest, { params }: { params: { userId: string } }) {
+// Define the context type to match the Vercel build environment's expectations
+// for this experimental Next.js version.
+type RouteContext = {
+  params: {
+    userId: string;
+  }
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
   await dbConnect();
+
+  // Access the userId directly from the context object
+  const otherUserId = context.params.userId;
   
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('session_token');
@@ -29,7 +39,6 @@ export async function GET(request: NextRequest, { params }: { params: { userId: 
   try {
     const payload = jwt.verify(sessionToken.value, JWT_SECRET) as { userId: string };
     const currentUserId = payload.userId;
-    const otherUserId = params.userId;
 
     const dbMessages = await Message.find({
       $or: [
@@ -40,7 +49,6 @@ export async function GET(request: NextRequest, { params }: { params: { userId: 
     .sort({ createdAt: 'asc' })
     .lean();
 
-    // Map database message format to the format expected by the frontend
     const formattedMessages: FrontendMessage[] = dbMessages.map((msg: any) => ({
       _id: msg._id.toString(),
       sender: msg.from.toString(),
