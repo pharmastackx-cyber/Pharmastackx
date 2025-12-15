@@ -15,20 +15,17 @@ interface FrontendMessage {
   createdAt: string;
 }
 
-// Define the context type to match the Vercel build environment's expectations
-// for this experimental Next.js version.
 type RouteContext = {
-  params: {
-    userId: string;
-  }
+  params: Promise<{ userId: string; }>;
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
   await dbConnect();
 
-  // Access the userId directly from the context object
-  const otherUserId = context.params.userId;
+  // Await the resolution of the params promise to access the userId
+  const { userId: otherUserId } = await context.params;
   
+  // Await the cookies() function to get the cookie store
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('session_token');
 
