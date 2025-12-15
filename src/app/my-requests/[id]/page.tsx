@@ -138,7 +138,7 @@ const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, i
 const ReviewRequestPage: React.FC = () => {
   const router = useRouter();
   const params = useParams();
-  const { id } = params;
+  const id = params?.id;
   const { addToCart, updateQuantity } = useCart();
 
   const [request, setRequest] = useState<Request | null>(null);
