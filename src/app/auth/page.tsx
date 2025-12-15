@@ -16,7 +16,7 @@ function AuthTrigger() {
         openModal();
 
         // Construct the redirect URL. Default to homepage if no redirect is specified.
-        const redirectUrl = searchParams.get('redirect') || '/';
+        const redirectUrl = searchParams?.get('redirect') || '/';
         
         // Replace the current history entry with the target URL.
         // This ensures the user doesn't get stuck in a back-button loop.
