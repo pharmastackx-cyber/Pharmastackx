@@ -8,10 +8,10 @@ import { Box, Typography, Paper, Link as MuiLink, Tabs, Tab, CircularProgress } 
 
 function AuthViewSwitcher() {
     const searchParams = useSearchParams();
-    const initialView = searchParams.get('view') === 'signup' ? 1 : 0;
+    const initialView = searchParams?.get('view') === 'signup' ? 1 : 0;
     const [tabIndex, setTabIndex] = useState(initialView);
 
-    const redirectUrl = searchParams.get('redirect');
+    const redirectUrl = searchParams?.get('redirect');
 
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setTabIndex(newValue);
