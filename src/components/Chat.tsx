@@ -1,177 +1,164 @@
 
+"use client";
 import { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Paper, Avatar, TextField, IconButton } from '@mui/material';
-import SendIcon from '@mui/icons-material/Send';
-import io, { Socket } from 'socket.io-client';
+import { useSession } from "@/context/SessionProvider";
+import { Box, TextField, Button, Typography, CircularProgress, Paper, Avatar, IconButton } from '@mui/material';
+import { ArrowBack } from '@mui/icons-material';
+import { io, Socket } from "socket.io-client";
 
-interface User {
-  _id: string;
-  username: string;
-  profilePicture?: string;
-  role?: string;
+interface ChatProps {
+    user: {
+        _id: string;
+        username: string;
+        role: string;
+        profilePicture?: string;
+    };
+    onBack: () => void;
 }
 
 interface Message {
-  text: string;
-  sender: 'currentUser' | 'otherUser';
+    _id: string;
+    sender: string;
+    receiver: string;
+    content: string;
+    createdAt: string;
 }
 
-interface ChatProps {
-  currentUser: User;
-  otherUser: User;
-}
+let socket: Socket;
 
-const Chat = ({ currentUser, otherUser }: ChatProps) => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const socketRef = useRef<Socket | null>(null);
-  const messagesEndRef = useRef<null | HTMLDivElement>(null);
+const Chat = ({ user, onBack }: ChatProps) => {
+    const { user: currentUser } = useSession();
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [newMessage, setNewMessage] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const messagesEndRef = useRef<null | HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+    useEffect(() => {
+        const fetchMessages = async () => {
+            setIsLoading(true);
+            try {
+                const response = await fetch(`/api/messages/${user._id}`);
+                const data = await response.json();
+                setMessages(data);
+            } catch (error) {
+                console.error("Failed to fetch messages", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+        fetchMessages();
 
-  useEffect(() => {
-    if (!currentUser || !otherUser) return;
+        // Initialize Socket.IO connection
+        socket = io({ path: '/api/socket' });
 
-    fetch('/api/socket');
-    socketRef.current = io({ path: '/api/socket' });
-    const socket = socketRef.current;
+        socket.on('connect', () => {
+            console.log('Socket connected:', socket.id);
+            if (currentUser) {
+                socket.emit('register', currentUser._id);
+            }
+        });
 
-    socket.emit('register', currentUser._id);
+        socket.on('receiveMessage', (message: Message) => {
+            if (message.sender === user._id || message.sender === currentUser?._id) {
+                setMessages(prevMessages => [...prevMessages, message]);
+            }
+        });
 
-    socket.on('receive_message', (message) => {
-      if (message.from === currentUser._id) return; // Should be handled by optimistic update
+        socket.on('disconnect', () => {
+            console.log('Socket disconnected');
+        });
 
-      const receivedMessage: Message = {
-        text: message.text,
-        sender: 'otherUser',
-      };
-      setMessages((prevMessages) => [...prevMessages, receivedMessage]);
-    });
+        return () => {
+            console.log('Disconnecting socket');
+            socket.disconnect();
+        };
+    }, [user._id, currentUser]);
 
-    // Optional: Fetch message history
-    const fetchHistory = async () => {
-      const response = await fetch(`/api/messages/${otherUser._id}`);
-      const data = await response.json();
-      const formattedMessages = data.map((msg: any) => ({
-        text: msg.text,
-        sender: msg.from === currentUser._id ? 'currentUser' : 'otherUser',
-      }));
-      setMessages(formattedMessages);
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
+
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newMessage.trim() || !currentUser || !currentUser._id) return;
+
+        const messageData = {
+            content: newMessage,
+            receiverId: user._id,
+        };
+
+        // Optimistic UI update
+        const optimisticMessage: Message = {
+            _id: new Date().toISOString(), // Temporary ID
+            sender: currentUser._id,
+            receiver: user._id,
+            content: newMessage,
+            createdAt: new Date().toISOString(),
+        };
+        setMessages(prevMessages => [...prevMessages, optimisticMessage]);
+        setNewMessage('');
+
+        socket.emit('sendMessage', messageData);
     };
-    fetchHistory();
 
-    return () => {
-      socket.disconnect();
-    };
-  }, [currentUser, otherUser]);
-
-  const handleSendMessage = () => {
-    if (newMessage.trim() === '' || !socketRef.current || !currentUser?._id) return;
-
-    const messagePayload = {
-      text: newMessage,
-      from: currentUser._id,
-      to: otherUser._id,
-    };
-
-    socketRef.current.emit('private_message', messagePayload);
-
-    const optimisticMessage: Message = {
-      text: newMessage,
-      sender: 'currentUser',
-    };
-    setMessages((prevMessages) => [...prevMessages, optimisticMessage]);
-
-    setNewMessage('');
-  };
-
-  const handleKeyPress = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  if (!otherUser) {
-    return <Typography>Select a conversation to start chatting.</Typography>;
-  }
-
-  return (
-    <Box sx={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      background: 'white',
-      borderRadius: '12px',
-      overflow: 'hidden',
-      border: '1px solid #e0e0e0'
-    }}>
-      <Paper sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 2, background: '#f5f5f5', borderBottom: '1px solid #e0e0e0' }}>
-        <Avatar src={otherUser.profilePicture || ''} alt={otherUser.username} />
-        <Typography variant="h6" sx={{ color: 'black', fontWeight: 'bold' }}>{otherUser.username}</Typography>
-      </Paper>
-      
-      <Box sx={{ flexGrow: 1, p: 2, overflowY: 'auto', color: 'black' }}>
-        {messages.map((msg, index) => (
-          <Box
-            key={index}
-            sx={{
-              display: 'flex',
-              justifyContent: msg.sender === 'currentUser' ? 'flex-end' : 'flex-start',
-              mb: 1.5
-            }}
-          >
-            <Paper sx={{
-              p: 1.5,
-              background: msg.sender === 'currentUser' ? '#006D5B' : '#f0f0f0',
-              color: msg.sender === 'currentUser' ? 'white' : 'black',
-              maxWidth: '70%',
-              borderRadius: msg.sender === 'currentUser' ? '20px 20px 4px 20px' : '20px 20px 20px 4px'
-            }}>
-              {msg.text}
+    return (
+        <Paper elevation={3} sx={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column', bgcolor: 'white', borderRadius: '16px', overflow: 'hidden' }}>
+            <Paper elevation={1} sx={{ display: 'flex', alignItems: 'center', p: 1, bgcolor: '#f5f5f5', borderBottom: '1px solid rgba(0,0,0,0.12)' }}>
+                <IconButton onClick={onBack}>
+                    <ArrowBack />
+                </IconButton>
+                <Avatar src={user.profilePicture} alt={user.username} sx={{ ml: 1, mr: 2 }} />
+                <Typography variant="h6" sx={{ color: 'black' }}>{user.username}</Typography>
             </Paper>
-          </Box>
-        ))}
-        <div ref={messagesEndRef} />
-      </Box>
 
-      <Box sx={{ p: 1.5, background: '#f5f5f5', display: 'flex', alignItems: 'center', borderTop: '1px solid #e0e0e0' }}>
-        <TextField
-          fullWidth
-          variant="outlined"
-          placeholder="Type your message..."
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          onKeyPress={handleKeyPress}
-          multiline
-          maxRows={4}
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              borderRadius: '20px',
-              backgroundColor: 'white',
-              color: 'black',
-              '& fieldset': { borderColor: '#e0e0e0' },
-              '&:hover fieldset': { borderColor: '#bdbdbd' },
-              '&.Mui-focused fieldset': { borderColor: '#006D5B' },
-            },
-            '& .MuiInputBase-input': { color: 'black' }
-          }}
-        />
-        <IconButton
-          onClick={handleSendMessage}
-          sx={{ ml: 1, background: '#006D5B', color: 'white', '&:hover': { background: '#004D3F'} }}
-        >
-          <SendIcon />
-        </IconButton>
-      </Box>
-    </Box>
-  );
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, bgcolor: '#ffffff' }}>
+                {isLoading ? (
+                    <CircularProgress sx={{ display: 'block', margin: 'auto', mt: 4 }} />
+                ) : (
+                    messages.map((msg) => (
+                        <Box
+                            key={msg._id}
+                            sx={{
+                                display: 'flex',
+                                justifyContent: msg.sender === currentUser?._id ? 'flex-end' : 'flex-start',
+                                mb: 1,
+                            }}
+                        >
+                            <Paper
+                                elevation={0}
+                                sx={{
+                                    p: 1.5,
+                                    borderRadius: '12px',
+                                    bgcolor: msg.sender === currentUser?._id ? 'primary.main' : '#e0e0e0',
+                                    color: msg.sender === currentUser?._id ? 'white' : 'black',
+                                    maxWidth: '70%',
+                                }}
+                            >
+                                <Typography variant="body1">{msg.content}</Typography>
+                            </Paper>
+                        </Box>
+                    ))
+                )}
+                <div ref={messagesEndRef} />
+            </Box>
+
+            <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderTop: '1px solid rgba(0,0,0,0.12)' }}>
+                <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '8px' }}>
+                    <TextField
+                        fullWidth
+                        variant="outlined"
+                        size="small"
+                        placeholder="Type a message..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        sx={{ input: { color: 'black' }, bgcolor: 'white' }}
+                    />
+                    <Button type="submit" variant="contained" disabled={!newMessage.trim()}>Send</Button>
+                </form>
+            </Box>
+        </Paper>
+    );
 };
 
 export default Chat;

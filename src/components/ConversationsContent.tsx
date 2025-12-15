@@ -59,39 +59,39 @@ const ConversationsContent = ({ onUserSelect }: ConversationsContentProps) => {
   }
 
   if (conversations.length === 0) {
-    return <Typography sx={{ mt: 4, textAlign: 'center', color: 'rgba(255,255,255,0.7)' }}>No conversations yet.</Typography>;
+    return (
+        <Box sx={{ bgcolor: 'white', p: { xs: 2, sm: 3 }, borderRadius: '16px', color: 'black' }}>
+            <Typography sx={{ mt: 4, textAlign: 'center', color: 'grey.600' }}>No conversations yet.</Typography>
+        </Box>
+    );
   }
 
   return (
-    <List sx={{ width: '100%', bgcolor: 'transparent', color: 'white' }}>
-      {conversations.map((convo, index) => (
-        <div key={convo.with._id}>
-          <ListItem 
-            alignItems="flex-start"
-            onClick={() => onUserSelect(convo.with)}
-            sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }, borderRadius: '8px', mb: 1 }}
-          >
-            <ListItemAvatar>
-              <Avatar alt={convo.with.username} src={convo.with.profilePicture} />
-            </ListItemAvatar>
-            <ListItemText
-              primary={
-                <Typography variant="h6">{convo.with.username}</Typography>
-              }
-              secondary={
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                  {convo.lastMessage.content}
-                </Typography>
-              }
-            />
-             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', alignSelf: 'center' }}>
-                {new Date(convo.lastMessage.createdAt).toLocaleTimeString()}
-            </Typography>
-          </ListItem>
-          {index < conversations.length - 1 && <Divider variant="inset" component="li" sx={{ borderColor: 'rgba(255,255,255,0.2)' }} />}
-        </div>
-      ))}
-    </List>
+    <Paper elevation={0} sx={{ bgcolor: 'white', p: { xs: 1, sm: 2 }, borderRadius: '16px', color: 'black' }}>
+      <List sx={{ width: '100%', bgcolor: 'transparent' }}>
+        {conversations.map((convo, index) => (
+          <div key={convo.with._id}>
+            <ListItem 
+              alignItems="flex-start"
+              onClick={() => onUserSelect(convo.with)}
+              sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#f5f5f5' }, borderRadius: '12px', mb: 1 }}
+            >
+              <ListItemAvatar>
+                <Avatar alt={convo.with.username} src={convo.with.profilePicture} />
+              </ListItemAvatar>
+              <ListItemText
+                primary={<Typography variant="h6">{convo.with.username}</Typography>}
+                secondary={<Typography variant="body2" sx={{ color: 'grey.700' }}>{convo.lastMessage.content}</Typography>}
+              />
+              <Typography variant="caption" sx={{ color: 'grey.500', alignSelf: 'center' }}>
+                  {new Date(convo.lastMessage.createdAt).toLocaleTimeString()}
+              </Typography>
+            </ListItem>
+            {index < conversations.length - 1 && <Divider variant="inset" component="li" sx={{ borderColor: 'rgba(0,0,0,0.12)' }} />}
+          </div>
+        ))}
+      </List>
+    </Paper>
   );
 };
 

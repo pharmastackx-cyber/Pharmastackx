@@ -8,7 +8,7 @@ interface Pharmacist {
   _id: string;
   username: string;
   email: string;
-  role: string; // Added role
+  role: string;
   profilePicture?: string;
   specialties?: string[];
 }
@@ -56,14 +56,21 @@ const FindPharmacistContent = ({ onPharmacistSelect }: FindPharmacistContentProp
   };
 
   return (
-    <Box>
+    <Box sx={{ bgcolor: 'white', p: { xs: 2, sm: 3 }, borderRadius: '16px', color: 'black' }}>
       <TextField
         fullWidth
         variant="outlined"
         placeholder="Search for a pharmacist by name or specialty..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        sx={{ mb: 3, input: { color: 'white' }, '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'rgba(255,255,255,0.5)' }, '&:hover fieldset': { borderColor: 'white' } } }}
+        sx={{ 
+          mb: 3, 
+          input: { color: 'black' }, 
+          '& .MuiOutlinedInput-root': { 
+            '& fieldset': { borderColor: 'rgba(0,0,0,0.23)' }, 
+            '&:hover fieldset': { borderColor: 'black' } 
+          } 
+        }}
       />
       
       {isLoading && page === 0 && <CircularProgress sx={{ display: 'block', margin: 'auto', mt: 4 }} />}
@@ -74,14 +81,25 @@ const FindPharmacistContent = ({ onPharmacistSelect }: FindPharmacistContentProp
         {pharmacists.map((pharmacist) => (
           <Grid item xs={12} key={pharmacist._id}>
             <Paper 
-              elevation={2}
+              elevation={0}
               onClick={() => onPharmacistSelect(pharmacist)}
-              sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }, bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}
+              sx={{ 
+                p: 2, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 2, 
+                cursor: 'pointer', 
+                bgcolor: '#f5f5f5', 
+                '&:hover': { bgcolor: '#e0e0e0' }, 
+                color: 'black',
+                border: '1px solid rgba(0,0,0,0.12)',
+                borderRadius: '12px'
+              }}
             >
               <Avatar src={pharmacist.profilePicture} alt={pharmacist.username} />
               <Box>
                 <Typography variant="h6">{pharmacist.username}</Typography>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                <Typography variant="body2" sx={{ color: 'grey.700' }}>
                   {pharmacist.specialties?.join(', ') || 'General Pharmacist'}
                 </Typography>
               </Box>
@@ -97,7 +115,7 @@ const FindPharmacistContent = ({ onPharmacistSelect }: FindPharmacistContentProp
       )}
 
       {!hasMore && pharmacists.length === 0 && !isLoading && (
-        <Typography sx={{ mt: 4, textAlign: 'center', color: 'rgba(255,255,255,0.7)' }}>
+        <Typography sx={{ mt: 4, textAlign: 'center', color: 'grey.600' }}>
           No pharmacists found.
         </Typography>
       )}

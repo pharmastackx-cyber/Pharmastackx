@@ -342,13 +342,14 @@ export default function HomePage() {
         return renderPageView('Conversations', 'consult-header', <ConversationsContent onUserSelect={handleUserSelect} />);
       case 'account':
         return renderPageView('Account', 'account-header', <AccountContent setView={setView} />);
-      case 'chat':
-        // Ensure both users are defined before rendering Chat
-        if (normalizedUser && otherUser) {
-            return renderPageView('Chat', 'chat-header', <Chat currentUser={normalizedUser} otherUser={otherUser} />);
-        }
-        // Fallback or loading state if users are not ready
-        return <CircularProgress />;
+        case 'chat':
+          // Ensure the other user is defined before rendering Chat
+          if (otherUser) {
+              return renderPageView('Chat', 'chat-header', <Chat user={otherUser} onBack={handleBackNavigation} />);
+          }
+          // Fallback or loading state if the other user is not ready
+          return <CircularProgress />;
+  
       default:
         return renderWelcomeView();
     }

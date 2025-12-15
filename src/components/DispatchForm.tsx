@@ -43,7 +43,6 @@ import SearchRadarModal from '@/components/dispatch/SearchRadarModal';
 import { styled } from '@mui/material/styles';
 import RequestHistory from '@/components/dispatch/RequestHistory';
 
-
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
   clipPath: 'inset(50%)',
@@ -126,9 +125,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
 
   const uploadModeRef = useRef<UploadMode | null>(null);
   const photoLibraryInputRef = useRef<HTMLInputElement>(null);
-
   const searchInputRef = useRef<HTMLInputElement>(null);
-
 
   const fetchHistory = useCallback(async () => {
       if (!user) return;
@@ -149,9 +146,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
   }, [fetchHistory]);
 
   useEffect(() => {
-    if (!activeRequestId || isQuoteReady) {
-      return;
-    }
+    if (!activeRequestId || isQuoteReady) return;
 
     const intervalId = setInterval(async () => {
       try {
@@ -162,10 +157,8 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
             setIsQuoteReady(true);
             clearInterval(intervalId);
           }
-        } else {
-            if(response.status === 404) {
-                clearInterval(intervalId);
-            }
+        } else if(response.status === 404) {
+            clearInterval(intervalId);
         }
       } catch (error) {
         console.error("Polling error:", error);
@@ -178,9 +171,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
   useEffect(() => {
     try {
       const savedDrugs = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (savedDrugs) {
-        setRequestedDrugs(JSON.parse(savedDrugs));
-      }
+      if (savedDrugs) setRequestedDrugs(JSON.parse(savedDrugs));
     } catch (error) {
       console.error("Failed to load drugs from local storage", error);
     }
@@ -194,9 +185,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
   }, [requestedDrugs, isInitialLoad]);
 
   const handleRefillRequest = (itemsToRefill: any[]) => {
-    if (requestedDrugs.length > 0 && !confirm('This action will replace your current list. Are you sure you want to continue?')) {
-        return;
-    }
+    if (requestedDrugs.length > 0 && !confirm('This action will replace your current list. Are you sure?')) return;
     setRequestedDrugs(itemsToRefill);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -207,13 +196,11 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
       return;
     }
     setLoading(true);
-    
     setTimeout(() => {
-        const mockSuggestions = [
+        setSuggestions([
             { label: `${input} 100mg` },
             { label: `${input} 200mg` },
-        ];
-        setSuggestions(mockSuggestions);
+        ]);
         setLoading(false);
     }, 500);
   };
@@ -221,21 +208,10 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
   const debouncedFetchSuggestions = useCallback(debounce(fetchSuggestions, 800), []);
 
   useEffect(() => {
-    // Always focus the input field when the component first renders.
-    // The timeout gives the transition animation time to finish.
-    const timer = setTimeout(() => {
-        searchInputRef.current?.focus();
-    }, 100);
-
-    // If a search value was passed from the home screen, fetch suggestions.
-    if (initialSearchValue) {
-      debouncedFetchSuggestions(initialSearchValue);
-    }
-
-    // Clean up the timer when the component unmounts.
+    const timer = setTimeout(() => searchInputRef.current?.focus(), 100);
+    if (initialSearchValue) debouncedFetchSuggestions(initialSearchValue);
     return () => clearTimeout(timer);
-  }, []); // The empty array ensures this effect runs only once on mount.
-
+  }, []);
 
   const handleInputChange = (_: any, newInputValue: string) => {
     setInputValue(newInputValue);
@@ -276,9 +252,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
       if (!file) return;
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => {
-          handleAddDrug('', reader.result as string, uploadModeRef.current);
-      };
+      reader.onload = () => handleAddDrug('', reader.result as string, uploadModeRef.current);
   };
 
   const triggerImageUpload = (mode: UploadMode) => {
@@ -342,10 +316,10 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
 
       const newRequest = await response.json();
       localStorage.removeItem(LOCAL_STORAGE_KEY);
-      setIsQuoteReady(false); // Reset for the new request
+      setIsQuoteReady(false);
       setActiveRequestId(newRequest._id);
       setIsRadarModalOpen(true);
-      fetchHistory(); // Refetch history to include the new request
+      fetchHistory();
 
     } catch (error) {
       setGlobalError(error instanceof Error ? error.message : 'An unknown error occurred.');
@@ -370,45 +344,36 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
 
   if (isSessionLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: 'white' }}>
         <CircularProgress />
       </Box>
     );
   }
 
   return (
-    <>
+    <Box sx={{ bgcolor: 'white', color: 'black' }}>
         <input type="file" accept="image/*" ref={photoLibraryInputRef} onChange={(e) => { e.target.files && handleImageUpload(e.target.files[0]); e.target.value = ''; }} style={{ display: 'none' }} />
 
         {isQuoteReady && !isRadarModalOpen && activeRequestId && (
             <Alert
                 severity="success"
                 action={
-                    <Button color="inherit" size="small" onClick={handleReviewQuote}>
-                        REVIEW QUOTE
-                    </Button>
+                    <Button color="inherit" size="small" onClick={handleReviewQuote}>REVIEW QUOTE</Button>
                 }
-                sx={{ mb: 2, bgcolor: 'success.main', color: 'white' }}
+                sx={{ mb: 2, borderRadius: '8px' }}
             >
                 A quote for your request is ready
             </Alert>
         )}
 
         <Grid container spacing={4} justifyContent="center">
-          <Grid item xs={12}>
-            {globalError && <Alert severity="error" sx={{ mb: 2, bgcolor: 'error.main', color: 'white' }}>{globalError}</Alert>}
+          <Grid item xs={20}>
+            {globalError && <Alert severity="error" sx={{ mb: 2 }}>{globalError}</Alert>}
 
             <Box sx={{ display: 'flex', gap: 1, mb: 4, alignItems: 'stretch' }}>
                 <Autocomplete
                     freeSolo
-                    sx={{ 
-                      flexGrow: 1,
-                      "& .MuiOutlinedInput-root": {
-                          borderRadius: '50px',
-                          background: '#f5f5f5', // Light grey background
-                      },
-                  }}
-                  
+                    sx={{ flexGrow: 1, "& .MuiOutlinedInput-root": { borderRadius: '50px', background: '#f5f5f5' }}}
                     options={suggestions}
                     getOptionLabel={(option) => (typeof option === 'string' ? option : option.label)}
                     onInputChange={handleInputChange}
@@ -422,8 +387,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                     <TextField
                         {...params}
                         inputRef={searchInputRef}
-                        label
-                        ="Search by Medicine Name..."
+                        label="Search by Medicine Name..."
                         variant="outlined"
                         InputProps={{
                         ...params.InputProps,
@@ -431,7 +395,6 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                             <InputAdornment position="end">
                             {loading ? <CircularProgress color="inherit" size={20} /> : (
                                 <Button onClick={() => handleAddDrug(inputValue, null, null)} disabled={!inputValue.trim() || loading} sx={{ color: 'primary.main', mr: -1 }}>Add</Button>
-
                             )}
                             </InputAdornment>
                         ),
@@ -439,11 +402,11 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                     />
                     )}
                 />
-                <Box onClick={() => triggerImageUpload('prescription')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(255, 255, 255, 0.3)', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', color: 'rgba(255, 255, 255, 0.7)', '&:hover': { backgroundColor: 'rgba(103, 10, 10, 0.1)' } }}>
+                <Box onClick={() => triggerImageUpload('prescription')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(0, 0, 0, 0.23)', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', color: 'grey.700', '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}>
                     <DescriptionIcon />
                     <Typography variant="caption" sx={{ lineHeight: 1.2, mt: 0.5 }}>Prescription</Typography>
                 </Box>
-                <Box onClick={() => triggerImageUpload('image')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(255, 255, 255, 0.3)', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', color: 'rgba(255, 255, 255, 0.7)', '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)' } }}>
+                <Box onClick={() => triggerImageUpload('image')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(0, 0, 0, 0.23)', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', color: 'grey.700', '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}>
                     <ImageIcon />
                     <Typography variant="caption" sx={{ lineHeight: 1.2, mt: 0.5 }}>Image</Typography>
                 </Box>
@@ -451,26 +414,18 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
 
             
             {requestedDrugs.map((drug) => (
-              <Card key={drug.id} sx={{ mb: 2, borderRadius: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'visible', background: 'rgba(82, 5, 137, 0.54)', color: 'black' }}
-
+              <Card key={drug.id} sx={{ mb: 2, borderRadius: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'visible', background: 'white', border: '1px solid rgba(0,0,0,0.12)' }}
               >
                 <Collapse in={drug.isEditing} timeout="auto" unmountOnExit>
                   <CardContent>
-                    <TextField
-                        label="Medicine Name"
-                        fullWidth
-                        value={drug.name}
-                        onChange={(e) => handleUpdateDrug(drug.id, 'name', e.target.value)}
-                        
-                    />
+                    <TextField label="Medicine Name" fullWidth value={drug.name} onChange={(e) => handleUpdateDrug(drug.id, 'name', e.target.value)} />
                     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mt: 2 }}>
-                       <FormControl fullWidth 
-                       >
+                       <FormControl fullWidth>
                         <InputLabel>Form</InputLabel>
-                        <Select value={drug.form} label="Form" onChange={(e) => handleUpdateDrug(drug.id, 'form', e.target.value)} sx={{ color: 'white' }}>
+                        <Select value={drug.form} label="Form" onChange={(e) => handleUpdateDrug(drug.id, 'form', e.target.value)}>
                           {drug.formSuggestions.map((form) => (
                             <MenuItem key={form} value={form}>
-                              <Chip label="Suggested" size="small" color="primary" variant="outlined" sx={{ mr: 1, borderColor: '#96ffde', color: '#96ffde' }} />
+                              <Chip label="Suggested" size="small" color="primary" variant="outlined" sx={{ mr: 1 }} />
                               {form}
                             </MenuItem>
                           ))}
@@ -478,7 +433,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                             <MenuItem key={form} value={form}>{form}</MenuItem>
                           ))}
                            {!drug.showAllForms && drug.formSuggestions.length > 0 && (
-                            <Button onClick={() => toggleShowAllForms(drug.id)} size="small" sx={{ mt: 1, alignSelf: 'flex-start', color: '#96ffde' }}>
+                            <Button onClick={() => toggleShowAllForms(drug.id)} size="small" sx={{ mt: 1, alignSelf: 'flex-start', color: 'primary.main' }}>
                               Show All Forms
                             </Button>
                           )}
@@ -490,18 +445,12 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                         options={drug.strengthSuggestions}
                         value={drug.strength}
                         onInputChange={(_, newValue) => handleUpdateDrug(drug.id, 'strength', newValue)}
-                        
-                        renderInput={(params) => 
-                        <TextField 
-                        {...params} 
-                        label="Strength (e.g., 200mg)"
-                        variant="outlined"
-                        />}
+                        renderInput={(params) => <TextField {...params} label="Strength (e.g., 200mg)" variant="outlined"/>}
                       />
 
-                      <FormControl sx={{ width: { xs: '100%', sm: '120px' }, "& .MuiInputLabel-root": { color: "rgba(255, 255, 255, 0.7)" }, "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: "rgba(255, 255, 255, 0.3)" } } }}>
+                      <FormControl sx={{ width: { xs: '100%', sm: '120px' } }}>
                         <InputLabel>Qty</InputLabel>
-                        <Select value={drug.quantity} label="Qty" onChange={(e) => handleUpdateDrug(drug.id, 'quantity', e.target.value)} sx={{ color: 'white' }}>
+                        <Select value={drug.quantity} label="Qty" onChange={(e) => handleUpdateDrug(drug.id, 'quantity', e.target.value)}>
                           {quantityOptions.map((qty) => (
                             <MenuItem key={qty} value={qty}>{qty}</MenuItem>
                           ))}
@@ -509,7 +458,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                       </FormControl>
                     </Box>
                     <Box sx={{ mt: 2 }}>
-                      <Button size="small" startIcon={drug.showOtherInfo ? <RemoveIcon /> : <AddIcon />} onClick={() => toggleShowOtherInfo(drug.id)} sx={{ color: '#96ffde' }}>
+                      <Button size="small" startIcon={drug.showOtherInfo ? <RemoveIcon /> : <AddIcon />} onClick={() => toggleShowOtherInfo(drug.id)} sx={{ color: 'primary.main' }}>
                         {drug.showOtherInfo ? 'Hide Details' : 'Add More Details'}
                       </Button>
                       <Collapse in={drug.showOtherInfo}>
@@ -522,7 +471,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                       </Collapse>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                      <Button variant="contained" onClick={() => handleSetEditing(drug.id, false)} sx={{ bgcolor: 'secondary.main', color: 'white', '&:hover': { bgcolor: 'secondary.dark' } }}>Done</Button>
+                      <Button variant="contained" onClick={() => handleSetEditing(drug.id, false)}>Done</Button>
                     </Box>
                   </CardContent>
                 </Collapse>
@@ -533,14 +482,14 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                         <Box sx={{display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap'}}>
                             {drug.image && <Avatar src={drug.image} sx={{ width: 40, height: 40, mr: 1 }} />}
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>{drug.name}</Typography>
-                            {drug.strength && <Chip label={drug.strength} size="small" sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)', color: 'white' }}/>}
-                            {drug.form && <Chip label={drug.form} size="small" sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)', color: 'white' }}/>}
-                            {drug.quantity > 1 && <Chip label={`Qty: ${drug.quantity}`} size="small" sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)', color: 'white' }}/>}
-                            {drug.notes && <Chip label="Has Notes" size="small" sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)', color: 'white' }}/>}
+                            {drug.strength && <Chip label={drug.strength} size="small" />}
+                            {drug.form && <Chip label={drug.form} size="small" />}
+                            {drug.quantity > 1 && <Chip label={`Qty: ${drug.quantity}`} size="small" />}
+                            {drug.notes && <Chip label="Has Notes" size="small" />}
                         </Box>
                         <Box>
-                            <IconButton onClick={() => handleSetEditing(drug.id, true)} sx={{ color: 'white' }}><EditIcon /></IconButton>
-                            <IconButton onClick={() => handleRemoveDrug(drug.id)} sx={{ color: 'white' }}><DeleteIcon /></IconButton>
+                            <IconButton onClick={() => handleSetEditing(drug.id, true)}><EditIcon /></IconButton>
+                            <IconButton onClick={() => handleRemoveDrug(drug.id)}><DeleteIcon /></IconButton>
                         </Box>
                     </Box>
                   </CardContent>
@@ -553,54 +502,19 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                 variant="contained"
                 onClick={handleFindMedicinesClick}
                 disabled={requestedDrugs.length === 0 || requestedDrugs.some(d => d.isEditing) || isSubmitting}
-                sx={{
-                    bgcolor: '#FF00FF', // Magenta color
-                    color: 'white',
-                    fontWeight: 'bold',
-                    padding: '6px 20px',
-                    fontSize: '0.875rem',
-                    textTransform: 'none',
-                    borderRadius: '20px',
-                    boxShadow: 'none',
-                    '&:hover': {
-                        bgcolor: '#CC00CC' // Darker magenta on hover
-                    },
-                }}
               >
-                {isSubmitting ? <CircularProgress size={20} color="inherit" /> : 'Find Medicines'}
+                {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Search'}
               </Button>
               
-              {/* This button will only appear when the request list is empty */}
               {requestedDrugs.length === 0 && (
                   <Button
                       variant="outlined"
-                      onClick={() => router.push('/find-medicines')} // Correct link to the Find Medicines page
-                      sx={{
-                          borderRadius: '20px',
-                          borderColor: 'rgba(150, 255, 222, 0.5)',
-                          color: 'white',
-                          fontWeight: 'bold',
-                          padding: '6px 20px',
-                          fontSize: '0.875rem',
-                          textTransform: 'none',
-                          transition: 'transform 0.2s, background-color 0.3s',
-                          '&:hover': {
-                              transform: 'scale(1.05)',
-                              backgroundColor: 'rgba(150, 255, 222, 0.1)',
-                              borderColor: '#96ffde',
-                          }
-                      }}
+                      onClick={() => router.push('/find-medicines')}
                   >
                     View Full Catalog
                   </Button>
               )}
             </Box>
-
-
-
-
-
-
             
             {user && <RequestHistory history={requestHistory} onRefill={handleRefillRequest} />}
 
@@ -626,8 +540,6 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
         <Modal
             open={isLoginModalOpen}
             onClose={() => setIsLoginModalOpen(false)}
-            aria-labelledby="login-prompt-title"
-            aria-describedby="login-prompt-description"
         >
             <Box sx={{
                 position: 'absolute',
@@ -641,23 +553,18 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                 p: 4,
                 textAlign: 'center'
             }}>
-                <Typography id="login-prompt-title" variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-                    Login Recommended
+                <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
+                    Login to Continue
                 </Typography>
-                <Typography id="login-prompt-description" sx={{ mt: 2 }}>
-                    To continue with your request, please log in or create an account. Your current list will be saved.
+                <Typography sx={{ mt: 2 }}>
+                    Please log in or create an account to submit your request. Your list will be saved for when you return.
                 </Typography>
                 <Link href="/auth?redirect=/dispatch" passHref>
-                    <Button 
-                        variant="contained" 
-                        sx={{ mt: 3, bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' } }}
-                    >
-                        Login / Sign Up
-                    </Button>
+                    <Button variant="contained" sx={{ mt: 3 }}>Login / Sign Up</Button>
                 </Link>
             </Box>
         </Modal>
-    </>
+    </Box>
   );
 } 
 

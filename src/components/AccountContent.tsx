@@ -70,7 +70,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     if (error || !detailedUser) {
         return (
             <Box sx={{ textAlign: 'center', mt: 4 }}>
-                <Typography sx={{color: 'white'}}>Error: {error || 'Could not load user data.'}</Typography>
+                <Typography sx={{color: 'grey.800'}}>Error: {error || 'Could not load user data.'}</Typography>
                 <Button variant="contained" onClick={() => window.location.href = '/auth'} sx={{ mt: 2 }}>
                     Login
                 </Button>
@@ -84,14 +84,14 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                 <Box sx={{ width: '100%', mt: 2 }}>
                     {detailedUser.businessName && (
                         <ListItem>
-                            <ListItemIcon sx={{ color: 'white' }}><Business /></ListItemIcon>
-                            <ListItemText primary="Business Name" secondary={detailedUser.businessName} secondaryTypographyProps={{ color: 'rgba(255,255,255,0.8)' }} />
+                            <ListItemIcon sx={{ color: 'grey.800' }}><Business /></ListItemIcon>
+                            <ListItemText primary="Business Name" secondary={detailedUser.businessName} secondaryTypographyProps={{ color: 'grey.600' }} />
                         </ListItem>
                     )}
                     {detailedUser.businessAddress && (
                          <ListItem>
-                            <ListItemIcon sx={{ color: 'white' }}><LocationOn /></ListItemIcon>
-                            <ListItemText primary="Location" secondary={`${detailedUser.city}, ${detailedUser.state}`} secondaryTypographyProps={{ color: 'rgba(255,255,255,0.8)' }} />
+                            <ListItemIcon sx={{ color: 'grey.800' }}><LocationOn /></ListItemIcon>
+                            <ListItemText primary="Location" secondary={`${detailedUser.city}, ${detailedUser.state}`} secondaryTypographyProps={{ color: 'grey.600' }} />
                         </ListItem>
                     )}
                 </Box>
@@ -101,13 +101,13 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     };
 
     return (
-        <Paper elevation={0} sx={{ p: { xs: 1, sm: 2 }, bgcolor: 'transparent', color: 'white' }}>
+        <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, bgcolor: 'white', color: 'black', borderRadius: '16px', width: '100%', maxWidth: '600px', margin: 'auto' }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-                <Avatar src={detailedUser.profilePicture} sx={{ width: 80, height: 80, mb: 2, bgcolor: 'secondary.main', fontSize: '2.5rem' }}>
+                <Avatar src={detailedUser.profilePicture} sx={{ width: 80, height: 80, mb: 2, bgcolor: 'primary.main', color: 'white', fontSize: '2.5rem' }}>
                     {detailedUser.username?.charAt(0).toUpperCase()}
                 </Avatar>
                 <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{detailedUser.username}</Typography>
-                <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.7)' }}>{detailedUser.email}</Typography>
+                <Typography variant="body1" sx={{ color: 'grey.600' }}>{detailedUser.email}</Typography>
             </Box>
 
             <List dense>
@@ -122,27 +122,27 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                 </ListItem>
             </List>
 
-            <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.2)' }} />
+            <Divider sx={{ my: 2, borderColor: 'rgba(0,0,0,0.12)' }} />
 
             <List dense>
                  <ListItem button onClick={() => { /* TODO: Implement profile edit */ }}>
-                    <ListItemIcon sx={{ color: 'white', minWidth: '40px' }}><Person /></ListItemIcon>
+                    <ListItemIcon sx={{ color: 'grey.800', minWidth: '40px' }}><Person /></ListItemIcon>
                     <ListItemText primary="Edit Profile" />
                 </ListItem>
                 <ListItem button onClick={() => { /* TODO: Implement change password */ }}>
-                    <ListItemIcon sx={{ color: 'white', minWidth: '40px' }}><VpnKey /></ListItemIcon>
+                    <ListItemIcon sx={{ color: 'grey.800', minWidth: '40px' }}><VpnKey /></ListItemIcon>
                     <ListItemText primary="Change Password" />
                 </ListItem>
             </List>
             
-            <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.2)' }} />
+            <Divider sx={{ my: 2, borderColor: 'rgba(0,0,0,0.12)' }} />
 
             <Grid container spacing={2} sx={{ mb: 2 }}>
                 <Grid item xs={6}>
-                    <Button fullWidth variant="outlined" startIcon={<Info />} onClick={() => setView('about')} sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.5)' }}>About Us</Button>
+                    <Button fullWidth variant="outlined" startIcon={<Info />} onClick={() => setView('about')} sx={{ color: 'grey.800', borderColor: 'rgba(0,0,0,0.23)' }}>About Us</Button>
                 </Grid>
                 <Grid item xs={6}>
-                    <Button fullWidth variant="outlined" startIcon={<ContactMail />} onClick={() => setView('contact')} sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.5)' }}>Contact</Button>
+                    <Button fullWidth variant="outlined" startIcon={<ContactMail />} onClick={() => setView('contact')} sx={{ color: 'grey.800', borderColor: 'rgba(0,0,0,0.23)' }}>Contact</Button>
                 </Grid>
             </Grid>
 
