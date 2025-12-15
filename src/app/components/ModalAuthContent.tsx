@@ -11,7 +11,7 @@ function AuthViewSwitcher() {
     const initialView = searchParams?.get('view') === 'signup' ? 1 : 0;
     const [tabIndex, setTabIndex] = useState(initialView);
 
-    const redirectUrl = searchParams?.get('redirect');
+    const redirectUrl = searchParams?.get('redirect') || null;
 
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setTabIndex(newValue);
