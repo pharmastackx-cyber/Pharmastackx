@@ -79,13 +79,13 @@ const modalStyle = {
 
 export default function FindMedicinesPage() {
   const searchParams = useSearchParams();
-  const slug = searchParams.get('slug') || '';
+  const slug = searchParams?.get('slug') || '';
   const router = useRouter();
   const [medicines, setMedicines] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const initialSearch = searchParams.get('search') || '';
+  const initialSearch = searchParams?.get('search') || '';
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [sortBy, setSortBy] = useState('recommended');
   const [filterBy, setFilterBy] = useState('all');
