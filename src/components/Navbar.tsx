@@ -76,6 +76,7 @@ export default function Navbar() {
   const pathname = usePathname();
 
   const isActive = (path: string) => {
+    if (!pathname) return false;
     if (path === '/') {
       return pathname === '/';
     }
