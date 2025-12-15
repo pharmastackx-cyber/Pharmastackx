@@ -8,7 +8,7 @@ import Link from 'next/link';
 export default function ResetPasswordPage() {
   const router = useRouter();
   const params = useParams();
-  const { token } = params;
+  const token = params?.token;
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
