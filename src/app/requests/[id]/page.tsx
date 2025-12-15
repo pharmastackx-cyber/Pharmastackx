@@ -41,7 +41,7 @@ const modalStyle = { position: 'absolute' as 'absolute', top: '50%', left: '50%'
 const ManageRequestPage: React.FC = () => {
   const router = useRouter();
   const params = useParams();
-  const { id } = params;
+  const id = params?.id;
 
   const [request, setRequest] = useState<FullRequest | null>(null);
   const [manualItems, setManualItems] = useState<ManualItem[]>([ { name: '', price: 0, pharmacyQuantity: 1, isAvailable: true } ]);
