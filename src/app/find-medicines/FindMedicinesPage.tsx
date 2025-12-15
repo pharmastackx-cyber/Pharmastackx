@@ -32,10 +32,11 @@ import { useState, useEffect, useCallback } from 'react';
 
 import { useCart } from '../../contexts/CartContext';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 import { event } from '../../lib/gtag';
 import { debounce } from 'lodash';
-import FileUploader from "../../components/FileUploader";
+
 
 
 // --- CONFIGURATION --- //
@@ -96,13 +97,11 @@ export default function FindMedicinesPage() {
   const { addToCart } = useCart(); 
 
   const [selectedMedicine, setSelectedMedicine] = useState<any | null>(null);
-  const [isPrescriptionModalOpen, setIsPrescriptionModalOpen] = useState(false);
-  const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
-  const [prescriptionMessage, setPrescriptionMessage] = useState("");
+  
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [prescriptionSent, setPrescriptionSent] = useState(false); 
+   
 
   const drugClasses = ['all', 'Analgesic', 'Antibiotic', 'Antimalarial', 'Antifungal', 'Vitamin', 'NSAID', 'Antidiabetic'];
 
@@ -203,12 +202,7 @@ export default function FindMedicinesPage() {
 
   const handleCloseModal = () => setSelectedMedicine(null);
   const handleSnackbarClose = () => setSnackbarOpen(false);
-  const handleOpenPrescriptionModal = () => setIsPrescriptionModalOpen(true);
-  const handleClosePrescriptionModal = () => {
-    setIsPrescriptionModalOpen(false);
-    setPrescriptionFile(null);
-    setPrescriptionMessage("");
-  }
+  
 
   const handleAddToCart = (medicine: any) => {
     event({ action: 'add_to_cart', category: 'ecommerce', label: medicine.name, value: medicine.price });
@@ -220,54 +214,27 @@ export default function FindMedicinesPage() {
     setCurrentPage(page);
   };
 
-  const handleSendPrescription = () => {
-    if (!prescriptionFile) {
-      alert("Please upload a prescription image.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const imageUrl = event.target?.result as string;
-
-      const existingPrescriptions = JSON.parse(localStorage.getItem('prescriptions') || '[]');
-
-      const newPrescription = {
-        id: Date.now(),
-        fileName: prescriptionFile.name,
-        imageUrl,
-        message: prescriptionMessage,
-        status: 'pending',
-        timestamp: new Date().toISOString(),
-      };
-
-      existingPrescriptions.push(newPrescription);
-      localStorage.setItem('prescriptions', JSON.stringify(existingPrescriptions));
-      
-      handleClosePrescriptionModal();
-      setPrescriptionSent(true);
-    };
-
-    reader.readAsDataURL(prescriptionFile);
-  };
+  
 
 
   return (
     <>
       <Container maxWidth="lg" sx={{ mt: 0.5, mb: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
-            <Button
-                variant="contained"
-                onClick={handleOpenPrescriptionModal}
-                sx={{
-                    borderRadius: '20px',
-                    bgcolor: '#E91E63',
-                    '&:hover': { bgcolor: '#C2185B' },
-                    color: 'white'
-                }}
-            >
-                Search by Prescription
-            </Button>
+        <Button
+    variant="contained"
+    component={Link}
+    href="/?view=orderMedicines"
+    sx={{
+        borderRadius: '20px',
+        bgcolor: '#E91E63',
+        '&:hover': { bgcolor: '#C2185B' },
+        color: 'white'
+    }}
+>
+    Search by Prescription
+</Button>
+
         </Box>
         <Box sx={{ mb: 1 }}>
           <TextField
@@ -438,42 +405,7 @@ export default function FindMedicinesPage() {
         </Box>
       </Modal>
 
-      <Modal open={isPrescriptionModalOpen} onClose={handleClosePrescriptionModal}>
-        <Box sx={modalStyle}>
-            <IconButton aria-label="close" onClick={handleClosePrescriptionModal} sx={{ position: 'absolute', right: 8, top: 8, color: (theme) => theme.palette.grey[500] }}><Close /></IconButton>
-            <Typography variant="h6" component="h2" sx={{ fontWeight: 700, color: '#006D5B', mb: 2 }}>
-                Search by Prescription
-            </Typography>
-            <FileUploader
-                onFileSelect={setPrescriptionFile}
-                onClear={() => setPrescriptionFile(null)}
-            />
-            <TextField
-                fullWidth
-                multiline
-                rows={4}
-                placeholder="Add a message (optional)"
-                value={prescriptionMessage}
-                onChange={(e) => setPrescriptionMessage(e.target.value)}
-                sx={{ mt: 2, borderRadius: '10px' }}
-            />
-            <Button
-                fullWidth
-                variant="contained"
-                onClick={handleSendPrescription}
-                disabled={!prescriptionFile}
-                sx={{
-                    mt: 2,
-                    borderRadius: '20px',
-                    bgcolor: '#006D5B',
-                    '&:hover': { bgcolor: '#004D3F' },
-                    color: 'white'
-                }}
-            >
-                Send for Review
-            </Button>
-        </Box>
-      </Modal>
+      
 
       <Snackbar open={snackbarOpen} autoHideDuration={3000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert onClose={handleSnackbarClose} severity="success" sx={{ width: '100%' }}>
@@ -481,11 +413,6 @@ export default function FindMedicinesPage() {
         </Alert>
       </Snackbar>
 
-      <Snackbar open={prescriptionSent} autoHideDuration={6000} onClose={() => setPrescriptionSent(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert onClose={() => setPrescriptionSent(false)} severity="success" sx={{ width: '100%' }}>
-            Prescription sent for review! A pharmacist will contact you shortly.
-        </Alert>
-      </Snackbar>
     </>
   );
 }

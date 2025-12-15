@@ -25,28 +25,32 @@ export default function AuthModal() {
             aria-describedby="auth-modal-description"
         >
             <Fade in={isOpen}>
-                <Box sx={{ 
-                    position: 'relative',
-                    height: '100vh', 
-                    width: '100vw',
+                <Box sx={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    // Ensure clicks outside the content area don't close the modal if needed,
-                    // though the backdrop click is handled by Modal's onClose.
-                    p: 2, // Add some padding
+                    height: '100vh',
+                    width: '100vw',
+                    p: 2,
                 }}>
-                    {/* The close button remains outside the content, at the top right of the screen */}
-                    <IconButton 
-                        onClick={closeModal} 
-                        sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1, color: 'white' }}
-                    >
-                        <CloseIcon />
-                    </IconButton>
-                    
-                    {/* Render the new, self-contained auth content */}
-                    <ModalAuthContent />
-
+                    <Box sx={{
+                        position: 'relative',
+                    }}>
+                        <IconButton
+                            aria-label="close"
+                            onClick={closeModal}
+                            sx={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                zIndex: 10,
+                                color: (theme) => theme.palette.grey[500],
+                            }}
+                        >
+                            <CloseIcon />
+                        </IconButton>
+                        <ModalAuthContent />
+                    </Box>
                 </Box>
             </Fade>
         </Modal>

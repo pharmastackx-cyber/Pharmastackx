@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import dynamic from 'next/dynamic';
-
+import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation'; // Import useRouter
 import { Box, Typography, Paper, TextField, IconButton, Avatar, Menu, MenuItem, Button, Grid, CircularProgress, Container } from "@mui/material";
 import { motion, AnimatePresence, Variants, LayoutGroup } from "framer-motion";
@@ -16,10 +16,23 @@ import AboutContent from "@/components/AboutContent";
 import ContactContent from "@/components/ContactContent";
 import FindPharmacyContent from "@/components/FindPharmacyContent";
 import OrderRequestsContent from "@/components/OrderRequestsContent"; // Import the new component
-import ConsultContent from "@/components/ConsultContent";
+import FindPharmacistContent from "@/components/FindPharmacistContent";
 import AccountContent from "@/components/AccountContent";
+import Chat from "@/components/Chat"; // Import the new Chat component
+import ConversationsContent from "@/components/ConversationsContent";
 import { Home as HomeIcon, Chat as ChatIcon, Person as PersonIcon, LocalPharmacy as PharmacyIcon } from '@mui/icons-material';
 import { wrap } from "lodash";
+import { useTheme, useMediaQuery } from "@mui/material";
+
+// Define a unified User type
+interface UnifiedUser {
+  _id: string; // Always use _id
+  id?: string; // Keep original id for compatibility if needed
+  username: string;
+  email?: string;
+  role: string;
+  profilePicture?: string;
+}
 
 const MapBackground = dynamic(() => import('@/components/MapBackground'), {
   ssr: false,
@@ -32,11 +45,18 @@ const animatedWords = ["pharmacies", "pharmacists", "medicines"];
 
 export default function HomePage() {
   const { user, isLoading } = useSession();
-  const router = useRouter(); // Initialize router
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const pathname = usePathname();
+  const router = useRouter();
   const [inputValue, setInputValue] = useState("");
   const [wordIndex, setWordIndex] = useState(0);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [view, setView] = useState('home');
+  const [otherUser, setOtherUser] = useState<UnifiedUser | null>(null);
+
+  // Normalize user object from session provider
+  const normalizedUser: UnifiedUser | null = user ? { ...user, _id: user.id } : null;
 
   const bottomPadding = view === 'home' ? { xs: '140px', sm: '150px' } : { xs: '70px', sm: '80px' };
 
@@ -64,13 +84,7 @@ export default function HomePage() {
 
   const userInitial = user?.email?.charAt(0)?.toUpperCase() || '';
 
-
-    useEffect(() => {
-      window.scrollTo(0, document.body.scrollHeight);
-    }, []);
-    useEffect(() => {
-    
-
+  useEffect(() => {
     const timer = setTimeout(() => {
       setWordIndex((prevIndex) => (prevIndex + 1) % animatedWords.length);
     }, 2500);
@@ -79,20 +93,23 @@ export default function HomePage() {
 
   const handleSearchInitiation = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.value;
-    // As soon as the user types, set the input value and switch the view
     if (value) {
       setInputValue(value);
       setView('orderMedicines');
     }
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view');
+    if (viewParam === 'orderMedicines') {
+      setView('orderMedicines');
+    }
+  }, []);
+
   const containerVariants: Variants = {
     hidden: { opacity: 0, scale: 0.98 },
-    visible: {
-      opacity: 1,
-      scale: 1,
-      transition: { staggerChildren: 0.1, delayChildren: 0.2 }
-    },
+    visible: { opacity: 1, scale: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
     exit: { opacity: 0, scale: 0.98, transition: { duration: 0.2 } }
   };
 
@@ -100,6 +117,21 @@ export default function HomePage() {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1, transition: { type: 'spring', stiffness: 100 } },
     exit: { y: 20, opacity: 0 }
+  };
+
+  const handleUserSelect = (selectedUser: UnifiedUser) => {
+    setOtherUser(selectedUser);
+    setView('chat');
+  };
+  
+  const handleBackNavigation = () => {
+    // Unified back logic
+    if (view === 'chat') {
+      setView(normalizedUser?.role === 'pharmacist' ? 'conversations' : 'consult');
+    } else {
+      setView('home');
+    }
+    setInputValue('');
   };
 
   const renderWelcomeView = () => (
@@ -110,62 +142,38 @@ export default function HomePage() {
       initial="hidden"
       animate="visible"
       exit="exit"
-      sx={{ width: '100%', ml: 'auto', textAlign: 'center', p: 2,  }}
-
-
-
-
-
-
+      sx={{ width: '100%', ml: 'auto', textAlign: 'left', p: 2,  }}
     >
       <motion.div variants={itemVariants}>
         
       <Typography variant="h5" sx={{ 
-        color: "rgba(248, 247, 247, 0.9)", 
-        fontWeight: 1000, 
-        fontSize: { xs: '1.3rem', sm: '2.9rem' }, 
+        color: "rgba(4, 0, 0, 0.9)", 
+        fontWeight: 700, 
+        fontSize: { xs: '1.7rem', sm: '3.5rem' }, 
         flexWrap: 'wrap',
-         
+        maxWidth: '70%',
+        marginBottom: '3rem',
+        marginTop: '3rem',
+        fontFamily: 'Verdana'
        }}
       >
          <>Ensuring that no patient is left untreated because a drug is unavailable, unfindable or inaccessible.</>
 
       </Typography>
 
-
-        
-
-        
-      </motion.div>
-
-      <Box 
-      sx={{ 
-        position: 'absolute', 
-        bottom: { xs: 24, sm: 24 }, // Position it at the bottom
-        left: '50%', // Center horizontally
-        transform: 'translateX(-50%)', // Ensure perfect centering
-        minHeight: { xs: '40px', sm: '60px' }, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        textAlign: 'center'
-    }}>
-
-            <Typography variant="h5" 
+      <Typography variant="h5" 
             sx={{ color: "rgba(8, 2, 2, 0.9)", 
               fontWeight: 1000, 
                 display: 'flex', 
                 flexWrap: 'wrap', 
                 alignItems: 'left',
-                justifyContent: 'center', 
                 columnGap: '0.5rem', 
                 maxWidth: '100%',
-                fontSize: { xs: '0.9rem', sm: '1.5rem' } 
+                fontSize: { xs: '0.9rem', sm: '1.5rem' }, 
+                marginBottom: '4rem'
             }}
-            
-              
               >
-                <span>PharmaStackX connects you to</span>
+                <span>We connect you to</span>
                 <AnimatePresence mode="wait">
                     <motion.span
                         key={wordIndex}
@@ -179,22 +187,45 @@ export default function HomePage() {
                     </motion.span>
                 </AnimatePresence>
             </Typography>
-        </Box>
-      
+      </motion.div>
+
       {!isLoading && (
-        user && ['pharmacy', 'pharmacist'].includes(user.role) ? (
+        normalizedUser && ['pharmacy', 'pharmacist'].includes(normalizedUser.role) ? (
           <div>
-              <Grid container spacing={1} sx={{ justifyContent: 'center', flexWrap: 'nowrap' }}>
+              <Grid container spacing={2} sx={{ flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'left', justifyContent: 'center' }}>
                   <Grid item xs="auto">
-                    <motion.div layoutId="store-management-header">
-                      <Button variant="contained" size="small" onClick={() => router.push('/store-management')} sx={{ borderRadius: '20px', fontSize: '0.75rem', px: 2, whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
+                    <motion.div 
+                    layoutId="store-management-header"{...(isMobile ? {
+                      ...mobileButtonAnimation,
+                      transition: { ...mobileButtonAnimation.transition, delay: 0.15 } 
+                  } : {})}
+              >
+                      <Button variant="contained" onClick={() => router.push('/store-management')} 
+                      sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' },
+                      px: { xs: 2, sm: 4 },
+                      py: { xs: 0.75, sm: 1 },
+                      whiteSpace: 'nowrap', 
+                      transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', 
+                      color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
                           Store Management
                       </Button>
                     </motion.div>
                   </Grid>
                   <Grid item xs="auto">
-                    <motion.div layoutId="order-requests-header">
-                      <Button variant="outlined" size="small" onClick={() => setView('orderRequests')} sx={{ borderRadius: '20px', fontSize: '0.75rem', px: 2, whiteSpace: 'nowrap', borderColor: 'rgba(150, 255, 222, 0.5)', color: 'white', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.05)', borderColor: '#96ffde', backgroundColor: 'rgba(150, 255, 222, 0.1)' } }}>
+                    <motion.div layoutId="order-requests-header"{...(isMobile ? {
+        ...mobileButtonAnimation,
+        transition: { ...mobileButtonAnimation.transition, delay: 0.15 } 
+    } : {})}
+>
+                      <Button variant="contained" size="small" onClick={() => setView('orderRequests')} 
+                      sx={{ borderRadius: '20px', 
+                        fontSize: { xs: '0.75rem', sm: '0.9rem' },
+                      px: { xs: 2, sm: 4 },
+                      py: { xs: 0.75, sm: 1 },
+                      whiteSpace: 'nowrap', 
+                      bgcolor: 'rgb(1, 61, 63)', color: 'rgb(243, 247, 246)', 
+                      transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.05)', 
+                      borderColor: 'rgb(1, 61, 63)', backgroundColor: 'rgb(1, 61, 63)' } }}>
                           Order Requests
                       </Button>
                     </motion.div>
@@ -203,15 +234,39 @@ export default function HomePage() {
           </div>
         ) : (
           <div>
-              <Grid container spacing={1} sx={{ justifyContent: 'center', flexWrap: 'nowrap' }}>
+              <Grid container spacing={2} sx={{ flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'left', justifyContent: 'center' }}>
                   <Grid item xs="auto">
-                    <motion.div layoutId="order-medicines-header">
-                        
+                    <motion.div layoutId="order-medicines-header"
+                    {...(isMobile ? {
+                      ...mobileButtonAnimation,
+                      transition: { ...mobileButtonAnimation.transition, delay: 0.15 } 
+                  } : {})}
+              >
+                    <Button variant="contained" size="small" onClick={() => setView('orderMedicines')} 
+                    sx={{ borderRadius: '20px', 
+                      fontSize: { xs: '0.75rem', sm: '0.9rem' },
+                      px: { xs: 2, sm: 4 },
+                      py: { xs: 0.75, sm: 1 }, 
+                    whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
+                            Order Medicines
+                        </Button>
                     </motion.div>
                   </Grid>
                   <Grid item xs="auto">
-                    <motion.div layoutId="find-pharmacy-header">
-                      
+                    <motion.div layoutId="find-pharmacy-header"
+                    {...(isMobile ? {
+        ...mobileButtonAnimation,
+        transition: { ...mobileButtonAnimation.transition, delay: 0.15 } 
+    } : {})}
+>
+                    <Button variant="contained" size="small" onClick={() => setView('findPharmacy')} 
+                    sx={{ borderRadius: '20px', 
+                      fontSize: { xs: '0.75rem', sm: '0.9rem' },
+                      px: { xs: 2, sm: 4 },
+                      py: { xs: 0.75, sm: 1 },
+                    whiteSpace: 'nowrap', bgcolor: 'rgb(1, 61, 63)', color: 'rgb(243, 247, 246)', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.05)', borderColor: 'rgb(1, 61, 63)', backgroundColor: 'rgb(1, 61, 63)' } }}>
+                          Find a Pharmacy
+                      </Button>
                     </motion.div>
                   </Grid>
               </Grid>
@@ -220,6 +275,13 @@ export default function HomePage() {
       )}
     </Box>
   );
+
+  const mobileButtonAnimation = {
+    initial: { x: -100, opacity: 0 },
+    animate: { x: 0, opacity: 1 },
+    transition: { type: 'spring', stiffness: 120, damping: 14 } as const,
+};
+
 
   const renderPageView = (title: string, layoutId: string, children?: React.ReactNode) => (
     <Box
@@ -246,7 +308,7 @@ export default function HomePage() {
                     borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
                 }}
             >
-                <IconButton onClick={() => { setView('home'); setInputValue(''); }} sx={{ color: 'white' }}>
+                <IconButton onClick={handleBackNavigation} sx={{ color: 'white' }}>
                     <ArrowBackIcon />
                 </IconButton>
                 <Typography variant="h6" sx={{ ml: 2, fontWeight: 500 }}>
@@ -275,9 +337,18 @@ export default function HomePage() {
       case 'contact':
         return renderPageView('Contact Us', 'contact-us-header', <ContactContent />);
       case 'consult':
-        return renderPageView('Consult', 'consult-header', <ConsultContent />);
+        return renderPageView('Consult a Pharmacist', 'consult-header', <FindPharmacistContent onPharmacistSelect={handleUserSelect} />);
+      case 'conversations':
+        return renderPageView('Conversations', 'consult-header', <ConversationsContent onUserSelect={handleUserSelect} />);
       case 'account':
         return renderPageView('Account', 'account-header', <AccountContent setView={setView} />);
+      case 'chat':
+        // Ensure both users are defined before rendering Chat
+        if (normalizedUser && otherUser) {
+            return renderPageView('Chat', 'chat-header', <Chat currentUser={normalizedUser} otherUser={otherUser} />);
+        }
+        // Fallback or loading state if users are not ready
+        return <CircularProgress />;
       default:
         return renderWelcomeView();
     }
@@ -291,14 +362,9 @@ export default function HomePage() {
       pb: bottomPadding,
       
     }}>
-    
-
-      {/* Background Map and Overlay */}
       <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60vh', zIndex: 0 }}>
           <MapBackground />
         </Box>
-        
-
 
       <Box sx={{
           position: 'relative',
@@ -310,8 +376,6 @@ export default function HomePage() {
           p: { xs: 2, sm: 3 },
           overflow: 'hidden'
         }}>
-
-                               {/* Wavy Animated Gradient Background */}
             <style>
               {`
                 @keyframes wavyGradient {
@@ -323,32 +387,30 @@ export default function HomePage() {
             </style>
             <Box
               sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                zIndex: 1, // Sits on top of the map, but behind the white slant
-                background: 'linear-gradient(120deg, #e43a5a,rgb(134, 3, 112),rgb(16, 172, 157), rgb(61, 149, 249),rgb(170, 73, 244))',
-                backgroundSize: '300% 300%',
-                animation: 'wavyGradient 8s ease infinite',
-                opacity: 0.7, // Adjust opacity to control map visibility
-              }}
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: (view === 'findPharmacy' || view === 'consult') ? 2 : 1,
+  background: (view === 'findPharmacy' || view === 'consult')
+    ? 'linear-gradient(120deg,rgb(3, 34, 14),rgb(82, 6, 59),rgb(6, 36, 51),rgb(5, 84, 65),rgb(115, 3, 127),rgb(3, 56, 83))'
+    : 'linear-gradient(120deg, #e43a5a,rgb(134, 3, 112),rgb(16, 172, 157), rgb(61, 149, 249),rgb(170, 73, 244))', 
+  backgroundSize: '300% 300%',
+  animation: (view === 'findPharmacy' || view === 'consult') ? 'wavyGradient 15s ease infinite' : 'wavyGradient 8s ease infinite', 
+  opacity: (view === 'findPharmacy' || view === 'consult') ? 0.8 : 0.7, 
+}}
             />
 
-
-
-
-                  {/* New Slanted White Background */}
         <Box
           sx={{
             position: 'absolute',
             bottom: 0,
             left: 0,
             right: 0,
-            height: '40%', // Adjust the height to control how much of the page is white
-            bgcolor: 'white',
-            zIndex: 1, // This places it above the map but below your content
+            height: '55%', 
+            bgcolor: 'rgb(255, 255, 255)',
+            zIndex: 1, 
             clipPath: `polygon(
                0% 10%, 2.5% 10.7%, 5% 11.5%, 7.5% 12.2%, 10% 13%, 12.5% 13.7%, 15% 14.4%, 17.5% 14.8%, 
                     20% 15%, 22.5% 14.9%, 25% 14.5%, 27.5% 14.1%, 30% 13%, 32.5% 12.3%, 35% 11.5%, 37.5% 10.7%, 
@@ -358,17 +420,11 @@ export default function HomePage() {
                     100% 15%, 
                     100% 100%, 0 100%
             )`,
-            
-            
-            
-            
           }}
         />
 
+        {pathname === '/' && view === 'home' && (
 
-        
-
-        {/* Header */}
         <Box
           component={Paper}
           elevation={0}
@@ -387,12 +443,9 @@ export default function HomePage() {
             borderBottom: '1px solid rgb(2, 38, 34)'
           }}
         >
-          {/* Logo */}
           <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
             PharmaStack<span style={{ color: '#00E6A4' }}>X</span>
           </Typography>
-
-          {/* User/Login Section */}
           {isLoading ? (
             <CircularProgress size={24} sx={{ color: 'white' }} />
           ) : user ? (
@@ -435,11 +488,8 @@ export default function HomePage() {
             </Button>
           )}
         </Box>
+        )}
 
-        
-
-        
-        {/* Main Content Area */}
         <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', flex: 1 }}>
             <LayoutGroup>
               <AnimatePresence mode="wait">
@@ -449,7 +499,6 @@ export default function HomePage() {
         </Box>
       </Box>
 
-      {/* Persistent Bottom Bar (Search + Nav) */}
       <Box
         sx={{
             position: 'fixed',
@@ -475,15 +524,18 @@ export default function HomePage() {
                 style={{ width: '100%', maxWidth: '800px' }}
             >
                 <MotionPaper
-                    elevation={3}
-                    sx={{
-                        p: '8px 16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        borderRadius: '12px',
-                        background: 'rgba(255, 255, 255, 0.98)',
-                    }}
-                >
+    elevation={3}
+    onClick={() => setView('orderMedicines')}
+    sx={{
+        p: '8px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        borderRadius: '12px',
+        background: 'rgba(255, 255, 255, 0.98)',
+        cursor: 'pointer', 
+    }}
+>
+
                     <SearchIcon sx={{ color: 'grey.500', mr: 1.5 }} />
                     <TextField
                         fullWidth
@@ -520,7 +572,7 @@ export default function HomePage() {
                 <PharmacyIcon />
                 Pharmacies
             </Button>
-            <Button onClick={() => setView('consult')} sx={{ flexDirection: 'column', color: view === 'consult' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
+            <Button onClick={() => normalizedUser?.role === 'pharmacist' ? setView('conversations') : setView('consult')} sx={{ flexDirection: 'column', color: view === 'consult' || view === 'conversations' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
                 <ChatIcon />
                 Consult
             </Button>

@@ -12,7 +12,8 @@ import { event } from '../lib/gtag';
 
 interface PaystackButtonProps {
   total: number;
-  deliveryOption: 'standard' | 'express';
+  deliveryOption: 'standard' | 'express' | 'pickup';
+
   orderType: 'S' | 'MN' | 'MP';
   uniquePharmacies: string[];
   subtotal: number;

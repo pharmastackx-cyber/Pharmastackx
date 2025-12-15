@@ -221,14 +221,21 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
   const debouncedFetchSuggestions = useCallback(debounce(fetchSuggestions, 800), []);
 
   useEffect(() => {
-    if (initialSearchValue && searchInputRef.current) {
-      // Timeout ensures the element is ready for focus after the transition animation.
-      setTimeout(() => {
-          searchInputRef.current?.focus();
-      }, 100); 
+    // Always focus the input field when the component first renders.
+    // The timeout gives the transition animation time to finish.
+    const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+    }, 100);
+
+    // If a search value was passed from the home screen, fetch suggestions.
+    if (initialSearchValue) {
       debouncedFetchSuggestions(initialSearchValue);
     }
-  }, [initialSearchValue, debouncedFetchSuggestions]);
+
+    // Clean up the timer when the component unmounts.
+    return () => clearTimeout(timer);
+  }, []); // The empty array ensures this effect runs only once on mount.
+
 
   const handleInputChange = (_: any, newInputValue: string) => {
     setInputValue(newInputValue);
@@ -395,16 +402,13 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                 <Autocomplete
                     freeSolo
                     sx={{ 
-                        flexGrow: 1,
-                        "& .MuiOutlinedInput-root": {
-                            background: "rgba(255, 255, 255, 0.05)",
-                            borderRadius: '50px',
-                            "& fieldset": { borderColor: "rgba(255, 255, 255, 0.3)" },
-                            "&:hover fieldset": { borderColor: "rgba(255, 255, 255, 0.5)" },
-                        },
-                        "& .MuiInputLabel-root": { color: "rgba(255, 255, 255, 0.7)" },
-                        "& .MuiInputBase-input": { color: "white" }
-                    }}
+                      flexGrow: 1,
+                      "& .MuiOutlinedInput-root": {
+                          borderRadius: '50px',
+                          background: '#f5f5f5', // Light grey background
+                      },
+                  }}
+                  
                     options={suggestions}
                     getOptionLabel={(option) => (typeof option === 'string' ? option : option.label)}
                     onInputChange={handleInputChange}
@@ -418,14 +422,16 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                     <TextField
                         {...params}
                         inputRef={searchInputRef}
-                        label="Search by Medicine Name..."
+                        label
+                        ="Search by Medicine Name..."
                         variant="outlined"
                         InputProps={{
                         ...params.InputProps,
                         endAdornment: (
                             <InputAdornment position="end">
                             {loading ? <CircularProgress color="inherit" size={20} /> : (
-                                <Button onClick={() => handleAddDrug(inputValue, null, null)} disabled={!inputValue.trim() || loading} sx={{ color: 'white', mr: -1 }}>Add</Button>
+                                <Button onClick={() => handleAddDrug(inputValue, null, null)} disabled={!inputValue.trim() || loading} sx={{ color: 'primary.main', mr: -1 }}>Add</Button>
+
                             )}
                             </InputAdornment>
                         ),
@@ -433,7 +439,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                     />
                     )}
                 />
-                <Box onClick={() => triggerImageUpload('prescription')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(255, 255, 255, 0.3)', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', color: 'rgba(255, 255, 255, 0.7)', '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)' } }}>
+                <Box onClick={() => triggerImageUpload('prescription')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(255, 255, 255, 0.3)', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', color: 'rgba(255, 255, 255, 0.7)', '&:hover': { backgroundColor: 'rgba(103, 10, 10, 0.1)' } }}>
                     <DescriptionIcon />
                     <Typography variant="caption" sx={{ lineHeight: 1.2, mt: 0.5 }}>Prescription</Typography>
                 </Box>
@@ -445,7 +451,9 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
 
             
             {requestedDrugs.map((drug) => (
-              <Card key={drug.id} sx={{ mb: 2, borderRadius: '16px', boxShadow: 3, overflow: 'visible', background: 'rgba(255, 255, 255, 0.05)', color: 'white' }}>
+              <Card key={drug.id} sx={{ mb: 2, borderRadius: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'visible', background: 'rgba(82, 5, 137, 0.54)', color: 'black' }}
+
+              >
                 <Collapse in={drug.isEditing} timeout="auto" unmountOnExit>
                   <CardContent>
                     <TextField
@@ -453,18 +461,11 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                         fullWidth
                         value={drug.name}
                         onChange={(e) => handleUpdateDrug(drug.id, 'name', e.target.value)}
-                        sx={{ 
-                            mb: 2,
-                            "& .MuiOutlinedInput-root": {
-                                "& fieldset": { borderColor: "rgba(255, 255, 255, 0.3)" },
-                                "&:hover fieldset": { borderColor: "rgba(255, 255, 255, 0.5)" },
-                            },
-                            "& .MuiInputLabel-root": { color: "rgba(255, 255, 255, 0.7)" },
-                            "& .MuiInputBase-input": { color: "white" }
-                         }}
+                        
                     />
                     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mt: 2 }}>
-                       <FormControl fullWidth sx={{ "& .MuiInputLabel-root": { color: "rgba(255, 255, 255, 0.7)" }, "& .MuiOutlinedInput-root": { color: 'white', "& fieldset": { borderColor: "rgba(255, 255, 255, 0.3)" } } }}>
+                       <FormControl fullWidth 
+                       >
                         <InputLabel>Form</InputLabel>
                         <Select value={drug.form} label="Form" onChange={(e) => handleUpdateDrug(drug.id, 'form', e.target.value)} sx={{ color: 'white' }}>
                           {drug.formSuggestions.map((form) => (
@@ -489,15 +490,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                         options={drug.strengthSuggestions}
                         value={drug.strength}
                         onInputChange={(_, newValue) => handleUpdateDrug(drug.id, 'strength', newValue)}
-                        sx={{ 
-                            width: { xs: '100%', sm: '220px' },
-                            "& .MuiOutlinedInput-root": {
-                                background: "rgba(255, 255, 255, 0.05)",
-                                "& fieldset": { borderColor: "rgba(255, 255, 255, 0.3)" },
-                            },
-                            "& .MuiInputLabel-root": { color: "rgba(255, 255, 255, 0.7)" },
-                            "& .MuiInputBase-input": { color: "white" }
-                        }}
+                        
                         renderInput={(params) => 
                         <TextField 
                         {...params} 

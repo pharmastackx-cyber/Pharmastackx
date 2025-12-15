@@ -49,6 +49,8 @@
     "react-leaflet": "^5.0.0",
     "react-paystack": "^6.0.0",
     "sheetjs-style": "^0.15.8",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "twilio": "^5.10.5",
     "xlsx": "^0.18.5"
   },

@@ -21,6 +21,8 @@ import {
   Remove,
   Delete,
   LocalShipping,
+  
+
   Security,
   ShoppingCart,
   ArrowBack,
@@ -58,7 +60,8 @@ export default function Cart() {
 
   const [promoCode, setPromoCode] = useState('');
   const [promoMessage, setPromoMessage] = useState('');
-  const [deliveryOption, setDeliveryOption] = useState<'standard' | 'express'>('standard');
+  const [deliveryOption, setDeliveryOption] = useState<'standard' | 'express' | 'pickup'>('standard');
+
   const [orderType, setOrderType] = useState('MN');
   const [isProcessingFreeOrder, setIsProcessingFreeOrder] = useState(false);
 
@@ -77,14 +80,18 @@ export default function Cart() {
     }
   }, [user]);
 
-  const isFormValid = 
-    patientName.trim() !== '' &&
-    patientAge.trim() !== '' &&
-    deliveryPhone.trim() !== '' &&
-    deliveryEmail.trim() !== '' &&
+    const isAddressRequired = deliveryOption !== 'pickup';
+const isFormValid =
+  patientName.trim() !== '' &&
+  patientAge.trim() !== '' &&
+  deliveryPhone.trim() !== '' &&
+  deliveryEmail.trim() !== '' &&
+  (!isAddressRequired || (
     deliveryAddress.trim() !== '' &&
     deliveryCity.trim() !== '' &&
-    deliveryState.trim() !== '';
+    deliveryState.trim() !== ''
+  ));
+
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const uniquePharmacies = [...new Set(items.map(item => item.pharmacy))];
@@ -108,16 +115,22 @@ export default function Cart() {
     setPromoMessage('');
   };
 
-  const getDeliveryFee = () => {
+    const getDeliveryFee = () => {
+    if (deliveryOption === 'pickup') return 0;
     const baseDeliveryFee = deliveryOption === 'standard' ? 2000 : 4000;
     if (actualOrderType === 'S' || actualOrderType === 'MN') return baseDeliveryFee;
     if (actualOrderType === 'MP') return baseDeliveryFee * uniquePharmacies.length;
     return baseDeliveryFee;
-  };
+};
 
-  const deliveryFee = getDeliveryFee();
-  const { discountAmount, deliveryDiscount, finalTotal } = calculateDiscount(subtotal, deliveryFee);
-  const total = finalTotal;
+
+const deliveryFee = getDeliveryFee();
+const sfcPercentage = deliveryOption === 'pickup' ? 25 : 20;
+const sfcAmount = subtotal * (sfcPercentage / 100);
+const { discountAmount, deliveryDiscount, finalTotal } = calculateDiscount(subtotal, deliveryFee);
+const total = finalTotal + sfcAmount;
+
+  
 
   useEffect(() => {
     if (total === 0 && items.length > 0 && activePromo && !isProcessingFreeOrder && isFormValid && user) {
@@ -244,7 +257,10 @@ export default function Cart() {
                   <Box sx={{ width: '100%' }}><TextField fullWidth size="small" label="Patient Condition (Optional)" value={patientCondition} onChange={(e) => setPatientCondition(e.target.value)} /></Box>
                   <Box sx={{ width: { xs: '100%', sm: 'calc(50% - 8px)' } }}><TextField fullWidth required size="small" label="Delivery Phone Number" value={deliveryPhone} onChange={(e) => setDeliveryPhone(e.target.value)} /></Box>
                   <Box sx={{ width: { xs: '100%', sm: 'calc(50% - 8px)' } }}><TextField fullWidth required size="small" label="Email Address" value={deliveryEmail} onChange={(e) => setDeliveryEmail(e.target.value)} /></Box>
-                  <Box sx={{ width: '100%' }}><TextField fullWidth required size="small" label="Delivery Address" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} /></Box>
+                  <Box sx={{ width: '100%' }}><TextField fullWidth required={deliveryOption !== 'pickup'} size="small" label="Delivery Address" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} /></Box>
+                  <Box sx={{ width: { xs: '100%', sm: 'calc(50% - 8px)' } }}><TextField fullWidth required={deliveryOption !== 'pickup'} size="small" label="City" value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} /></Box>
+                  <Box sx={{ width: { xs: '100%', sm: 'calc(50% - 8px)' } }}><TextField fullWidth required={deliveryOption !== 'pickup'} size="small" label="State" value={deliveryState} onChange={(e) => setDeliveryState(e.target.value)} /></Box>
+
                   <Box sx={{ width: { xs: '100%', sm: 'calc(50% - 8px)' } }}><TextField fullWidth required size="small" label="City" value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} /></Box>
                   <Box sx={{ width: { xs: '100%', sm: 'calc(50% - 8px)' } }}><TextField fullWidth required size="small" label="State" value={deliveryState} onChange={(e) => setDeliveryState(e.target.value)} /></Box>
                 </Box>
@@ -280,14 +296,45 @@ export default function Cart() {
                 </Box>
                 
                 {/* Delivery Options */}
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" sx={{ mb: 1, color: '#666', fontSize: '0.85rem', fontWeight: 500 }}>Delivery Option</Typography>
-                  <RadioGroup value={deliveryOption} onChange={(e) => setDeliveryOption(e.target.value as 'standard' | 'express')} sx={{ gap: 0 }}>
-                    <FormControlLabel value="standard" control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />} label={<Box><Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>Standard - ₦2,000</Typography><Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>Next day delivery</Typography></Box>} sx={{ mr: 0, mb: 0.5 }} />
-                    <FormControlLabel value="express" control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />} label={<Box><Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>Express - ₦4,000</Typography><Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#E91E63' }}>30mins - 3hrs delivery</Typography></Box>} sx={{ mr: 0 }} />
-                  </RadioGroup>
-                </Box>
+<Box sx={{ mb: 2 }}>
+  <Typography variant="body2" sx={{ mb: 1, color: '#666', fontSize: '0.85rem', fontWeight: 500 }}>Delivery Option</Typography>
+  <RadioGroup value={deliveryOption} onChange={(e) => setDeliveryOption(e.target.value as 'standard' | 'express' | 'pickup')} sx={{ gap: 0 }}>
+    <FormControlLabel value="standard" control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />} label={<Box><Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>Standard - ₦700</Typography><Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>You will get your items tomorrow</Typography></Box>} sx={{ mr: 0, mb: 0.5 }} />
+    <FormControlLabel value="express" control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />} label={<Box><Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>Express - ₦2,000</Typography><Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#E91E63' }}>30mins - 3hrs delivery</Typography></Box>} sx={{ mr: 0, mb: 0.5 }} />
+    <FormControlLabel
+  value="pickup"
+  control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />}
+  label={
+    <Box>
+      <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
+        Pickup from Pharmacy - Free
+      </Typography>
+      <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>
+      You will receive the pharmacy's location and phone number to arrange pickup.
+      </Typography>
+    </Box>
+  }
+  sx={{ mr: 0 }}
+/>
 
+  </RadioGroup>
+</Box>
+
+{deliveryOption === 'pickup' && (
+  <Paper sx={{ p: 2, mt: 2, border: '1px solid #006D5B', bgcolor: '#e8f5e8' }}>
+    <Typography sx={{ fontWeight: 600, color: '#004D40', mb: 1 }}>
+      {uniquePharmacies.length > 1 ? 'Pickup Locations' : 'Pickup Location'}
+    </Typography>
+    {uniquePharmacies.map((pharmacy, index) => (
+      <Box key={index} sx={{ mb: index === uniquePharmacies.length - 1 ? 0 : 1 }}>
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>- {pharmacy}</Typography>
+      </Box>
+    ))}
+    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+      Please proceed to the respective pharmacy addresses for pickup. Full details will be provided on the Orders page after checkout.
+    </Typography>
+  </Paper>
+)}
                 {/* Promo Code */}
                 <Box sx={{ mb: 3 }}>
                   {!activePromo ? (
@@ -310,12 +357,25 @@ export default function Cart() {
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}><Typography variant="body2" color="text.secondary">Delivery Fee</Typography><Typography variant="body2" sx={{ color: deliveryDiscount > 0 ? 'text.secondary' : '#006D5B', fontWeight: 500, textDecoration: deliveryDiscount > 0 ? 'line-through' : 'none' }}>₦{deliveryFee.toLocaleString()}</Typography></Box>
                   {deliveryDiscount > 0 && <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, color: '#4CAF50' }}><Typography variant="body2" color="#4CAF50">Free Delivery ({activePromo?.code})</Typography><Typography variant="body2" color="#4CAF50" sx={{ fontWeight: 600 }}>-₦{deliveryDiscount.toLocaleString()}</Typography></Box>}
                 </Box>
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+  <Typography variant="body2" color="text.secondary">Service Fee (SFC)</Typography>
+  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+    {sfcPercentage}%
+  </Typography>
+</Box>
+
+
                 <Divider sx={{ mb: 2 }} />
+
+                
                 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>Total</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 600, color: '#006D5B' }}>₦{total.toLocaleString()}</Typography>
                 </Box>
+
+                
 
                 {total === 0 && !isProcessingFreeOrder ? (
                    <Button 
@@ -350,6 +410,7 @@ export default function Cart() {
                     uniquePharmacies={uniquePharmacies}
                     subtotal={subtotal}
                     deliveryFee={deliveryFee}
+                    
                     discountAmount={discountAmount}
                     deliveryDiscount={deliveryDiscount}
                     promoCode={activePromo?.code}

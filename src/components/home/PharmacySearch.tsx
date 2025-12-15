@@ -97,7 +97,7 @@ export default function PharmacySearch() {
   };
 
   return (
-    <Box>
+    <Box sx={{ bgcolor: '#f0f7f4', p: { xs: 2, sm: 3, md: 4 }, borderRadius: '16px' }}>
       {/* Search Bar */}
       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
         <TextField
@@ -184,6 +184,8 @@ const PharmacyCard = ({ pharmacy }: { pharmacy: IPharmacy }) => (
     target="_blank" 
     rel="noopener noreferrer"
     sx={{
+      bgcolor: '#1B5E20', // Dark green background for the whole card
+      color: 'white', // Default text color to white for readability
       textDecoration: 'none',
       cursor: 'pointer',
       borderRadius: '30px 10px',
@@ -199,9 +201,6 @@ const PharmacyCard = ({ pharmacy }: { pharmacy: IPharmacy }) => (
     }}
   >
     <Box sx={{
-      bgcolor: '#004D40',
-      color: 'white',
-      minHeight: 140,
       p: 2,
       display: 'flex',
       flexDirection: 'column',
@@ -220,9 +219,12 @@ const PharmacyCard = ({ pharmacy }: { pharmacy: IPharmacy }) => (
         fullWidth
         variant="outlined"
         sx={{
-          borderColor: '#006D5B',
-          color: '#006D5B',
-          '&:hover': { bgcolor: '#006D5B', color: 'white' },
+          borderColor: 'white',
+          color: 'white',
+          '&:hover': { 
+            bgcolor: 'rgba(255, 255, 255, 0.1)',
+            borderColor: 'white'
+          },
           mt: 'auto'
         }}
       >
