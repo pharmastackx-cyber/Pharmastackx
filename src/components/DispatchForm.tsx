@@ -27,6 +27,8 @@ import {
   InputAdornment,
   Alert,
   Modal,
+  Paper,
+  FormLabel,
 } from '@mui/material';
 import {
     Delete as DeleteIcon,
@@ -351,7 +353,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
   }
 
   return (
-    <Box sx={{ bgcolor: 'white', color: 'black' }}>
+    <Box sx={{ bgcolor: '#F7F7F7', color: 'black', minHeight: '100vh', py: 4 }}>
         <input type="file" accept="image/*" ref={photoLibraryInputRef} onChange={(e) => { e.target.files && handleImageUpload(e.target.files[0]); e.target.value = ''; }} style={{ display: 'none' }} />
 
         {isQuoteReady && !isRadarModalOpen && activeRequestId && (
@@ -360,165 +362,186 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                 action={
                     <Button color="inherit" size="small" onClick={handleReviewQuote}>REVIEW QUOTE</Button>
                 }
-                sx={{ mb: 2, borderRadius: '8px' }}
+                sx={{ mb: 2, borderRadius: '8px', maxWidth: { xs: '90%', sm: '80%', md: '600px' }, mx: 'auto' }}
             >
                 A quote for your request is ready
             </Alert>
         )}
 
-        <Grid container spacing={4} justifyContent="center">
-          <Grid item xs={20}>
-            {globalError && <Alert severity="error" sx={{ mb: 2 }}>{globalError}</Alert>}
+        <Grid container justifyContent="center">
+            <Grid item xs={11} sm={10} md={8} lg={6}>
+                <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: '28px', boxShadow: '0 8px 24px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                    {globalError && <Alert severity="error" sx={{ mb: 2 }}>{globalError}</Alert>}
 
-            <Box sx={{ display: 'flex', gap: 1, mb: 4, alignItems: 'stretch' }}>
-                <Autocomplete
-                    freeSolo
-                    sx={{ flexGrow: 1, "& .MuiOutlinedInput-root": { borderRadius: '50px', background: '#f5f5f5' }}}
-                    options={suggestions}
-                    getOptionLabel={(option) => (typeof option === 'string' ? option : option.label)}
-                    onInputChange={handleInputChange}
-                    onChange={(_, newValue) => {
-                        const drugName = typeof newValue === 'string' ? newValue : (newValue as Suggestion)?.label;
-                        if (drugName) handleAddDrug(drugName, null, null);
-                    }}
-                    inputValue={inputValue}
-                    loading={loading}
-                    renderInput={(params) => (
-                    <TextField
-                        {...params}
-                        inputRef={searchInputRef}
-                        label="Search by Medicine Name..."
-                        variant="outlined"
-                        InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <InputAdornment position="end">
-                            {loading ? <CircularProgress color="inherit" size={20} /> : (
-                                <Button onClick={() => handleAddDrug(inputValue, null, null)} disabled={!inputValue.trim() || loading} sx={{ color: 'primary.main', mr: -1 }}>Add</Button>
+                    <Box sx={{ mb: 3 }}>
+                        <Autocomplete
+                            freeSolo
+                            fullWidth
+                            options={suggestions}
+                            getOptionLabel={(option) => (typeof option === 'string' ? option : option.label)}
+                            onInputChange={handleInputChange}
+                            onChange={(_, newValue) => {
+                                const drugName = typeof newValue === 'string' ? newValue : (newValue as Suggestion)?.label;
+                                if (drugName) handleAddDrug(drugName, null, null);
+                            }}
+                            inputValue={inputValue}
+                            loading={loading}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    inputRef={searchInputRef}
+                                    placeholder="Type medicine name to search..."
+                                    variant="outlined"
+                                    InputProps={{
+                                        ...params.InputProps,
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                {loading ? <CircularProgress color="inherit" size={20} /> : (
+                                                    <Button onClick={() => handleAddDrug(inputValue, null, null)} disabled={!inputValue.trim() || loading} sx={{ color: 'primary.main', mr: -1 }}>Add</Button>
+                                                )}
+                                            </InputAdornment>
+                                        ),
+                                        sx: { borderRadius: '12px', background: '#f5f5f5' }
+                                    }}
+                                />
                             )}
-                            </InputAdornment>
-                        ),
-                        }}
-                    />
-                    )}
-                />
-                <Box onClick={() => triggerImageUpload('prescription')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(0, 0, 0, 0.23)', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', color: 'grey.700', '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}>
-                    <DescriptionIcon />
-                    <Typography variant="caption" sx={{ lineHeight: 1.2, mt: 0.5 }}>Prescription</Typography>
-                </Box>
-                <Box onClick={() => triggerImageUpload('image')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', border: '1px solid rgba(0, 0, 0, 0.23)', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', color: 'grey.700', '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}>
-                    <ImageIcon />
-                    <Typography variant="caption" sx={{ lineHeight: 1.2, mt: 0.5 }}>Image</Typography>
-                </Box>
-            </Box>
-
-            
-            {requestedDrugs.map((drug) => (
-              <Card key={drug.id} sx={{ mb: 2, borderRadius: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'visible', background: 'white', border: '1px solid rgba(0,0,0,0.12)' }}
-              >
-                <Collapse in={drug.isEditing} timeout="auto" unmountOnExit>
-                  <CardContent>
-                    <TextField label="Medicine Name" fullWidth value={drug.name} onChange={(e) => handleUpdateDrug(drug.id, 'name', e.target.value)} />
-                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mt: 2 }}>
-                       <FormControl fullWidth>
-                        <InputLabel>Form</InputLabel>
-                        <Select value={drug.form} label="Form" onChange={(e) => handleUpdateDrug(drug.id, 'form', e.target.value)}>
-                          {drug.formSuggestions.map((form) => (
-                            <MenuItem key={form} value={form}>
-                              <Chip label="Suggested" size="small" color="primary" variant="outlined" sx={{ mr: 1 }} />
-                              {form}
-                            </MenuItem>
-                          ))}
-                          {(drug.showAllForms || drug.formSuggestions.length === 0) && allFormTypes.filter(f => !drug.formSuggestions.includes(f)).map((form) => (
-                            <MenuItem key={form} value={form}>{form}</MenuItem>
-                          ))}
-                           {!drug.showAllForms && drug.formSuggestions.length > 0 && (
-                            <Button onClick={() => toggleShowAllForms(drug.id)} size="small" sx={{ mt: 1, alignSelf: 'flex-start', color: 'primary.main' }}>
-                              Show All Forms
-                            </Button>
-                          )}
-                        </Select>
-                      </FormControl>
-
-                      <Autocomplete
-                        freeSolo
-                        options={drug.strengthSuggestions}
-                        value={drug.strength}
-                        onInputChange={(_, newValue) => handleUpdateDrug(drug.id, 'strength', newValue)}
-                        renderInput={(params) => <TextField {...params} label="Strength (e.g., 200mg)" variant="outlined"/>}
-                      />
-
-                      <FormControl sx={{ width: { xs: '100%', sm: '120px' } }}>
-                        <InputLabel>Qty</InputLabel>
-                        <Select value={drug.quantity} label="Qty" onChange={(e) => handleUpdateDrug(drug.id, 'quantity', e.target.value)}>
-                          {quantityOptions.map((qty) => (
-                            <MenuItem key={qty} value={qty}>{qty}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Box>
-                    <Box sx={{ mt: 2 }}>
-                      <Button size="small" startIcon={drug.showOtherInfo ? <RemoveIcon /> : <AddIcon />} onClick={() => toggleShowOtherInfo(drug.id)} sx={{ color: 'primary.main' }}>
-                        {drug.showOtherInfo ? 'Hide Details' : 'Add More Details'}
-                      </Button>
-                      <Collapse in={drug.showOtherInfo}>
-                        <OtherInfoInput
-                          notes={drug.notes}
-                          image={drug.image}
-                          onNotesChange={(value) => handleUpdateDrug(drug.id, 'notes', value)}
-                          onImageChange={(value) => handleUpdateDrug(drug.id, 'image', value)}
                         />
-                      </Collapse>
+                        <FormControl component="fieldset" variant="outlined" sx={{ mt: 2, width: '100%', justifyContent: 'center' }}>
+                            <FormLabel component="legend" sx={{ px: 1, mx: 'auto', fontSize: '0.9rem', justifyContent: 'center' }}>Search by prescription or image</FormLabel>
+                            <Box sx={{ display: 'flex', gap: 2, p: 2, pt: 1, justifyContent: 'center' }}>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => triggerImageUpload('prescription')}
+                                    startIcon={<DescriptionIcon />}
+                                    sx={{ borderRadius: '20px', textTransform: 'none', flex: 1 }}
+                                >
+                                    Prescription
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => triggerImageUpload('image')}
+                                    startIcon={<ImageIcon />}
+                                    sx={{ borderRadius: '20px', textTransform: 'none', flex: 1 }}
+                                >
+                                    Image
+                                </Button>
+                            </Box>
+                        </FormControl>
                     </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                      <Button variant="contained" onClick={() => handleSetEditing(drug.id, false)}>Done</Button>
-                    </Box>
-                  </CardContent>
-                </Collapse>
 
-                <Collapse in={!drug.isEditing} timeout="auto" unmountOnExit>
-                   <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box sx={{display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap'}}>
-                            {drug.image && <Avatar src={drug.image} sx={{ width: 40, height: 40, mr: 1 }} />}
-                            <Typography variant="h6" sx={{ fontWeight: 600 }}>{drug.name}</Typography>
-                            {drug.strength && <Chip label={drug.strength} size="small" />}
-                            {drug.form && <Chip label={drug.form} size="small" />}
-                            {drug.quantity > 1 && <Chip label={`Qty: ${drug.quantity}`} size="small" />}
-                            {drug.notes && <Chip label="Has Notes" size="small" />}
-                        </Box>
-                        <Box>
-                            <IconButton onClick={() => handleSetEditing(drug.id, true)}><EditIcon /></IconButton>
-                            <IconButton onClick={() => handleRemoveDrug(drug.id)}><DeleteIcon /></IconButton>
-                        </Box>
-                    </Box>
-                  </CardContent>
-                </Collapse>
-              </Card>
-            ))}
-            
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 4 }}>
-              <Button
-                variant="contained"
-                onClick={handleFindMedicinesClick}
-                disabled={requestedDrugs.length === 0 || requestedDrugs.some(d => d.isEditing) || isSubmitting}
-              >
-                {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Search'}
-              </Button>
-              
-              {requestedDrugs.length === 0 && (
-                  <Button
-                      variant="outlined"
-                      onClick={() => router.push('/find-medicines')}
-                  >
-                    View Full Catalog
-                  </Button>
-              )}
-            </Box>
-            
-            {user && <RequestHistory history={requestHistory} onRefill={handleRefillRequest} />}
+                    {requestedDrugs.map((drug) => (
+                    <Card key={drug.id} sx={{ mb: 2, borderRadius: '20px', boxShadow: 'none', overflow: 'visible', background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.12)' }}>
+                        <Collapse in={!drug.isEditing} timeout="auto" unmountOnExit>
+                          <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Box sx={{display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap'}}>
+                                    {drug.image && <Avatar src={drug.image} sx={{ width: 40, height: 40 }} />}
+                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>{drug.name}</Typography>
+                                    {drug.strength && <Chip label={drug.strength} size="small" />}
+                                    {drug.form && <Chip label={drug.form} size="small" />}
+                                    {drug.quantity > 1 && <Chip label={`Qty: ${drug.quantity}`} size="small" />}
+                                    {drug.notes && <Chip label="Has Notes" size="small" />}
+                                </Box>
+                                <Box>
+                                    <IconButton onClick={() => handleSetEditing(drug.id, true)}><EditIcon /></IconButton>
+                                    <IconButton onClick={() => handleRemoveDrug(drug.id)}><DeleteIcon /></IconButton>
+                                </Box>
+                            </Box>
+                          </CardContent>
+                        </Collapse>
+                        <Collapse in={drug.isEditing} timeout="auto" unmountOnExit>
+                          <CardContent>
+                            <TextField fullWidth label="Medicine Name" value={drug.name} onChange={(e) => handleUpdateDrug(drug.id, 'name', e.target.value)} sx={{mb: 2}}/>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6}>
+                                    <FormControl fullWidth>
+                                      <InputLabel>Form</InputLabel>
+                                      <Select value={drug.form} label="Form" onChange={(e) => handleUpdateDrug(drug.id, 'form', e.target.value)}>
+                                        {drug.formSuggestions.map((form) => (
+                                          <MenuItem key={form} value={form}>
+                                            <Chip label="Suggested" size="small" color="primary" variant="outlined" sx={{ mr: 1 }} />
+                                            {form}
+                                          </MenuItem>
+                                        ))}
+                                        {(drug.showAllForms || drug.formSuggestions.length === 0) && allFormTypes.filter(f => !drug.formSuggestions.includes(f)).map((form) => (
+                                          <MenuItem key={form} value={form}>{form}</MenuItem>
+                                        ))}
+                                        {!drug.showAllForms && drug.formSuggestions.length > 0 && (
+                                          <Button onClick={() => toggleShowAllForms(drug.id)} size="small" sx={{ mt: 1, ml: 1, color: 'primary.main' }}>Show All Forms</Button>
+                                        )}
+                                      </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                  <Autocomplete
+                                    freeSolo
+                                    fullWidth
+                                    options={drug.strengthSuggestions}
+                                    value={drug.strength}
+                                    onInputChange={(_, newValue) => handleUpdateDrug(drug.id, 'strength', newValue)}
+                                    renderInput={(params) => <TextField {...params} label="Strength (e.g., 200mg)" />}
+                                  />
+                                </Grid>
+                                <Grid item xs={12}>
+                                  <FormControl fullWidth>
+                                    <InputLabel>Qty</InputLabel>
+                                    <Select value={drug.quantity} label="Qty" onChange={(e) => handleUpdateDrug(drug.id, 'quantity', Number(e.target.value))}>
+                                      {quantityOptions.map((qty) => (
+                                        <MenuItem key={qty} value={qty}>{qty}</MenuItem>
+                                      ))}
+                                    </Select>
+                                  </FormControl>
+                                </Grid>
+                            </Grid>
+                            <Box sx={{ mt: 2 }}>
+                              <Button size="small" startIcon={drug.showOtherInfo ? <RemoveIcon /> : <AddIcon />} onClick={() => toggleShowOtherInfo(drug.id)} sx={{ color: 'primary.main' }}>
+                                {drug.showOtherInfo ? 'Hide Details' : 'Add More Details'}
+                              </Button>
+                              <Collapse in={drug.showOtherInfo}>
+                                <OtherInfoInput
+                                  notes={drug.notes}
+                                  image={drug.image}
+                                  onNotesChange={(value) => handleUpdateDrug(drug.id, 'notes', value)}
+                                  onImageChange={(value) => handleUpdateDrug(drug.id, 'image', value)}
+                                />
+                              </Collapse>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                              <Button variant="contained" onClick={() => handleSetEditing(drug.id, false)}>Done</Button>
+                            </Box>
+                          </CardContent>
+                        </Collapse>
+                    </Card>
+                    ))}
 
-          </Grid>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 4 }}>
+                        <Button
+                            variant="contained"
+                            fullWidth
+                            onClick={handleFindMedicinesClick}
+                            disabled={requestedDrugs.length === 0 || requestedDrugs.some(d => d.isEditing) || isSubmitting}
+                            sx={{py: 0.8, borderRadius: '12px'}}
+                        >
+                            {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Search'}
+                        </Button>
+                        {requestedDrugs.length === 0 && (
+                            <Button
+                                variant="contained"
+                                fullWidth
+                                onClick={() => router.push('/find-medicines')}
+                                sx={{py: 0.8, borderRadius: '12px'}}
+                            >
+                                View Full Catalog
+                            </Button>
+                        )}
+                    </Box>
+                    <Box sx={{mt: 4}}>
+                      <RequestHistory history={requestHistory} onRefill={handleRefillRequest} />
+                    </Box>
+                </Paper>
+            </Grid>
         </Grid>
 
         <ConfirmationModal 
