@@ -3,31 +3,31 @@
 import { useState, useEffect } from "react";
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { useRouter } from 'next/navigation'; // Import useRouter
-import { Box, Typography, Paper, TextField, IconButton, Avatar, Menu, MenuItem, Button, Grid, CircularProgress, Container } from "@mui/material";
+import { useRouter } from 'next/navigation';
+import { Box, Typography, Paper, TextField, IconButton, Button, Grid, CircularProgress, Badge } from "@mui/material";
 import { motion, AnimatePresence, Variants, LayoutGroup } from "framer-motion";
 import SearchIcon from "@mui/icons-material/Search";
-import Person from '@mui/icons-material/Person';
-import Link from 'next/link';
 import { useSession } from "@/context/SessionProvider";
+import { useCart } from "@/contexts/CartContext";
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DispatchForm from "@/components/DispatchForm";
 import AboutContent from "@/components/AboutContent";
 import ContactContent from "@/components/ContactContent";
 import FindPharmacyContent from "@/components/FindPharmacyContent";
-import OrderRequestsContent from "@/components/OrderRequestsContent"; // Import the new component
+import OrderRequestsContent from "@/components/OrderRequestsContent";
 import FindPharmacistContent from "@/components/FindPharmacistContent";
+import FindMedicinesContent from "@/components/FindMedicinesContent";
 import AccountContent from "@/components/AccountContent";
-import Chat from "@/components/Chat"; // Import the new Chat component
+import Chat from "@/components/Chat";
 import ConversationsContent from "@/components/ConversationsContent";
+import CartContent from "@/components/CartContent";
+import OrdersContent from "@/components/OrdersContent";
 import { Home as HomeIcon, Chat as ChatIcon, Person as PersonIcon, LocalPharmacy as PharmacyIcon } from '@mui/icons-material';
-import { wrap } from "lodash";
 import { useTheme, useMediaQuery } from "@mui/material";
 
-// Define a unified User type
 interface UnifiedUser {
-  _id: string; // Always use _id
-  id?: string; // Keep original id for compatibility if needed
+  _id: string;
+  id?: string;
   username: string;
   email?: string;
   role: string;
@@ -45,44 +45,18 @@ const animatedWords = ["pharmacies", "pharmacists", "medicines"];
 
 export default function HomePage() {
   const { user, isLoading } = useSession();
+  const { getTotalItems } = useCart();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const pathname = usePathname();
   const router = useRouter();
   const [inputValue, setInputValue] = useState("");
   const [wordIndex, setWordIndex] = useState(0);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [view, setView] = useState('home');
   const [otherUser, setOtherUser] = useState<UnifiedUser | null>(null);
 
-  // Normalize user object from session provider
   const normalizedUser: UnifiedUser | null = user ? { ...user, _id: user.id } : null;
 
   const bottomPadding = view === 'home' ? { xs: '140px', sm: '150px' } : { xs: '70px', sm: '80px' };
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = async () => {
-    handleMenuClose();
-    try {
-        const response = await fetch('/api/auth/logout', { method: 'POST' });
-        if (response.ok) {
-            window.location.href = '/auth';
-        } else {
-            console.error('Logout failed');
-        }
-    } catch (error) {
-        console.error('An error occurred during logout:', error);
-    }
-  };
-
-  const userInitial = user?.email?.charAt(0)?.toUpperCase() || '';
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -125,7 +99,6 @@ export default function HomePage() {
   };
   
   const handleBackNavigation = () => {
-    // Unified back logic
     if (view === 'chat') {
       setView(normalizedUser?.role === 'pharmacist' ? 'conversations' : 'consult');
     } else {
@@ -259,13 +232,13 @@ export default function HomePage() {
         transition: { ...mobileButtonAnimation.transition, delay: 0.15 } 
     } : {})}
 >
-                    <Button variant="contained" size="small" onClick={() => setView('findPharmacy')} 
+                    <Button variant="contained" size="small" onClick={() => setView('findMedicines')} 
                     sx={{ borderRadius: '20px', 
                       fontSize: { xs: '0.75rem', sm: '0.9rem' },
                       px: { xs: 2, sm: 4 },
                       py: { xs: 0.75, sm: 1 },
                     whiteSpace: 'nowrap', bgcolor: 'rgb(1, 61, 63)', color: 'rgb(243, 247, 246)', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.05)', borderColor: 'rgb(1, 61, 63)', backgroundColor: 'rgb(1, 61, 63)' } }}>
-                          Find a Pharmacy
+                          View catalog
                       </Button>
                     </motion.div>
                   </Grid>
@@ -283,7 +256,8 @@ export default function HomePage() {
 };
 
 
-  const renderPageView = (title: string, layoutId: string, children?: React.ReactNode) => (
+const renderPageView = (title: string, layoutId: string, children?: React.ReactNode, fullWidthMobile: boolean = false) => (
+
     <Box
       key={layoutId}
       component={motion.div}
@@ -301,6 +275,7 @@ export default function HomePage() {
                 sx={{
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'space-between',
                     p: 2,
                     bgcolor: 'transparent',
                     color: 'white',
@@ -308,15 +283,55 @@ export default function HomePage() {
                     borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
                 }}
             >
-                <IconButton onClick={handleBackNavigation} sx={{ color: 'white' }}>
-                    <ArrowBackIcon />
-                </IconButton>
-                <Typography variant="h6" sx={{ ml: 2, fontWeight: 500 }}>
-                    {title}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <IconButton onClick={handleBackNavigation} sx={{ color: 'white' }}>
+                        <ArrowBackIcon />
+                    </IconButton>
+                    <Typography variant="h6" sx={{ ml: 2, fontWeight: 500 }}>
+                        {title}
+                    </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1, alignItems: { xs: 'flex-end', sm: 'center' } }}>
+                    <Badge badgeContent={getTotalItems()} color="secondary">
+                        <Button
+                            variant="outlined"
+                            onClick={() => setView('cart')}
+                            sx={{
+                                borderRadius: '20px',
+                                borderColor: 'rgba(255, 255, 255, 0.8)',
+                                color: 'white',
+                                textTransform: 'uppercase',
+                                fontWeight: 'bold',
+                                '&:hover': {
+                                  borderColor: 'white',
+                                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                },
+                            }}
+                        >
+                            Cart
+                        </Button>
+                    </Badge>
+                    <Button
+                        variant="outlined"
+                        onClick={() => setView('orders')}
+                        sx={{
+                            borderRadius: '20px',
+                            borderColor: 'rgba(255, 255, 255, 0.8)',
+                            color: 'white',
+                            textTransform: 'uppercase',
+                            fontWeight: 'bold',
+                            '&:hover': {
+                              borderColor: 'white',
+                              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            },
+                        }}
+                    >
+                        Orders
+                    </Button>
+                </Box>
             </Paper>
         </motion.div>
-        <Box sx={{ flexGrow: 1, overflowY: 'auto', p: { xs: 2, sm: 3 } }}>
+        <Box sx={{ flexGrow: 1, overflowY: 'auto', p: fullWidthMobile ? { xs: 0, sm: 3 } : { xs: 2, sm: 3 } }}>
             {children}
         </Box>
     </Box>
@@ -330,9 +345,12 @@ export default function HomePage() {
         return renderPageView('Store Management', 'store-management-header');
       case 'orderRequests':
         return renderPageView('Order Requests', 'order-requests-header', <OrderRequestsContent />);
-      case 'findPharmacy':
-        return renderPageView('Find a Pharmacy', 'find-pharmacy-header', <FindPharmacyContent />);
-      case 'about':
+        case 'findPharmacy':
+          return renderPageView('Find a Pharmacy', 'find-pharmacy-header', <FindPharmacyContent />);
+          case 'findMedicines':
+  return renderPageView('Find Medicines', 'find-pharmacy-header', <FindMedicinesContent />);
+
+          case 'about':
         return renderPageView('About Us', 'about-us-header', <AboutContent />);
       case 'contact':
         return renderPageView('Contact Us', 'contact-us-header', <ContactContent />);
@@ -342,12 +360,14 @@ export default function HomePage() {
         return renderPageView('Conversations', 'consult-header', <ConversationsContent onUserSelect={handleUserSelect} />);
       case 'account':
         return renderPageView('Account', 'account-header', <AccountContent setView={setView} />);
+      case 'cart':
+        return renderPageView('Cart', 'cart-header', <CartContent />, true);
+      case 'orders':
+        return renderPageView('Orders', 'orders-header', <OrdersContent />, true);
         case 'chat':
-          // Ensure the other user is defined before rendering Chat
           if (otherUser) {
               return renderPageView('Chat', 'chat-header', <Chat user={otherUser} onBack={handleBackNavigation} />);
           }
-          // Fallback or loading state if the other user is not ready
           return <CircularProgress />;
   
       default:
@@ -423,73 +443,6 @@ export default function HomePage() {
             )`,
           }}
         />
-
-        {pathname === '/' && view === 'home' && (
-
-        <Box
-          component={Paper}
-          elevation={0}
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            p: 2,
-            zIndex: 1301,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: ' rgba(3, 28, 24, 0)', 
-            backdropFilter: 'blur(8px)',
-            borderBottom: '1px solid rgb(2, 38, 34)'
-          }}
-        >
-          <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
-            PharmaStack<span style={{ color: '#00E6A4' }}>X</span>
-          </Typography>
-          {isLoading ? (
-            <CircularProgress size={24} sx={{ color: 'white' }} />
-          ) : user ? (
-            <>
-              <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
-                <Avatar sx={{ bgcolor: 'rgba(59, 4, 66, 0.88)', color: 'white', fontWeight: 'bold' }}>
-                  {userInitial}
-                </Avatar>
-              </IconButton>
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                sx={{ mt: 1 }}
-              >
-                <MenuItem disabled>{user.email}</MenuItem>
-                <MenuItem onClick={handleLogout}>Logout</MenuItem>
-              </Menu>
-            </>
-          ) : (
-            <Button
-              variant="outlined"
-              component={Link}
-              href="/auth"
-              sx={{
-                borderRadius: '20px',
-                borderColor: 'rgba(255, 255, 255, 0.8)',
-                color: 'white',
-                textTransform: 'uppercase',
-                fontWeight: 'bold',
-                '&:hover': {
-                  borderColor: 'white',
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                }
-              }}
-            >
-              Sign In
-            </Button>
-          )}
-        </Box>
-        )}
 
         <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', flex: 1 }}>
             <LayoutGroup>

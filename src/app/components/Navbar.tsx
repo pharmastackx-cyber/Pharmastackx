@@ -1,15 +1,111 @@
-"use client";
-import { Box, Typography } from "@mui/material";
-import Link from "next/link";
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import {
+  Box,
+  Paper,
+  Typography,
+  CircularProgress,
+  IconButton,
+  Avatar,
+  Menu,
+  MenuItem,
+  Button,
+} from '@mui/material';
+import { useSession } from "@/context/SessionProvider";
 
 export default function Navbar() {
+  const { user, isLoading } = useSession();
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = async () => {
+    handleMenuClose();
+    try {
+        const response = await fetch('/api/auth/logout', { method: 'POST' });
+        if (response.ok) {
+            window.location.href = '/auth';
+        } else {
+            console.error('Logout failed');
+        }
+    } catch (error) {
+        console.error('An error occurred during logout:', error);
+    }
+  };
+
+  const userInitial = user?.email?.charAt(0)?.toUpperCase() || '';
+
   return (
-    <Box sx={{ position: 'fixed', top: 24, left: 24, zIndex: 1301, display: 'flex', alignItems: 'center', height: '40px' }}>
-      <Link href="https://psx.ng" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', marginRight: '24px' }}>
-        <Typography variant="h6" component="div" sx={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 'normal', fontSize: '1.1rem' }}>
-            
-        </Typography>
-      </Link>
+    <Box
+      component={Paper}
+      elevation={0}
+      sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        p: 2,
+        zIndex: 1301,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: 'rgba(3, 28, 24, 0)',
+        backdropFilter: 'blur(8px)',
+        borderBottom: '1px solid rgb(2, 38, 34)',
+      }}
+    >
+      <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
+        PharmaStack<span style={{ color: '#00E6A4' }}>X</span>
+      </Typography>
+      {isLoading ? (
+        <CircularProgress size={24} sx={{ color: 'white' }} />
+      ) : user ? (
+        <>
+          <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
+            <Avatar sx={{ bgcolor: 'rgba(59, 4, 66, 0.88)', color: 'white', fontWeight: 'bold' }}>
+              {userInitial}
+            </Avatar>
+          </IconButton>
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleMenuClose}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            sx={{ mt: 1 }}
+          >
+            <MenuItem disabled>{user.email}</MenuItem>
+            <MenuItem onClick={handleLogout}>Logout</MenuItem>
+          </Menu>
+        </>
+      ) : (
+        <Button
+          variant="outlined"
+          component={Link}
+          href="/auth"
+          sx={{
+            borderRadius: '20px',
+            borderColor: 'rgba(255, 255, 255, 0.8)',
+            color: 'white',
+            textTransform: 'uppercase',
+            fontWeight: 'bold',
+            '&:hover': {
+              borderColor: 'white',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            },
+          }}
+        >
+          Sign In
+        </Button>
+      )}
     </Box>
   );
 }
