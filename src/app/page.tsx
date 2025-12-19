@@ -80,6 +80,9 @@ export default function HomePage() {
     if (viewParam === 'orderMedicines') {
       setView('orderMedicines');
     }
+    if (viewParam === 'findMedicines') {
+      setView('findMedicines');
+    }
   }, []);
 
   const containerVariants: Variants = {

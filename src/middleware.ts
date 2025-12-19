@@ -31,12 +31,15 @@ export async function middleware(request: NextRequest) {
                       !mainDomains.includes(hostname);
 
 
-  if (isSubdomain && pathname === '/') {
-    console.log(`[Middleware] Subdomain root hit. Redirecting to /find-medicines?slug=${slug}`);
-    url.pathname = '/find-medicines';
-    url.searchParams.set('slug', slug);
-    return NextResponse.redirect(url);
-  }
+                      if (isSubdomain && pathname === '/') {
+                        url.pathname = '/';
+                        url.searchParams.set('view', 'findMedicines');
+                        url.searchParams.set('slug', slug);
+                      
+                        console.log(`[Middleware] Subdomain detected: ${slug}`);
+                        return NextResponse.redirect(url);
+                      }
+                      
   
   
   const sessionToken = request.cookies.get('session_token')?.value;
