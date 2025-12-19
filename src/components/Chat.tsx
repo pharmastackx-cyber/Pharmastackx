@@ -38,16 +38,32 @@ const Chat = ({ user, onBack }: ChatProps) => {
             setIsLoading(true);
             try {
                 const response = await fetch(`/api/messages/${user._id}`);
-                const data = await response.json();
-                setMessages(data);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (Array.isArray(data)) {
+                        setMessages(data);
+                    } else {
+                        console.error("Failed to fetch messages: Data is not an array", data);
+                        setMessages([]); // Set to empty array on unexpected data format
+                    }
+                } else {
+                    console.error("Failed to fetch messages with status:", response.status);
+                    setMessages([]); // Set to empty array on error
+                }
             } catch (error) {
                 console.error("Failed to fetch messages", error);
+                setMessages([]); // Also set to empty array on network errors
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchMessages();
+        if (currentUser?._id) {
+            fetchMessages();
+        } else {
+            setIsLoading(false);
+            setMessages([]);
+        }
 
         // Initialize Socket.IO connection
         socket = io({ path: '/api/socket' });

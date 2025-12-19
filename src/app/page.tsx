@@ -22,7 +22,8 @@ import Chat from "@/components/Chat";
 import ConversationsContent from "@/components/ConversationsContent";
 import CartContent from "@/components/CartContent";
 import OrdersContent from "@/components/OrdersContent";
-import { Home as HomeIcon, Chat as ChatIcon, Person as PersonIcon, LocalPharmacy as PharmacyIcon } from '@mui/icons-material';
+import { Home as HomeIcon, Chat as ChatIcon, Person as PersonIcon, LocalPharmacy as PharmacyIcon, Medication as MedicationIcon } from '@mui/icons-material';
+
 import { useTheme, useMediaQuery } from "@mui/material";
 
 interface UnifiedUser {
@@ -493,7 +494,7 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
                     <SearchIcon sx={{ color: 'grey.500', mr: 1.5 }} />
                     <TextField
                         fullWidth
-                        placeholder="Find medicines, pharmacies, pharmacists ..."
+                        placeholder="Type to search for a drug"
                         variant="standard"
                         value={inputValue}
                         onChange={handleSearchInitiation}
@@ -522,14 +523,15 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
                 <HomeIcon />
                 Home
             </Button>
+            <Button onClick={() => setView('orderMedicines')} sx={{ flexDirection: 'column', color: view === 'findMedicines' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
+                <MedicationIcon  />
+                Search Medicines
+            </Button>
             <Button onClick={() => setView('findPharmacy')} sx={{ flexDirection: 'column', color: view === 'findPharmacy' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
                 <PharmacyIcon />
                 Pharmacies
             </Button>
-            <Button onClick={() => normalizedUser?.role === 'pharmacist' ? setView('conversations') : setView('consult')} sx={{ flexDirection: 'column', color: view === 'consult' || view === 'conversations' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
-                <ChatIcon />
-                Consult
-            </Button>
+            
             <Button onClick={() => setView('account')} sx={{ flexDirection: 'column', color: view === 'account' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
                 <PersonIcon />
                 Account

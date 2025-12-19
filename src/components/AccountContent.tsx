@@ -1,6 +1,7 @@
 
 "use client";
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSession } from "@/context/SessionProvider";
 import { Box, Typography, Avatar, Button, Paper, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Chip, Grid } from "@mui/material";
 import { Person, VpnKey, Logout, Info, ContactMail, Business, LocationOn } from "@mui/icons-material";
@@ -29,6 +30,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     const [detailedUser, setDetailedUser] = useState<DetailedUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const router = useRouter();
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -50,9 +52,13 @@ const AccountContent = ({ setView }: AccountContentProps) => {
         };
 
         if (!isSessionLoading) {
-            fetchUserData();
+            if (sessionUser) {
+                fetchUserData();
+            } else {
+                router.push('/auth');
+            }
         }
-    }, [sessionUser, isSessionLoading]);
+    }, [sessionUser, isSessionLoading, router]);
 
     const handleLogout = async () => {
         try {
