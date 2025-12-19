@@ -9,8 +9,7 @@ import { OrderProvider } from "@/contexts/OrderContext";
 import Script from "next/script";
 import { Suspense } from "react";
 import { AuthModalProvider } from "@/contexts/AuthModalContext"; // Import the provider
-import AuthModal from "./components/AuthModal";
-import Navbar from "./components/Navbar";
+import MainLayout from "./MainLayout";
 
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -58,9 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <PromoProvider>
                 <OrderProvider>
                   <CartProvider>
-                    <Navbar />
-                    <AuthModal />
-                    {children}
+                    <MainLayout>{children}</MainLayout>
                   </CartProvider>
                 </OrderProvider>
               </PromoProvider>
