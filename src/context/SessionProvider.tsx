@@ -1,61 +1,68 @@
 
 'use client';
 
-import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
 import { User } from '@/types';
 
 interface Session {
   user: User | null;
   isLoading: boolean;
   error: any;
+  refreshSession: () => void;
 }
 
 const SessionContext = createContext<Session | undefined>(undefined);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session>({
-    user: null,
-    isLoading: true, // Start with loading true
-    error: null,
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<any>(null);
 
-  useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        console.log('Attempting to fetch session...');
-        const response = await fetch('/api/auth/session');
-        
-        if (!response.ok) {
-          console.log('Fetch response not OK. User is likely not authenticated.');
-          // It's not an error if the user is not logged in.
-          setSession({ user: null, isLoading: false, error: null });
-          return;
-        }
-
+  const fetchSession = useCallback(async () => {
+    console.log('Attempting to fetch session...');
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/auth/session');
+      
+      if (!response.ok) {
+        console.log('Fetch response not OK. User is likely not authenticated.');
+        setUser(null);
+      } else {
         const data = await response.json();
         console.log('Session data received:', data);
-        
         if (data && data.user && data.user._id) {
             console.log('User session set:', data.user);
-            setSession({ user: data.user, isLoading: false, error: null });
+            setUser(data.user);
         } else {
             console.log('No user data in response.');
-            setSession({ user: null, isLoading: false, error: null });
+            setUser(null);
         }
-
-      } catch (error) {
-        console.error('Session fetch error:', error);
-        // Only set an error if the fetch itself fails
-        setSession({ user: null, isLoading: false, error });
       }
-    };
+    } catch (fetchError) {
+      console.error('Session fetch error:', fetchError);
+      setError(fetchError);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
     fetchSession();
-    
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, [fetchSession]);
+
+  const refreshSession = useCallback(() => {
+    fetchSession();
+  }, [fetchSession]);
+
+  const value = {
+    user,
+    isLoading,
+    error,
+    refreshSession,
+  };
 
   return (
-    <SessionContext.Provider value={session}>
+    <SessionContext.Provider value={value}>
       {children}
     </SessionContext.Provider>
   );

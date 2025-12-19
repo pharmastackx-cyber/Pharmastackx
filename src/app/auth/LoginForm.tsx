@@ -1,18 +1,22 @@
 'use client';
 import React, { useState, useEffect } from "react";
+import { useRouter } from 'next/navigation';
 import { TextField, Button, InputAdornment, IconButton, Box, Typography, Alert } from "@mui/material";
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import Link from 'next/link';
 import axios from "axios";
 import Cookies from "js-cookie";
+import { useSession } from "@/context/SessionProvider"; // Import useSession
 
 export default function LoginForm({
   redirectUrl,
   prefilledCredentials,
 }: {
   redirectUrl: string | null;
-  prefilledCredentials?: { email: string; password: string };
+  prefilledCredentials?: { email: string; password:string };
 }) {
+  const router = useRouter();
+  const { refreshSession } = useSession(); // Get the refresh function
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,13 +48,13 @@ export default function LoginForm({
       Cookies.set("session_token", res.data.token, { expires: 7 });
       setSuccess("Login successful! Redirecting...");
       
-      // Redirect after a short delay to allow user to see success message
+      // Refresh the session to update the UI
+      refreshSession();
+
+      // Redirect after a short delay
       setTimeout(() => {
-        if (redirectUrl) {
-          window.location.href = redirectUrl;
-        } else {
-          window.location.href = '/';
-        }
+        router.push(redirectUrl || '/');
+        router.refresh(); // This will re-fetch server components and refresh the page
       }, 1000);
 
     } catch (err: any) {
