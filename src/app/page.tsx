@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+
 import { useRouter } from 'next/navigation';
 import { Box, Typography, Paper, TextField, IconButton, Button, Grid, CircularProgress, Badge } from "@mui/material";
 import { motion, AnimatePresence, Variants, LayoutGroup } from "framer-motion";
@@ -74,16 +76,23 @@ export default function HomePage() {
     }
   };
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const viewParam = params.get('view');
-    if (viewParam === 'orderMedicines') {
-      setView('orderMedicines');
-    }
-    if (viewParam === 'findMedicines') {
-      setView('findMedicines');
-    }
-  }, []);
+  const searchParams = useSearchParams();
+
+useEffect(() => {
+  if (!searchParams) return;
+
+  const viewParam = searchParams.get('view');
+
+  if (viewParam === 'orderMedicines') {
+    setView('orderMedicines');
+  }
+
+  if (viewParam === 'findMedicines') {
+    setView('findMedicines');
+  }
+}, [searchParams]);
+
+
 
   const containerVariants: Variants = {
     hidden: { opacity: 0, scale: 0.98 },
