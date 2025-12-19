@@ -1,7 +1,10 @@
 
 "use client";
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from "react";
-import dynamic from 'next/dynamic';
+import dynamicImport from 'next/dynamic';
+
 import { usePathname } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 
@@ -37,7 +40,7 @@ interface UnifiedUser {
   profilePicture?: string;
 }
 
-const MapBackground = dynamic(() => import('@/components/MapBackground'), {
+const MapBackground = dynamicImport(() => import('@/components/MapBackground'), {
   ssr: false,
   loading: () => <Box sx={{ height: '100%', width: '100%', bgcolor: '#002d24' }}/>
 });
