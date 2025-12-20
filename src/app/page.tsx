@@ -136,7 +136,7 @@ useEffect(() => {
       <Typography variant="h5" sx={{ 
         color: "rgba(4, 0, 0, 0.9)", 
         fontWeight: 700, 
-        fontSize: { xs: '1.7rem', sm: '3.5rem' }, 
+        fontSize: { xs: '1.4rem', sm: '3.2rem' }, 
         flexWrap: 'wrap',
         maxWidth: '70%',
         marginBottom: '3rem',

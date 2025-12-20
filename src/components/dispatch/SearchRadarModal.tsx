@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Modal, Box, Typography, keyframes, Grid, Chip, Avatar, Button, Alert, Slide } from '@mui/material';
+import { Modal, Box, Typography, keyframes, Grid, Chip, Avatar, Button, Slide } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 
@@ -113,28 +113,45 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
       <Box sx={modalStyle}>
         
         <Slide direction="down" in={isQuoteReady} mountOnEnter unmountOnExit>
-            <Alert
-                severity="success"
-                variant="filled"
-                icon={<CheckCircleIcon fontSize="inherit" />}
+            <Box
                 sx={{
                     position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
+                    top: '16px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
                     zIndex: 10,
-                    borderRadius: 0,
+                    width: 'calc(100% - 32px)',
+                    bgcolor: '#00e676',
+                    color: '#001a14',
+                    p: '12px 20px',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
+                    boxShadow: '0 8px 24px rgba(0, 230, 118, 0.4)',
                 }}
-                action={
-                    <Button color="inherit" size="small" onClick={handleReviewClick}>
-                        REVIEW
-                    </Button>
-                }
             >
-                <Typography sx={{fontWeight: 'bold'}}>Items Found!</Typography>
-                A pharmacist has responded. Click to review their quote.
-            </Alert>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <CheckCircleIcon sx={{ mr: 1.5 }} />
+                    <Box>
+                        <Typography sx={{ fontWeight: 'bold' }}>Quote Ready!</Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>A pharmacist has sent a quote.</Typography>
+                    </Box>
+                </Box>
+                <Button 
+                    variant="contained" 
+                    size="small" 
+                    onClick={handleReviewClick}
+                    sx={{ 
+                        bgcolor: 'white', 
+                        color: '#004D40', 
+                        '&:hover': { bgcolor: '#e0f2f1' },
+                        ml: 2,
+                    }}
+                >
+                    Review Now
+                </Button>
+            </Box>
         </Slide>
 
         <Grid container spacing={3} alignItems="center">
