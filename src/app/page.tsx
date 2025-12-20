@@ -271,7 +271,7 @@ useEffect(() => {
 
 
 const renderPageView = (title: string, layoutId: string, children?: React.ReactNode, fullWidthMobile: boolean = false) => {
-  const showButtons = view !== 'findPharmacy' && view !== 'account';
+  const showButtons = view !== 'findPharmacy' && view !== 'account' && view !== 'about' && view !== 'contact';
 
   return (
     <Box
