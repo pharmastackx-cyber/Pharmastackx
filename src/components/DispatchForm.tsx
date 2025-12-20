@@ -18,7 +18,6 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Autocomplete,
   CircularProgress,
   Chip,
   Collapse,
@@ -38,7 +37,6 @@ import {
     Description as DescriptionIcon,
     Image as ImageIcon,
 } from '@mui/icons-material';
-import { debounce } from 'lodash';
 import OtherInfoInput from '@/components/dispatch/OtherInfoInput';
 import ConfirmationModal from '@/components/dispatch/ConfirmationModal';
 import SearchRadarModal from '@/components/dispatch/SearchRadarModal';
@@ -65,44 +63,19 @@ interface DrugRequest {
   quantity: number;
   notes: string;
   image: string | null;
-  formSuggestions: string[];
-  strengthSuggestions: string[];
-  showAllForms: boolean;
   showOtherInfo: boolean;
   isEditing: boolean;
-}
-
-interface Suggestion {
-  label: string;
 }
 
 const LOCAL_STORAGE_KEY = 'requestedDrugs';
 type UploadMode = 'prescription' | 'image';
 
 const allFormTypes = [
-    'Tablet', 'Capsule', 'Lozenge', 'Sachet', 'Powder', 'Granules',
-    'Syrup', 'Suspension', 'Emulsion', 'Elixir', 'Solution', 'Oral Drops',
-    'Cream', 'Ointment', 'Gel', 'Lotion', 'Paste', 'Transdermal Patch',
-    'Inhaler', 'Nebulizer Solution',
-    'Injection (IM/IV/SC)', 'Infusion',
-    'Suppository', 'Pessary', 'Eye Drops', 'Ear Drops', 'Nasal Spray',
+    'Sachet', 'Syrup', 'Pack', 'Cream', 'Inhaler', 'Injection (IM/IV/SC)', 'Eye Drops', 'Ear Drops', 'Suppository', 'Pessary',
+    'Tablet', 'Capsule', 'Lozenge', 'Powder', 'Granules', 'Suspension', 'Emulsion', 'Elixir', 'Solution', 'Oral Drops', 'Ointment', 'Gel', 'Lotion', 'Paste', 'Transdermal Patch', 'Nebulizer Solution', 'Infusion', 'Nasal Spray'
 ];
 
 const quantityOptions = Array.from({ length: 30 }, (_, i) => i + 1);
-
-const getAIFormSuggestions = (drugName: string): string[] => {
-    const lowerCaseDrug = drugName.toLowerCase();
-    if (lowerCaseDrug.includes('syrup') || lowerCaseDrug.includes('suspension')) return ['Syrup', 'Suspension', 'Oral Drops'];
-    if (lowerCaseDrug.includes('cream') || lowerCaseDrug.includes('gel')) return ['Cream', 'Ointment', 'Gel'];
-    return ['Tablet', 'Capsule'].filter(form => allFormTypes.includes(form));
-};
-
-const getAIStrengthSuggestions = (drugName: string): string[] => {
-    const lowerCaseDrug = drugName.toLowerCase();
-    if (lowerCaseDrug.includes('ibuprofen')) return ['200mg', '400mg', '600mg'];
-    if (lowerCaseDrug.includes('paracetamol')) return ['500mg', '650mg', '1g'];
-    return [];
-};
 
 const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearchValue }) => {
 
@@ -110,8 +83,6 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
   const { user, isLoading: isSessionLoading } = useSession();
 
   const [requestedDrugs, setRequestedDrugs] = useState<DrugRequest[]>([]);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState(initialSearchValue || ""); 
@@ -192,33 +163,10 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const fetchSuggestions = async (input: string) => {
-    if (input.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-    setLoading(true);
-    setTimeout(() => {
-        setSuggestions([
-            { label: `${input} 100mg` },
-            { label: `${input} 200mg` },
-        ]);
-        setLoading(false);
-    }, 500);
-  };
-
-  const debouncedFetchSuggestions = useCallback(debounce(fetchSuggestions, 800), []);
-
   useEffect(() => {
     const timer = setTimeout(() => searchInputRef.current?.focus(), 100);
-    if (initialSearchValue) debouncedFetchSuggestions(initialSearchValue);
     return () => clearTimeout(timer);
   }, []);
-
-  const handleInputChange = (_: any, newInputValue: string) => {
-    setInputValue(newInputValue);
-    debouncedFetchSuggestions(newInputValue);
-  };
 
   const handleAddDrug = (name: string, image: string | null = null, mode: UploadMode | null = null) => {
     let finalName = name.trim();
@@ -233,21 +181,17 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
     const newDrug: DrugRequest = {
       id: Date.now(),
       name: finalName,
-      form: getAIFormSuggestions(finalName)[0] || '',
-      strength: getAIStrengthSuggestions(finalName)[0] || '',
+      form: 'Tablet',
+      strength: '',
       quantity: 1,
       notes: '',
       image,
-      formSuggestions: getAIFormSuggestions(finalName),
-      strengthSuggestions: getAIStrengthSuggestions(finalName),
-      showAllForms: false,
       showOtherInfo: false,
       isEditing: !image,
     };
 
     setRequestedDrugs(drugs => [newDrug, ...drugs.map(d => ({...d, isEditing: false}))]);
     setInputValue("");
-    setSuggestions([]);
   };
 
   const handleImageUpload = (file: File) => {
@@ -272,10 +216,6 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
 
   const handleRemoveDrug = (id: number) => {
     setRequestedDrugs(drugs => drugs.filter(drug => drug.id !== id));
-  };
-
-  const toggleShowAllForms = (id: number) => {
-    setRequestedDrugs(drugs => drugs.map(drug => (drug.id === id ? { ...drug, showAllForms: !drug.showAllForms } : drug)));
   };
 
   const toggleShowOtherInfo = (id: number) => {
@@ -374,37 +314,26 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                     {globalError && <Alert severity="error" sx={{ mb: 2 }}>{globalError}</Alert>}
 
                     <Box sx={{ mb: 3 }}>
-                        <Autocomplete
-                            freeSolo
+                        <TextField
                             fullWidth
-                            options={suggestions}
-                            getOptionLabel={(option) => (typeof option === 'string' ? option : option.label)}
-                            onInputChange={handleInputChange}
-                            onChange={(_, newValue) => {
-                                const drugName = typeof newValue === 'string' ? newValue : (newValue as Suggestion)?.label;
-                                if (drugName) handleAddDrug(drugName, null, null);
+                            inputRef={searchInputRef}
+                            placeholder="Type medicine name to add..."
+                            variant="outlined"
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyPress={(e) => {
+                                if (e.key === 'Enter' && inputValue.trim()) {
+                                    handleAddDrug(inputValue, null, null);
+                                }
                             }}
-                            inputValue={inputValue}
-                            loading={loading}
-                            renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    inputRef={searchInputRef}
-                                    placeholder="Type medicine name to search..."
-                                    variant="outlined"
-                                    InputProps={{
-                                        ...params.InputProps,
-                                        endAdornment: (
-                                            <InputAdornment position="end">
-                                                {loading ? <CircularProgress color="inherit" size={20} /> : (
-                                                    <Button onClick={() => handleAddDrug(inputValue, null, null)} disabled={!inputValue.trim() || loading} sx={{ color: 'primary.main', mr: -1 }}>Add</Button>
-                                                )}
-                                            </InputAdornment>
-                                        ),
-                                        sx: { borderRadius: '12px', background: '#f5f5f5' }
-                                    }}
-                                />
-                            )}
+                            InputProps={{
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <Button onClick={() => handleAddDrug(inputValue, null, null)} disabled={!inputValue.trim()} sx={{ color: 'primary.main', mr: -1 }}>Add</Button>
+                                    </InputAdornment>
+                                ),
+                                sx: { borderRadius: '12px', background: '#f5f5f5' }
+                            }}
                         />
                         <FormControl component="fieldset" variant="outlined" sx={{ mt: 2, width: '100%', justifyContent: 'center' }}>
                             <FormLabel component="legend" sx={{ px: 1, mx: 'auto', fontSize: '0.9rem', justifyContent: 'center' }}>Search by prescription or image</FormLabel>
@@ -459,30 +388,19 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                                     <FormControl fullWidth>
                                       <InputLabel>Form</InputLabel>
                                       <Select value={drug.form} label="Form" onChange={(e) => handleUpdateDrug(drug.id, 'form', e.target.value)}>
-                                        {drug.formSuggestions.map((form) => (
-                                          <MenuItem key={form} value={form}>
-                                            <Chip label="Suggested" size="small" color="primary" variant="outlined" sx={{ mr: 1 }} />
-                                            {form}
-                                          </MenuItem>
+                                        {allFormTypes.map((form) => (
+                                            <MenuItem key={form} value={form}>{form}</MenuItem>
                                         ))}
-                                        {(drug.showAllForms || drug.formSuggestions.length === 0) && allFormTypes.filter(f => !drug.formSuggestions.includes(f)).map((form) => (
-                                          <MenuItem key={form} value={form}>{form}</MenuItem>
-                                        ))}
-                                        {!drug.showAllForms && drug.formSuggestions.length > 0 && (
-                                          <Button onClick={() => toggleShowAllForms(drug.id)} size="small" sx={{ mt: 1, ml: 1, color: 'primary.main' }}>Show All Forms</Button>
-                                        )}
                                       </Select>
                                     </FormControl>
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
-                                  <Autocomplete
-                                    freeSolo
-                                    fullWidth
-                                    options={drug.strengthSuggestions}
-                                    value={drug.strength}
-                                    onInputChange={(_, newValue) => handleUpdateDrug(drug.id, 'strength', newValue)}
-                                    renderInput={(params) => <TextField {...params} label="Strength (e.g., 200mg)" />}
-                                  />
+                                    <TextField
+                                        fullWidth
+                                        label="Strength (e.g., 200mg, 500ml etc.)"
+                                        value={drug.strength}
+                                        onChange={(e) => handleUpdateDrug(drug.id, 'strength', e.target.value)}
+                                    />
                                 </Grid>
                                 <Grid item xs={12}>
                                   <FormControl fullWidth>

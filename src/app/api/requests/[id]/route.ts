@@ -142,6 +142,14 @@ export async function PATCH(req: NextRequest, { params: paramsPromise }: { param
                 break;
             }
 
+            case 'stop-search': { // Added this case
+                if (originalRequest.user.toString() !== session.userId) {
+                   return NextResponse.json({ message: 'Unauthorized: You cannot stop this search.' }, { status: 403 });
+               }
+               originalRequest.status = 'search-stopped';
+               break;
+           }
+
             default:
                 return NextResponse.json({ message: 'Invalid action specified.' }, { status: 400 });
         }

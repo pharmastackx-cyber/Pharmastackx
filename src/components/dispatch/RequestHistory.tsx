@@ -1,13 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, Typography, Button, Chip, Box, Grid } from '@mui/material';
+import { Card, CardContent, Typography, Button, Chip, Box, Grid, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { useState } from 'react';
 
 const RequestHistory = ({ history, onRefill }: { history: any[], onRefill: (items: any[]) => void }) => {
     const router = useRouter();
     const [visibleCount, setVisibleCount] = useState(1);
     const [increment, setIncrement] = useState(3);
+    const [open, setOpen] = useState(false);
+    const [selectedRequest, setSelectedRequest] = useState<any>(null);
     const tileColors = ['#006D5B', '#E91E63']; // Teal and Magenta
 
     const handleShowMore = () => {
@@ -18,6 +20,40 @@ const RequestHistory = ({ history, onRefill }: { history: any[], onRefill: (item
     const handleShowLess = () => {
         setVisibleCount(1);
         setIncrement(3);
+    };
+
+    const handleStopSearch = (request: any) => {
+        setSelectedRequest(request);
+        setOpen(true);
+    };
+
+    const handleConfirmStopSearch = async () => {
+        if (selectedRequest) {
+            try {
+                const response = await fetch(`/api/requests/${selectedRequest._id}`,
+                {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'stop-search' })
+                });
+                if (response.ok) {
+                    // You might want to refresh the history here
+                    // For now, we just close the dialog
+                    setOpen(false);
+                    setSelectedRequest(null);
+                    window.location.reload(); // Or a more sophisticated state management
+                } else {
+                    console.error('Failed to stop search');
+                }
+            } catch (error) {
+                console.error('Error stopping search:', error);
+            }
+        }
+    };
+
+    const handleClose = () => {
+        setOpen(false);
+        setSelectedRequest(null);
     };
 
     const visibleHistory = history.slice(0, visibleCount);
@@ -37,6 +73,9 @@ const RequestHistory = ({ history, onRefill }: { history: any[], onRefill: (item
                     <Grid container spacing={2}>
                         {visibleHistory.map((request, index) => {
                             const tileColor = tileColors[index % tileColors.length];
+                            const isActionable = !['confirmed', 'declined', 'cancelled', 'completed', 'search-stopped'].includes(request.status);
+                            const canRefill = ['confirmed', 'declined', 'cancelled', 'completed', 'search-stopped'].includes(request.status);
+
                             return (
                                 <Grid item xs={12} key={request._id}>
                                     <Card sx={{ background: tileColor, color: 'white', borderRadius: '16px' }}>
@@ -47,7 +86,7 @@ const RequestHistory = ({ history, onRefill }: { history: any[], onRefill: (item
                                                     <Chip label={request.status} size="small" sx={{ mt: 1, backgroundColor: 'rgba(255, 255, 255, 0.25)', color: 'white' }} />
                                                 </Box>
                                                 <Box sx={{ display: 'flex', gap: 1 }}>
-                                                    {['confirmed', 'declined', 'cancelled'].includes(request.status) && (
+                                                    {canRefill && (
                                                         <Button 
                                                             size="small" 
                                                             variant="outlined"
@@ -63,6 +102,24 @@ const RequestHistory = ({ history, onRefill }: { history: any[], onRefill: (item
                                                             }}
                                                         >
                                                             Refill
+                                                        </Button>
+                                                    )}
+                                                    {isActionable && (
+                                                        <Button 
+                                                            size="small" 
+                                                            variant="outlined"
+                                                            onClick={() => handleStopSearch(request)}
+                                                            sx={{ 
+                                                                color: 'white', 
+                                                                borderColor: 'rgba(255, 255, 255, 0.5)',
+                                                                textTransform: 'none',
+                                                                '&:hover': { 
+                                                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                                                    borderColor: 'white' 
+                                                                }
+                                                            }}
+                                                        >
+                                                            Stop Search
                                                         </Button>
                                                     )}
                                                     <Button 
@@ -130,6 +187,23 @@ const RequestHistory = ({ history, onRefill }: { history: any[], onRefill: (item
                     )}
                 </>
             )}
+            <Dialog
+                open={open}
+                onClose={handleClose}
+            >
+                <DialogTitle>Stop Search</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Are you sure you want to stop the search for this request? This will cancel the request and you will not receive any more quotes.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleClose}>Cancel</Button>
+                    <Button onClick={handleConfirmStopSearch} autoFocus>
+                        Confirm
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
