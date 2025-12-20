@@ -113,29 +113,28 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
       <Box sx={modalStyle}>
         
         <Slide direction="down" in={isQuoteReady} mountOnEnter unmountOnExit>
-            <Box
+           <Box
                 sx={{
                     position: 'absolute',
                     top: '16px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
+                    left: '16px',
+                    right: '16px',
                     zIndex: 10,
-                    width: 'calc(100% - 32px)',
-                    bgcolor: '#00e676',
-                    color: '#001a14',
+                    bgcolor: 'white',
+                    color: '#004D40',
                     p: '12px 20px',
                     borderRadius: '12px',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    boxShadow: '0 8px 24px rgba(0, 230, 118, 0.4)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                 }}
             >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <CheckCircleIcon sx={{ mr: 1.5 }} />
                     <Box>
-                        <Typography sx={{ fontWeight: 'bold' }}>Quote Ready!</Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>A pharmacist has sent a quote.</Typography>
+                        <Typography sx={{ fontWeight: 'bold', color: '#004D40' }}>Quote Ready!</Typography>
+                        <Typography variant="body2" sx={{ color: '#004D40', opacity: 0.8 }}>A pharmacist has sent a quote.</Typography>
                     </Box>
                 </Box>
                 <Button 
@@ -143,13 +142,15 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
                     size="small" 
                     onClick={handleReviewClick}
                     sx={{ 
-                        bgcolor: 'white', 
-                        color: '#004D40', 
-                        '&:hover': { bgcolor: '#e0f2f1' },
+                        bgcolor: '#00c853',
+                        color: 'white',
+                        boxShadow: 'none',
+                        fontWeight: 'bold',
+                        '&:hover': { bgcolor: '#009624' },
                         ml: 2,
                     }}
                 >
-                    Review Now
+                    Review
                 </Button>
             </Box>
         </Slide>
