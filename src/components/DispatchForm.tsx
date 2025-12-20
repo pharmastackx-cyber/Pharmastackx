@@ -167,34 +167,64 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
   }, []);
 
   const handleAddDrug = (name: string, image: string | null = null, mode: UploadMode | null = null) => {
-    let finalName = name.trim();
-    if ((!finalName && !image) || (finalName && requestedDrugs.some(drug => drug.name.toLowerCase() === finalName.toLowerCase()))) return;
+    const trimmedName = name.trim();
+    console.log('handleAddDrug called with:', { name, image, mode });
 
-    if (image && !finalName) {
-        const prefix = mode === 'prescription' ? 'Prescription' : 'Image';
-        const existingNames = requestedDrugs.map(d => d.name);
-        let count = 1;
-        let newName = `${prefix} ${count}`;
-        while (existingNames.includes(newName)) {
-            count++;
-            newName = `${prefix} ${count}`;
+    setRequestedDrugs(currentDrugs => {
+        console.log('Current drugs state:', currentDrugs);
+        if (trimmedName && currentDrugs.some(drug => drug.name.toLowerCase() === trimmedName.toLowerCase())) {
+            console.log('Attempted to add duplicate drug name:', trimmedName);
+            return currentDrugs; 
         }
-        finalName = newName;
-    }
 
-    const newDrug: DrugRequest = {
-      id: Date.now(),
-      name: finalName,
-      form: 'Tablet',
-      strength: '',
-      quantity: 1,
-      notes: '',
-      image,
-      showOtherInfo: false,
-      isEditing: !image,
-    };
+        let finalName = trimmedName;
+        let newId = Date.now();
 
-    setRequestedDrugs(drugs => [newDrug, ...drugs.map(d => ({...d, isEditing: false}))]);
+        if (image && !finalName) {
+            const prefix = mode === 'prescription' ? 'Prescription' : 'Image';
+            let count = 1;
+            
+            let nextName = `${prefix} ${count}`;
+            let nextId = newId + count;
+
+            while (currentDrugs.some(drug => drug.name === nextName || drug.id === nextId)) {
+                count++;
+                nextName = `${prefix} ${count}`;
+                nextId = newId + count;
+            }
+            finalName = nextName;
+            newId = nextId; 
+            console.log('Generated unique name for image/prescription:', { finalName, newId });
+        } else {
+            while (currentDrugs.some(drug => drug.id === newId)) {
+                newId++;
+            }
+             console.log('Generated unique ID for text input:', newId);
+        }
+
+        if (!finalName && !image) {
+             console.log('No name or image provided, aborting add.');
+            return currentDrugs; 
+        }
+        
+        const newDrug: DrugRequest = {
+            id: newId,
+            name: finalName,
+            form: 'Tablet',
+            strength: '',
+            quantity: 1,
+            notes: '',
+            image,
+            showOtherInfo: false,
+            isEditing: !image,
+        };
+        console.log('Creating new drug:', newDrug);
+
+        const updatedDrugs = currentDrugs.map(d => ({ ...d, isEditing: false }));
+
+        return [newDrug, ...updatedDrugs];
+    });
+
     setInputValue("");
   };
 
