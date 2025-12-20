@@ -92,8 +92,6 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
   const [isRadarModalOpen, setIsRadarModalOpen] = useState(false);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [isQuoteReady, setIsQuoteReady] = useState(false);
-  const [prescriptionCount, setPrescriptionCount] = useState(1);
-  const [imageCount, setImageCount] = useState(1);
   const [requestHistory, setRequestHistory] = useState<any[]>([]);
 
   const uploadModeRef = useRef<UploadMode | null>(null);
@@ -173,9 +171,15 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
     if ((!finalName && !image) || (finalName && requestedDrugs.some(drug => drug.name.toLowerCase() === finalName.toLowerCase()))) return;
 
     if (image && !finalName) {
-        finalName = mode === 'prescription' ? `Prescription ${prescriptionCount}` : `Image ${imageCount}`;
-        if (mode === 'prescription') setPrescriptionCount(prev => prev + 1);
-        else setImageCount(prev => prev + 1);
+        const prefix = mode === 'prescription' ? 'Prescription' : 'Image';
+        const existingNames = requestedDrugs.map(d => d.name);
+        let count = 1;
+        let newName = `${prefix} ${count}`;
+        while (existingNames.includes(newName)) {
+            count++;
+            newName = `${prefix} ${count}`;
+        }
+        finalName = newName;
     }
 
     const newDrug: DrugRequest = {
