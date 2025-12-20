@@ -270,8 +270,10 @@ useEffect(() => {
 };
 
 
-const renderPageView = (title: string, layoutId: string, children?: React.ReactNode, fullWidthMobile: boolean = false) => (
+const renderPageView = (title: string, layoutId: string, children?: React.ReactNode, fullWidthMobile: boolean = false) => {
+  const showButtons = view !== 'findPharmacy' && view !== 'account';
 
+  return (
     <Box
       key={layoutId}
       component={motion.div}
@@ -280,7 +282,7 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
       exit={{ opacity: 0 }}
       sx={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', pt: { xs: 8, sm: 10 }, pb: bottomPadding, color: 'white' }}
     >
-        <motion.div 
+        <motion.div
           layoutId={layoutId}
           transition={{ duration: 0.8, ease: "easeInOut" }}
         >
@@ -305,51 +307,57 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
                         {title}
                     </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1, alignItems: { xs: 'flex-end', sm: 'center' } }}>
-                    <Badge badgeContent={getTotalItems()} color="secondary">
-                        <Button
-                            variant="outlined"
-                            onClick={() => setView('cart')}
-                            sx={{
-                                borderRadius: '20px',
-                                borderColor: 'rgba(255, 255, 255, 0.8)',
-                                color: 'white',
-                                textTransform: 'uppercase',
-                                fontWeight: 'bold',
-                                '&:hover': {
-                                  borderColor: 'white',
-                                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                },
-                            }}
-                        >
-                            Cart
-                        </Button>
-                    </Badge>
-                    <Button
-                        variant="outlined"
-                        onClick={() => setView('orders')}
-                        sx={{
-                            borderRadius: '20px',
-                            borderColor: 'rgba(255, 255, 255, 0.8)',
-                            color: 'white',
-                            textTransform: 'uppercase',
-                            fontWeight: 'bold',
-                            '&:hover': {
-                              borderColor: 'white',
-                              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                            },
-                        }}
-                    >
-                        Orders
-                    </Button>
-                </Box>
+                {showButtons && (
+                        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1, alignItems: { xs: 'flex-end', sm: 'center' } }}>
+                            <Badge badgeContent={getTotalItems()} color="secondary">
+                                <Button
+                                    variant="outlined"
+                                    onClick={() => setView('cart')}
+                                    sx={{
+                                        borderRadius: '20px',
+                                        borderColor: 'rgba(255, 255, 255, 0.8)',
+                                        color: 'white',
+                                        textTransform: 'uppercase',
+                                        fontWeight: 'bold',
+                                        '&:hover': {
+                                          borderColor: 'white',
+                                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                        },
+                                    }}
+                                >
+                                    Cart
+                                </Button>
+                            </Badge>
+                            <Button
+                                variant="outlined"
+                                onClick={() => setView('orders')}
+                                sx={{
+                                    borderRadius: '20px',
+                                    borderColor: 'rgba(255, 255, 255, 0.8)',
+                                    color: 'white',
+                                    textTransform: 'uppercase',
+                                    fontWeight: 'bold',
+                                    '&:hover': {
+                                      borderColor: 'white',
+                                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    },
+                                }}
+                            >
+                                Orders
+                            </Button>
+                        </Box>
+                    )}
+
+
             </Paper>
         </motion.div>
         <Box sx={{ flexGrow: 1, overflowY: 'auto', p: fullWidthMobile ? { xs: 0, sm: 3 } : { xs: 2, sm: 3 } }}>
             {children}
         </Box>
+
     </Box>
   );
+}
 
   const renderActiveView = () => {
     switch (view) {

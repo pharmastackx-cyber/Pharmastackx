@@ -62,9 +62,10 @@ export default function Navbar() {
         borderBottom: '1px solid rgb(2, 38, 34)',
       }}
     >
-      <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
+            <Typography variant="h6" component={Link} href="/" sx={{ color: 'white', fontWeight: 'bold', textDecoration: 'none' }}>
         PharmaStack<span style={{ color: '#00E6A4' }}>X</span>
       </Typography>
+
       {isLoading ? (
         <CircularProgress size={24} sx={{ color: 'white' }} />
       ) : user ? (

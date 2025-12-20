@@ -159,10 +159,11 @@ export default function Navbar() {
         </ListItem>
 
         <ListItem disablePadding sx={{ mb: 0.5 }}>
-  <ListItemButton component={Link} href="/?view=orderMedicines" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
-    <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><DeliveryDining fontSize="small" /></ListItemIcon>
-    <ListItemText primary="Find Medicines" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
-  </ListItemButton>
+        <ListItemButton component={Link} href="/?view=orderMedicines" onClick={handleDrawerToggle} sx={{ borderRadius: '8px', mx: 0.5, py: 1, '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+  <ListItemIcon sx={{ color: 'white', minWidth: '32px' }}><DeliveryDining fontSize="small" /></ListItemIcon>
+  <ListItemText primary="Find Medicines" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.8rem', color: 'white' }} />
+</ListItemButton>
+
 </ListItem>
 
 
@@ -318,6 +319,7 @@ export default function Navbar() {
             <Button color="inherit" startIcon={<DeliveryDining />} component={Link} href="/?view=orderMedicines" sx={{ '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
   Find Meds
 </Button>
+
 
 
             {isAdmin && <Button color="inherit" startIcon={<Chat />} component={Link} href="/carechat" sx={{ bgcolor: isActive('/carechat') ? 'rgba(0, 0, 0, 0.08)' : 'transparent', '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }, borderRadius: '20px', mx: 0.5 }}>
