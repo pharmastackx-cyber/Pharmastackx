@@ -55,23 +55,23 @@ const OrderRequestsContent: React.FC = () => {
   }, []);
 
   return (
-    <Box>
-        {loading && <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress sx={{ color: '#96ffde' }} /></Box>}
+    <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: '28px', boxShadow: '0 8px 24px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+        {loading && <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress/></Box>}
         {error && <Alert severity="error" sx={{ my: 2 }}>{error}</Alert>}
         {!loading && !error && requests.length === 0 && (
-          <Paper sx={{ p: 4, textAlign: 'center', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.09)' }}><Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>There are no pending requests.</Typography></Paper>
+          <Box sx={{ p: 4, textAlign: 'center' }}><Typography variant="body1">There are no pending requests.</Typography></Box>
         )}
 
         {!loading && requests.length > 0 && (
             <List sx={{p: 0}}>
               {requests.map((request) => (
-                <Paper key={request._id} component="li" sx={{ p: 2, mb: 2, borderRadius: '12px', listStyle: 'none', background: 'rgba(255, 255, 255, 0.09)', color: 'white'}} elevation={2}>
+                <Paper key={request._id} component="li" sx={{ p: 2, mb: 2, borderRadius: '12px', listStyle: 'none', background: 'rgba(0, 0, 0, 0.04)'}} elevation={0}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                      <Typography variant="subtitle1" sx={{fontWeight: 'bold'}}>{`Request from ${new Date(request.createdAt).toLocaleString()}`}</Typography>
                      <Chip label={request.status} color={request.status === 'pending' ? 'warning' : 'success'} />
                   </Box>
                   
-                  <Divider sx={{my: 1.5, borderColor: 'rgba(255,255,255,0.2)'}} />
+                  <Divider sx={{my: 1.5}} />
 
                   {/* --- RENDER LOGIC BASED ON requestType --- */}
                   {request.requestType === 'image-upload' ? (
@@ -96,13 +96,13 @@ const OrderRequestsContent: React.FC = () => {
                   )}
                   
                   <Box sx={{mt: 2}}>
-                    <Button variant="outlined" size="small" onClick={() => router.push(`/requests/${request._id}`)} sx={{ color: '#96ffde', borderColor: 'rgba(150, 255, 222, 0.5)', '&:hover': { backgroundColor: 'rgba(150, 255, 222, 0.1)', borderColor: '#96ffde' } }}>Manage Request</Button>
+                    <Button variant="outlined" size="small" onClick={() => router.push(`/requests/${request._id}`)}>Manage Request</Button>
                   </Box>
                 </Paper>
               ))}
             </List>
         )}
-        </Box>
+        </Paper>
   );
 };
 
