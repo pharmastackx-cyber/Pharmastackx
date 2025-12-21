@@ -12,16 +12,24 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '0', 10);
     const searchQuery = searchParams.get('search') || '';
+    const fetchAll = searchParams.get('all') === 'true';
+
     const query: any = { role: 'pharmacy' };
     if (searchQuery) {
       query.businessName = { $regex: searchQuery, $options: 'i' };
     }
-    const pharmacies = await User.find(query)
+
+    let pharmaciesQuery = User.find(query)
       .select('_id businessName slug businessAddress city state')
-  
-      .skip(page * PHARMACIES_PER_PAGE)
-      .limit(PHARMACIES_PER_PAGE)
-      .lean();
+      .sort({ businessName: 1 });
+
+    if (!fetchAll) {
+      pharmaciesQuery = pharmaciesQuery
+        .skip(page * PHARMACIES_PER_PAGE)
+        .limit(PHARMACIES_PER_PAGE);
+    }
+
+    const pharmacies = await pharmaciesQuery.lean();
 
     return NextResponse.json({ pharmacies }, { status: 200 });
 

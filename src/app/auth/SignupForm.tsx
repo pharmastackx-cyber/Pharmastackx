@@ -49,12 +49,9 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
 
   const fetchPharmacies = useCallback(async () => {
     try {
-      const { data } = await axios.get('/api/pharmacies');
+      const { data } = await axios.get('/api/pharmacies?all=true');
       if (data && Array.isArray(data.pharmacies)) {
-        const sortedPharmacies = data.pharmacies.sort((a: Pharmacy, b: Pharmacy) =>
-          a.businessName.localeCompare(b.businessName)
-        );
-        setPharmacies(sortedPharmacies);
+        setPharmacies(data.pharmacies);
       } else {
         setError("Failed to load pharmacies list.");
       }
