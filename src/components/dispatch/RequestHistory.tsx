@@ -1,11 +1,9 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, Typography, Button, Chip, Box, Grid, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { useState } from 'react';
 
-const RequestHistory = ({ history, onRefill }: { history: any[], onRefill: (items: any[]) => void }) => {
-    const router = useRouter();
+const RequestHistory = ({ history, onRefill, setView, setSelectedRequestId }: { history: any[], onRefill: (items: any[]) => void, setView: (view: string) => void, setSelectedRequestId: (id: string) => void }) => {
     const [visibleCount, setVisibleCount] = useState(1);
     const [increment, setIncrement] = useState(3);
     const [open, setOpen] = useState(false);
@@ -56,6 +54,11 @@ const RequestHistory = ({ history, onRefill }: { history: any[], onRefill: (item
         setSelectedRequest(null);
     };
 
+    const handleViewRequest = (requestId: string) => {
+        setSelectedRequestId(requestId);
+        setView('reviewRequest');
+    }
+
     const visibleHistory = history.slice(0, visibleCount);
 
     return (
@@ -93,7 +96,7 @@ const RequestHistory = ({ history, onRefill }: { history: any[], onRefill: (item
                                                             onClick={() => onRefill(request.items)}
                                                             sx={{ 
                                                                 color: 'white', 
-                                                                borderColor: 'rgba(255, 255, 255, 0.5)', 
+                                                                borderColor: 'rgba(255, 255, 255, 0.5)',
                                                                 textTransform: 'none',
                                                                 '&:hover': { 
                                                                     backgroundColor: 'rgba(255, 255, 255, 0.1)', 
@@ -125,7 +128,7 @@ const RequestHistory = ({ history, onRefill }: { history: any[], onRefill: (item
                                                     <Button 
                                                         size="small" 
                                                         variant="outlined"
-                                                        onClick={() => router.push(`/my-requests/${request._id}`)}
+                                                        onClick={() => handleViewRequest(request._id)}
                                                         sx={{ 
                                                             color: 'white', 
                                                             borderColor: 'rgba(255, 255, 255, 0.5)',

@@ -25,6 +25,7 @@ import Chat from "@/components/Chat";
 import ConversationsContent from "@/components/ConversationsContent";
 import CartContent from "@/components/CartContent";
 import OrdersContent from "@/components/OrdersContent";
+import ReviewRequestContent from "@/components/ReviewRequestContent";
 import { Home as HomeIcon, Chat as ChatIcon, Person as PersonIcon, LocalPharmacy as PharmacyIcon, Medication as MedicationIcon } from '@mui/icons-material';
 
 import { useTheme, useMediaQuery } from "@mui/material";
@@ -57,6 +58,7 @@ export default function HomePage() {
   const [wordIndex, setWordIndex] = useState(0);
   const [view, setView] = useState('home');
   const [otherUser, setOtherUser] = useState<UnifiedUser | null>(null);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
   const normalizedUser: UnifiedUser | null = user ? { ...user, _id: user.id } : null;
 
@@ -115,6 +117,8 @@ useEffect(() => {
   const handleBackNavigation = () => {
     if (view === 'chat') {
       setView(normalizedUser?.role === 'pharmacist' ? 'conversations' : 'consult');
+    } else if (view === 'about' || view === 'contact' || view === 'reviewRequest') {
+      setView('orderMedicines');
     } else {
       setView('home');
     }
@@ -271,7 +275,7 @@ useEffect(() => {
 
 
 const renderPageView = (title: string, layoutId: string, children?: React.ReactNode, fullWidthMobile: boolean = false) => {
-  const showButtons = view !== 'findPharmacy' && view !== 'account' && view !== 'about' && view !== 'contact';
+  const showButtons = view !== 'findPharmacy' && view !== 'account' && view !== 'about' && view !== 'contact' && view !== 'reviewRequest';
 
   return (
     <Box
@@ -362,7 +366,7 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
   const renderActiveView = () => {
     switch (view) {
       case 'orderMedicines':
-        return renderPageView('Order Medicines', 'order-medicines-header', <DispatchForm initialSearchValue={inputValue} />);
+        return renderPageView('Order Medicines', 'order-medicines-header', <DispatchForm initialSearchValue={inputValue} setView={setView} setSelectedRequestId={setSelectedRequestId} />);
       case 'storeManagement':
         return renderPageView('Store Management', 'store-management-header');
       case 'orderRequests':
@@ -386,11 +390,16 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
         return renderPageView('Cart', 'cart-header', <CartContent />, true);
       case 'orders':
         return renderPageView('Orders', 'orders-header', <OrdersContent />, true);
-        case 'chat':
-          if (otherUser) {
-              return renderPageView('Chat', 'chat-header', <Chat user={otherUser} onBack={handleBackNavigation} />);
-          }
-          return <CircularProgress />;
+      case 'reviewRequest':
+        if (selectedRequestId) {
+            return renderPageView('Review Request', 'review-request-header', <ReviewRequestContent requestId={selectedRequestId} setView={setView} />);
+        }
+        return <CircularProgress />;
+      case 'chat':
+        if (otherUser) {
+            return renderPageView('Chat', 'chat-header', <Chat user={otherUser} onBack={handleBackNavigation} />);
+        }
+        return <CircularProgress />;
   
       default:
         return renderWelcomeView();

@@ -3,7 +3,6 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 import { useSession } from '@/context/SessionProvider';
 import {
@@ -77,9 +76,8 @@ const allFormTypes = [
 
 const quantityOptions = Array.from({ length: 30 }, (_, i) => i + 1);
 
-const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearchValue }) => {
+const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: string) => void, setSelectedRequestId: (id: string) => void }> = ({ initialSearchValue, setView, setSelectedRequestId }) => {
 
-  const router = useRouter();
   const { user, isLoading: isSessionLoading } = useSession();
 
   const [requestedDrugs, setRequestedDrugs] = useState<DrugRequest[]>([]);
@@ -312,7 +310,8 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
 
   const handleReviewQuote = () => {
       if (activeRequestId) {
-          router.push(`/my-requests/${activeRequestId}`);
+          setSelectedRequestId(activeRequestId);
+          setView('reviewRequest');
           handleCloseRadarModal();
           setIsQuoteReady(false);
       }
@@ -482,7 +481,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                             <Button
                                 variant="contained"
                                 fullWidth
-                                onClick={() => router.push('/find-medicines')}
+                                onClick={() => setView('findMedicines')}
                                 sx={{py: 0.8, borderRadius: '12px'}}
                             >
                                 View Full Catalog
@@ -490,7 +489,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string }> = ({ initialSearch
                         )}
                     </Box>
                     <Box sx={{mt: 4}}>
-                      <RequestHistory history={requestHistory} onRefill={handleRefillRequest} />
+                      <RequestHistory history={requestHistory} onRefill={handleRefillRequest} setView={setView} setSelectedRequestId={setSelectedRequestId} />
                     </Box>
                 </Paper>
             </Grid>
