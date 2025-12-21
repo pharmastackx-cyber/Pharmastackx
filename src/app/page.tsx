@@ -20,12 +20,15 @@ import FindPharmacyContent from "@/components/FindPharmacyContent";
 import OrderRequestsContent from "@/components/OrderRequestsContent";
 import FindPharmacistContent from "@/components/FindPharmacistContent";
 import FindMedicinesContent from "@/components/FindMedicinesContent";
+
 import AccountContent from "@/components/AccountContent";
 import Chat from "@/components/Chat";
 import ConversationsContent from "@/components/ConversationsContent";
 import CartContent from "@/components/CartContent";
 import OrdersContent from "@/components/OrdersContent";
 import ReviewRequestContent from "@/components/ReviewRequestContent";
+import StoreManagement from "./components/StoreManagement";
+
 import { Home as HomeIcon, Chat as ChatIcon, Person as PersonIcon, LocalPharmacy as PharmacyIcon, Medication as MedicationIcon } from '@mui/icons-material';
 
 import { useTheme, useMediaQuery } from "@mui/material";
@@ -191,15 +194,16 @@ useEffect(() => {
                       transition: { ...mobileButtonAnimation.transition, delay: 0.15 } 
                   } : {})}
               >
-                      <Button variant="contained" onClick={() => router.push('/store-management')} 
-                      sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' },
-                      px: { xs: 2, sm: 4 },
-                      py: { xs: 0.75, sm: 1 },
-                      whiteSpace: 'nowrap', 
-                      transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', 
-                      color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
-                          Store Management
-                      </Button>
+                     <Button variant="contained" onClick={() => setView('storeManagement')}
+  sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' },
+  px: { xs: 2, sm: 4 },
+  py: { xs: 0.75, sm: 1 },
+  whiteSpace: 'nowrap', 
+  transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', 
+  color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
+      Store Management
+</Button>
+
                     </motion.div>
                   </Grid>
                   <Grid item xs="auto">
@@ -367,9 +371,9 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
     switch (view) {
       case 'orderMedicines':
         return renderPageView('Order Medicines', 'order-medicines-header', <DispatchForm initialSearchValue={inputValue} setView={setView} setSelectedRequestId={setSelectedRequestId} />);
-      case 'storeManagement':
-        return renderPageView('Store Management', 'store-management-header');
-      case 'orderRequests':
+        case 'storeManagement':
+          return renderPageView('Store Management', 'store-management-header', <StoreManagement />);
+  case 'orderRequests':
         return renderPageView('Order Requests', 'order-requests-header', <OrderRequestsContent />);
         case 'findPharmacy':
           return renderPageView('Find a Pharmacy', 'find-pharmacy-header', <FindPharmacyContent />);

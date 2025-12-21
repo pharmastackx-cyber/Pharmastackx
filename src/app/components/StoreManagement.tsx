@@ -106,7 +106,7 @@ interface Business {
 
 
 
-export default function StoreManagementPage() {
+export default function StoreManagement() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
@@ -1980,8 +1980,8 @@ useEffect(() => {
 
 
   return (
-    <Box sx={{ p: isMobile ? 2 : 4, pb: '100px' }}>
-
+    <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3, bgcolor: '#f8f9fa', pb: '100px' }}>
+  
       <Typography variant={isMobile ? 'h5' : 'h4'} gutterBottom>Store Management</Typography>
       
       <Tabs value={selectedTab} onChange={handleTabChange} variant={isMobile ? 'scrollable' : 'standard'} scrollButtons="auto">
@@ -3405,6 +3405,7 @@ useEffect(() => {
 
 
 
-    </Box>
-  );
+</Paper>
+);
+
 }
