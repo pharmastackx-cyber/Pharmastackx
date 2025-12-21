@@ -1980,9 +1980,10 @@ useEffect(() => {
 
 
   return (
-    <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3, bgcolor: '#f8f9fa', pb: '100px' }}>
+    <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, borderRadius: { xs: 0, sm: 3 }, bgcolor: '#f8f9fa', pb: '100px', mx: { xs: -2, sm: 0 } }}>
+
   
-      <Typography variant={isMobile ? 'h5' : 'h4'} gutterBottom>Store Management</Typography>
+      
       
       <Tabs value={selectedTab} onChange={handleTabChange} variant={isMobile ? 'scrollable' : 'standard'} scrollButtons="auto">
         {isStockManager ? (
