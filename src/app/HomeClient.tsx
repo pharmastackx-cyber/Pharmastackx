@@ -26,6 +26,7 @@ import Chat from "@/components/Chat";
 import ConversationsContent from "@/components/ConversationsContent";
 import CartContent from "@/components/CartContent";
 import OrdersContent from "@/components/OrdersContent";
+import ReviewRequestContent from "@/components/ReviewRequestContent";
 import { Home as HomeIcon, Chat as ChatIcon, Person as PersonIcon, LocalPharmacy as PharmacyIcon, Medication as MedicationIcon } from '@mui/icons-material';
 
 import { useTheme, useMediaQuery } from "@mui/material";
@@ -66,6 +67,7 @@ export default function HomeClient({
       : 'home'
   );
   const [otherUser, setOtherUser] = useState<UnifiedUser | null>(null);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
   const normalizedUser: UnifiedUser | null = user ? { ...user, _id: user.id } : null;
 
@@ -106,6 +108,8 @@ export default function HomeClient({
   const handleBackNavigation = () => {
     if (view === 'chat') {
       setView(normalizedUser?.role === 'pharmacist' ? 'conversations' : 'consult');
+    } else if (view === 'reviewRequest') {
+      setView('orderMedicines');
     } else {
       setView('home');
     }
@@ -341,7 +345,7 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
   const renderActiveView = () => {
     switch (view) {
       case 'orderMedicines':
-        return renderPageView('Order Medicines', 'order-medicines-header', <DispatchForm initialSearchValue={inputValue} />);
+        return renderPageView('Order Medicines', 'order-medicines-header', <DispatchForm initialSearchValue={inputValue} setView={setView} setSelectedRequestId={setSelectedRequestId} />);
       case 'storeManagement':
         return renderPageView('Store Management', 'store-management-header');
       case 'orderRequests':
@@ -365,6 +369,9 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
         return renderPageView('Cart', 'cart-header', <CartContent />, true);
       case 'orders':
         return renderPageView('Orders', 'orders-header', <OrdersContent />, true);
+      case 'reviewRequest':
+        if (!selectedRequestId) return null;
+        return renderPageView('Review Request', 'review-request-header', <ReviewRequestContent requestId={selectedRequestId} setView={setView} />);
         case 'chat':
           if (otherUser) {
               return renderPageView('Chat', 'chat-header', <Chat user={otherUser} onBack={handleBackNavigation} />);
