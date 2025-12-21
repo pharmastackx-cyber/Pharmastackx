@@ -39,7 +39,6 @@ import { useRouter } from 'next/navigation';
 import dynamicImport from "next/dynamic";
 import { event } from '../lib/gtag';
 
-
 const PaystackButton = dynamicImport(
   () => import("./PaystackButton"),
   { ssr: false }
@@ -47,7 +46,8 @@ const PaystackButton = dynamicImport(
 
 export const dynamic = "force-dynamic";
 
-
+const STANDARD_DELIVERY_FEE = 900;
+const EXPRESS_DELIVERY_FEE = 2000;
 
 export default function CartContent() {
   const { user } = useSession();
@@ -116,7 +116,7 @@ const isFormValid =
 
     const getDeliveryFee = () => {
     if (deliveryOption === 'pickup') return 0;
-    const baseDeliveryFee = deliveryOption === 'standard' ? 2000 : 4000;
+    const baseDeliveryFee = deliveryOption === 'standard' ? STANDARD_DELIVERY_FEE : EXPRESS_DELIVERY_FEE;
     if (actualOrderType === 'S' || actualOrderType === 'MN') return baseDeliveryFee;
     if (actualOrderType === 'MP') return baseDeliveryFee * uniquePharmacies.length;
     return baseDeliveryFee;
@@ -242,9 +242,6 @@ const total = finalTotal + sfcAmount;
                   <Box sx={{ width: '100%' }}><TextField fullWidth required={deliveryOption !== 'pickup'} size="small" label="Delivery Address" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} /></Box>
                   <Box sx={{ width: { xs: '100%', sm: 'calc(50% - 8px)' } }}><TextField fullWidth required={deliveryOption !== 'pickup'} size="small" label="City" value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} /></Box>
                   <Box sx={{ width: { xs: '100%', sm: 'calc(50% - 8px)' } }}><TextField fullWidth required={deliveryOption !== 'pickup'} size="small" label="State" value={deliveryState} onChange={(e) => setDeliveryState(e.target.value)} /></Box>
-
-                  <Box sx={{ width: { xs: '100%', sm: 'calc(50% - 8px)' } }}><TextField fullWidth required size="small" label="City" value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} /></Box>
-                  <Box sx={{ width: { xs: '100%', sm: 'calc(50% - 8px)' } }}><TextField fullWidth required size="small" label="State" value={deliveryState} onChange={(e) => setDeliveryState(e.target.value)} /></Box>
                 </Box>
               </Paper>
             </Box>
@@ -281,24 +278,51 @@ const total = finalTotal + sfcAmount;
 <Box sx={{ mb: 2 }}>
   <Typography variant="body2" sx={{ mb: 1, color: '#666', fontSize: '0.85rem', fontWeight: 500 }}>Delivery Option</Typography>
   <RadioGroup value={deliveryOption} onChange={(e) => setDeliveryOption(e.target.value as 'standard' | 'express' | 'pickup')} sx={{ gap: 0 }}>
-    <FormControlLabel value="standard" control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />} label={<Box><Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>Standard - ₦700</Typography><Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>You will get your items tomorrow</Typography></Box>} sx={{ mr: 0, mb: 0.5 }} />
-    <FormControlLabel value="express" control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />} label={<Box><Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>Express - ₦2,000</Typography><Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#E91E63' }}>30mins - 3hrs delivery</Typography></Box>} sx={{ mr: 0, mb: 0.5 }} />
+    <FormControlLabel 
+        value="standard" 
+        control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />} 
+        label={
+            <Box>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                    Standard - ₦{STANDARD_DELIVERY_FEE.toLocaleString()}
+                </Typography>
+                <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>
+                    You will get your items tomorrow
+                </Typography>
+            </Box>
+        } 
+        sx={{ mr: 0, mb: 0.5 }} 
+    />
+    <FormControlLabel 
+        value="express" 
+        control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />} 
+        label={
+            <Box>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                    Express - ₦{EXPRESS_DELIVERY_FEE.toLocaleString()}
+                </Typography>
+                <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#E91E63' }}>
+                    30mins - 3hrs delivery
+                </Typography>
+            </Box>
+        } 
+        sx={{ mr: 0, mb: 0.5 }} 
+    />
     <FormControlLabel
-  value="pickup"
-  control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />}
-  label={
-    <Box>
-      <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
-        Pickup from Pharmacy - Free
-      </Typography>
-      <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>
-      You will receive the pharmacy's location and phone number to arrange pickup.
-      </Typography>
-    </Box>
-  }
-  sx={{ mr: 0 }}
-/>
-
+      value="pickup"
+      control={<Radio size="small" sx={{ py: 0.5, '&.Mui-checked': { color: '#006D5B' } }} />}
+      label={
+        <Box>
+          <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
+            Pickup from Pharmacy - Free
+          </Typography>
+          <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>
+          You will receive the pharmacy's location and phone number to arrange pickup.
+          </Typography>
+        </Box>
+      }
+      sx={{ mr: 0 }}
+    />
   </RadioGroup>
 </Box>
 

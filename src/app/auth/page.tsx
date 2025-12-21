@@ -3,7 +3,6 @@
 import React, { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthModal } from '@/contexts/AuthModalContext';
-import { Box, CircularProgress } from '@mui/material';
 
 // A lean component that triggers the modal and redirects.
 function AuthTrigger() {
@@ -19,23 +18,20 @@ function AuthTrigger() {
         const redirectUrl = searchParams?.get('redirect') || '/';
         
         // Replace the current history entry with the target URL.
-        // This ensures the user doesn't get stuck in a back-button loop.
+        // This creates the illusion that the modal is appearing over the previous page.
         router.replace(redirectUrl);
 
     }, [openModal, router, searchParams]);
 
-    
-    return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100vh' }}>
-            <CircularProgress />
-        </Box>
-    );
+    // This component renders nothing, as its only job is to trigger side effects.
+    return null;
 }
 
 // We must wrap with Suspense because AuthTrigger uses useSearchParams.
+// This page itself is invisible to the user.
 export default function AuthPage() {
     return (
-        <React.Suspense fallback={<CircularProgress />}>
+        <React.Suspense fallback={null}>
             <AuthTrigger />
         </React.Suspense>
     );

@@ -49,13 +49,10 @@ export default function LoginForm({
       setSuccess("Login successful! Redirecting...");
       
       // Refresh the session to update the UI
-      refreshSession();
+      await refreshSession();
 
-      // Redirect after a short delay
-      setTimeout(() => {
-        router.push(redirectUrl || '/');
-        router.refresh(); // This will re-fetch server components and refresh the page
-      }, 1000);
+      // Hard redirect to ensure a full page reload and session update
+      window.location.href = redirectUrl || '/';
 
     } catch (err: any) {
       setError(err.response?.data?.error || "Login failed. Please check your credentials.");
