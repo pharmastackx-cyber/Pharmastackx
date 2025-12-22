@@ -46,6 +46,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [pharmacySearch, setPharmacySearch] = useState("");
   const [isCreatePharmacyModalOpen, setCreatePharmacyModalOpen] = useState(false);
+  const [newlyCreatedPharmacy, setNewlyCreatedPharmacy] = useState<Pharmacy | null>(null);
 
   const fetchPharmacies = useCallback(async () => {
     try {
@@ -66,6 +67,20 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
       fetchPharmacies();
     }
   }, [providerType, fetchPharmacies]);
+
+  useEffect(() => {
+    if (newlyCreatedPharmacy) {
+      const fullPharmacyObject = pharmacies.find(p => p._id === newlyCreatedPharmacy._id);
+      if (fullPharmacyObject) {
+        setPharmacies(prevPharmacies => {
+          const reorderedList = prevPharmacies.filter(p => p._id !== newlyCreatedPharmacy._id);
+          reorderedList.unshift(fullPharmacyObject);
+          return reorderedList;
+        });
+        setNewlyCreatedPharmacy(null);
+      }
+    }
+  }, [pharmacies, newlyCreatedPharmacy]);
 
   const handlePharmacySearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setPharmacySearch(event.target.value);
@@ -147,9 +162,11 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
   };
 
   const handlePharmacyCreated = (newPharmacy: Pharmacy) => {
-    setPharmacies(prevPharmacies => [newPharmacy, ...prevPharmacies].sort((a,b) => a.businessName.localeCompare(b.businessName)));
+    fetchPharmacies();
     setForm((prevForm) => ({ ...prevForm, pharmacy: newPharmacy._id }));
+    setPharmacySearch("");
     setCreatePharmacyModalOpen(false);
+    setNewlyCreatedPharmacy(newPharmacy);
   };
   
   const providerTypes = [
