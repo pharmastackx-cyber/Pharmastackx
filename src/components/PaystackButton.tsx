@@ -18,6 +18,8 @@ interface PaystackButtonProps {
   uniquePharmacies: string[];
   subtotal: number;
   deliveryFee: number;
+  sfcAmount: number;
+  sfcDiscount: number;
   discountAmount: number;
   deliveryDiscount: number;
   promoCode?: string;
@@ -43,6 +45,27 @@ const PaystackButton: React.FC<PaystackButtonProps> = (props) => {
     email: props.deliveryEmail,
     amount: props.total * 100,
     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
+    metadata: {
+      custom_fields: [
+        { display_name: "Patient Name", variable_name: "patient_name", value: props.patientName },
+        { display_name: "Patient Age", variable_name: "patient_age", value: props.patientAge },
+        { display_name: "Delivery Option", variable_name: "delivery_option", value: props.deliveryOption },
+        { display_name: "Order Type", variable_name: "order_type", value: props.orderType },
+        { display_name: "Promo Code", variable_name: "promo_code", value: props.promoCode || 'N/A' },
+        { display_name: "Subtotal", variable_name: "subtotal", value: `₦${props.subtotal.toLocaleString()}` },
+        { display_name: "Delivery Fee", variable_name: "delivery_fee", value: `₦${props.deliveryFee.toLocaleString()}` },
+        { display_name: "Service Fee", variable_name: "sfc_amount", value: `₦${props.sfcAmount.toLocaleString()}` },
+        { display_name: "Discount", variable_name: "discount", value: `₦${props.discountAmount.toLocaleString()}` },
+        { display_name: "Delivery Discount", variable_name: "delivery_discount", value: `₦${props.deliveryDiscount.toLocaleString()}` },
+        { display_name: "SFC Discount", variable_name: "sfc_discount", value: `₦${props.sfcDiscount.toLocaleString()}` },
+        { display_name: "Total Paid", variable_name: "total_paid", value: `₦${props.total.toLocaleString()}` },
+        ...items.map((item, index) => ({
+          display_name: `Item ${index + 1}`,
+          variable_name: `item_${index + 1}`,
+          value: `${item.name} (x${item.quantity}) - ${item.pharmacy}`
+        }))
+      ]
+    }
   };
 
   const initializePayment = usePaystackPayment(config);

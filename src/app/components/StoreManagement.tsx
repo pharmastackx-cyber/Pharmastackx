@@ -1179,7 +1179,9 @@ useEffect(() => {
         console.log('--- [FRONTEND DEBUG] 7. Upload appears successful.');
         setStockData(prev => [...result.savedProducts, ...prev]);
         const publishedCount = result.savedProducts?.filter((p: any) => p.enrichmentStatus === 'completed').length || 0;
-        setUploadSuccessInfo({ totalSaved: result.savedProducts.length, publishedCount: publishedCount });
+        
+        setUploadSuccessInfo({ totalSaved: result.savedProducts.length, publishedCount: 0 });
+
         if (result.errors && result.errors.length > 0) {
             setUploadResult({ message: result.message, warnings: [], errors: result.errors });
         }
@@ -2140,28 +2142,16 @@ useEffect(() => {
       onClose={() => setUploadSuccessInfo(null)}
       sx={{ mb: 3, width: '100%', maxWidth: 600, boxShadow: '0 4px 12px rgba(0, 128, 0, 0.4)', border: '1px solid #4caf50' }}
     >
-      <AlertTitle sx={{ fontWeight: 'bold' }}>Upload Complete!</AlertTitle>
+      <AlertTitle sx={{ fontWeight: 'bold' }}>Upload Received!</AlertTitle>
       <Typography variant="body2" sx={{ mb: 1 }}>
-        All <strong>{uploadSuccessInfo.totalSaved}</strong> products have been added to your Stock Catalogue.
+        We have successfully received <strong>{uploadSuccessInfo.totalSaved}</strong> products.
       </Typography>
-      
-      {/* Details about publishing */}
-      <Box component="ul" sx={{ p: 0, pl: 2, m: 0, listStyleType: 'disc' }}>
-        {uploadSuccessInfo.publishedCount > 0 && (
-          <Typography component="li" variant="body2">
-            <strong>{uploadSuccessInfo.publishedCount}</strong> {uploadSuccessInfo.publishedCount === 1 ? 'product was' : 'products were'} published directly to the Find Medicines page.
-          </Typography>
-        )}
-        <Typography component="li" variant="body2">
-            <strong>{uploadSuccessInfo.totalSaved - uploadSuccessInfo.publishedCount}</strong> {uploadSuccessInfo.totalSaved - uploadSuccessInfo.publishedCount === 1 ? 'product requires' : 'products require'} your review in the{' '}
-            <Link component="button" variant="body2" onClick={() => { setSelectedTab(2); setUploadSuccessInfo(null); }} sx={{ fontWeight: 'bold', textAlign: 'left' }}>
-              Stock Catalogue
-            </Link> before going live.
-        </Typography>
-      </Box>
-
+      <Typography variant="body2">
+        Your items are now under review and will be published to your stock catalogue within 24-48 hours. For any urgent issues, please contact support via the WhatsApp button.
+      </Typography>
     </Alert>
 )}
+
 
       {/* --- NEW: UPLOAD PROGRESS INDICATOR --- */}
       {isUploading && (
@@ -3158,8 +3148,8 @@ useEffect(() => {
             position: 'fixed',
             // Position it directly above the known location of the WhatsApp FAB.
             // FAB bottom (24px) + FAB height (56px) + gap (8px) = 88px
-            bottom: { xs: 80, md: 88 }, 
-            right: { xs: 16, md: 24 },
+            bottom: { xs: 130, md: 140 }, 
+            right: { xs: 30, md: 60 },
             zIndex: 1399, 
             p: 1.5,
             bgcolor: 'rgba(0, 0, 0, 0.75)',

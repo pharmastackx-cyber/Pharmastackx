@@ -38,6 +38,7 @@ import { useSession } from '../context/SessionProvider';
 import { useRouter } from 'next/navigation';
 import dynamicImport from "next/dynamic";
 import { event } from '../lib/gtag';
+import { Business } from '@/types';
 
 const PaystackButton = dynamicImport(
   () => import("./PaystackButton"),
@@ -74,8 +75,21 @@ export default function CartContent() {
   const [deliveryState, setDeliveryState] = useState('');
 
   useEffect(() => {
-    if (user?.email) {
-      setDeliveryEmail(user.email);
+    if (user) {
+      // Always set the email for any logged-in user
+      setDeliveryEmail(user.email || '');
+
+      // Check for professional user roles
+      const professionalRoles = ['clinic', 'pharmacy', 'pharmacist'];
+      if (professionalRoles.includes(user.role)) {
+        const businessUser = user as Business; // Cast to Business to access address
+        if (businessUser.address) {
+          setDeliveryPhone(businessUser.phone || '');
+          setDeliveryAddress(businessUser.address.street || '');
+          setDeliveryCity(businessUser.address.city || '');
+          setDeliveryState(businessUser.address.state || '');
+        }
+      }
     }
   }, [user]);
 
@@ -126,8 +140,8 @@ const isFormValid =
 const deliveryFee = getDeliveryFee();
 const sfcPercentage = deliveryOption === 'pickup' ? 25 : 20;
 const sfcAmount = subtotal * (sfcPercentage / 100);
-const { discountAmount, deliveryDiscount, finalTotal } = calculateDiscount(subtotal, deliveryFee);
-const total = finalTotal + sfcAmount;
+const { discountAmount, deliveryDiscount, sfcDiscount, finalTotal } = calculateDiscount(subtotal, deliveryFee, sfcAmount);
+const total = finalTotal;
 
   
 
@@ -370,6 +384,14 @@ const total = finalTotal + sfcAmount;
     {sfcPercentage}%
   </Typography>
 </Box>
+{sfcDiscount > 0 && (
+  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, color: '#4CAF50' }}>
+    <Typography variant="body2" color="#4CAF50">SFC Discount ({activePromo?.code})</Typography>
+    <Typography variant="body2" color="#4CAF50" sx={{ fontWeight: 600 }}>
+      -₦{sfcDiscount.toLocaleString()}
+    </Typography>
+  </Box>
+)}
 
 
                 <Divider sx={{ mb: 2 }} />
@@ -416,7 +438,8 @@ const total = finalTotal + sfcAmount;
                     uniquePharmacies={uniquePharmacies}
                     subtotal={subtotal}
                     deliveryFee={deliveryFee}
-                    
+                    sfcAmount={sfcAmount}
+                    sfcDiscount={sfcDiscount}
                     discountAmount={discountAmount}
                     deliveryDiscount={deliveryDiscount}
                     promoCode={activePromo?.code}

@@ -20,6 +20,7 @@ import FindPharmacyContent from "@/components/FindPharmacyContent";
 import OrderRequestsContent from "@/components/OrderRequestsContent";
 import FindPharmacistContent from "@/components/FindPharmacistContent";
 import FindMedicinesContent from "@/components/FindMedicinesContent";
+import WhatsAppButton from "@/components/WhatsAppButton";
 
 import AccountContent from "@/components/AccountContent";
 import Chat from "@/components/Chat";
@@ -557,7 +558,7 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
                 <HomeIcon />
                 Home
             </Button>
-            <Button onClick={() => setView('orderMedicines')} sx={{ flexDirection: 'column', color: view === 'findMedicines' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
+            <Button onClick={() => setView('orderMedicines')} sx={{ flexDirection: 'column', color: view === 'orderMedicines' ? '#1B5E20 ' : 'grey.700', textTransform: 'none', fontSize: '0.75rem', minWidth: '60px' }}>
                 <MedicationIcon  />
                 Search Medicines
             </Button>
@@ -573,6 +574,7 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
         </Paper>
 
       </Box>
+      {view !== 'home' && <WhatsAppButton />}
     </Box>
   );
 }

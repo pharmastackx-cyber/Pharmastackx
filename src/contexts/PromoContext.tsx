@@ -25,9 +25,10 @@ interface PromoContextType {
   applyPromo: (code: string) => { success: boolean; message: string };
   removePromo: () => void;
   validatePromo: (code: string, orderAmount: number) => { valid: boolean; message: string };
-  calculateDiscount: (orderAmount: number, deliveryFee: number) => { 
+  calculateDiscount: (orderAmount: number, deliveryFee: number, sfcAmount: number) => { 
     discountAmount: number; 
     deliveryDiscount: number; 
+    sfcDiscount: number;
     finalTotal: number; 
   };
 }
@@ -140,7 +141,6 @@ export const PromoProvider: React.FC<PromoProviderProps> = ({ children }) => {
   };
 
   const applyPromo = (code: string) => {
-    // This will be called from cart page with order amount validation
     const promo = promos.find(p => p.code.toUpperCase() === code.toUpperCase());
     
     if (!promo) {
@@ -149,7 +149,6 @@ export const PromoProvider: React.FC<PromoProviderProps> = ({ children }) => {
 
     setActivePromo(promo);
     
-    // Increment usage count
     setPromos(prev => 
       prev.map(p => 
         p.id === promo.id 
@@ -163,7 +162,6 @@ export const PromoProvider: React.FC<PromoProviderProps> = ({ children }) => {
 
   const removePromo = () => {
     if (activePromo) {
-      // Decrement usage count when removing
       setPromos(prev => 
         prev.map(p => 
           p.id === activePromo.id 
@@ -186,7 +184,6 @@ export const PromoProvider: React.FC<PromoProviderProps> = ({ children }) => {
   };
 
   const deletePromo = (id: number) => {
-    // If deleting the active promo, remove it from active state
     if (activePromo && activePromo.id === id) {
       setActivePromo(null);
     }
@@ -202,19 +199,19 @@ export const PromoProvider: React.FC<PromoProviderProps> = ({ children }) => {
       )
     );
     
-    // If deactivating the currently active promo, remove it
     if (activePromo && activePromo.id === id) {
       setActivePromo(null);
     }
   };
 
-  const calculateDiscount = (orderAmount: number, deliveryFee: number) => {
+  const calculateDiscount = (orderAmount: number, deliveryFee: number, sfcAmount: number) => {
     if (!activePromo) {
-      return { discountAmount: 0, deliveryDiscount: 0, finalTotal: orderAmount + deliveryFee };
+      return { discountAmount: 0, deliveryDiscount: 0, sfcDiscount: 0, finalTotal: orderAmount + deliveryFee + sfcAmount };
     }
 
     let discountAmount = 0;
     let deliveryDiscount = 0;
+    let sfcDiscount = 0;
 
     switch (activePromo.type) {
       case 'percentage':
@@ -231,17 +228,18 @@ export const PromoProvider: React.FC<PromoProviderProps> = ({ children }) => {
         deliveryDiscount = deliveryFee;
         break;
       case 'all_free':
-        // All fees free - discount everything
         discountAmount = orderAmount;
         deliveryDiscount = deliveryFee;
+        sfcDiscount = sfcAmount;
         break;
     }
 
-    const finalTotal = orderAmount - discountAmount + deliveryFee - deliveryDiscount;
+    const finalTotal = orderAmount - discountAmount + deliveryFee - deliveryDiscount + sfcAmount - sfcDiscount;
 
     return { 
       discountAmount, 
       deliveryDiscount, 
+      sfcDiscount,
       finalTotal: Math.max(0, finalTotal)
     };
   };

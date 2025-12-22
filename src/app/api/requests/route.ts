@@ -81,17 +81,30 @@ export async function GET(req: NextRequest) {
     }
   
     try {
-      // Corrected Role-based authorization as requested.
-      // A user with one of these roles sees ALL requests.
-      // Any other authenticated user will only see their OWN requests.
-      const adminRoles = ['admin', 'pharmacist', 'pharmacy'];
-      const query = adminRoles.includes(session.role) 
-        ? {} // An empty query matches all documents
-        : { user: session.userId }; // Otherwise, filter by the user's ID
+        let query: any = {};
+        const pharmacistRoles = ['pharmacist', 'pharmacy'];
 
-      const requests = await RequestModel.find(query).populate('user', 'name email').sort({ createdAt: -1 });
+        if (pharmacistRoles.includes(session.role)) {
+            // Pharmacists see requests that are open OR requests where their quote was accepted.
+            query = {
+                $or: [
+                    { status: { $in: ['pending', 'quoted'] } },
+                    { 'quotes': { $elemMatch: { pharmacy: session.userId, status: 'accepted' } } }
+                ]
+            };
+        } else if (session.role === 'admin') {
+            // Admins see all requests.
+            query = {};
+        } else {
+            // Regular users only see their own requests.
+            query = { user: session.userId };
+        }
+
+        const requests = await RequestModel.find(query)
+            .populate('user', 'name email')
+            .sort({ createdAt: -1 });
   
-      return NextResponse.json(requests, { status: 200 });
+        return NextResponse.json(requests, { status: 200 });
 
     } catch (error) {
       console.error('Error fetching requests:', error);
