@@ -24,6 +24,11 @@ export interface IUser extends Document {
   stateOfPractice?: string;
   licenseNumber?: string;
   pharmacy?: string;
+  emailVerified: boolean;
+  emailVerificationToken?: string;
+  emailVerificationTokenExpires?: Date;
+  professionalVerificationStatus: 'not_started' | 'pending_review' | 'approved' | 'rejected';
+  verificationDocuments: string[];
 }
 
 // The schema defines the blueprint for the database
@@ -57,6 +62,15 @@ const userSchema: Schema<IUser> = new mongoose.Schema({
   stateOfPractice: { type: String },
   licenseNumber: { type: String },
   pharmacy: { type: String },
+  emailVerified: { type: Boolean, default: false },
+  emailVerificationToken: { type: String },
+  emailVerificationTokenExpires: { type: Date },
+  professionalVerificationStatus: {
+    type: String,
+    enum: ['not_started', 'pending_review', 'approved', 'rejected'],
+    default: 'not_started',
+  },
+  verificationDocuments: { type: [String], default: [] },
 });
 
 // This line creates the model
