@@ -69,16 +69,30 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
   }, [providerType, fetchPharmacies]);
 
   useEffect(() => {
-    if (newlyCreatedPharmacy) {
-      const fullPharmacyObject = pharmacies.find(p => p._id === newlyCreatedPharmacy._id);
-      if (fullPharmacyObject) {
-        setPharmacies(prevPharmacies => {
-          const reorderedList = prevPharmacies.filter(p => p._id !== newlyCreatedPharmacy._id);
-          reorderedList.unshift(fullPharmacyObject);
+    if (newlyCreatedPharmacy && pharmacies.some(p => p._id === newlyCreatedPharmacy._id)) {
+      setPharmacies(prevPharmacies => {
+        const otherPharmacies = prevPharmacies.filter(p => p._id !== newlyCreatedPharmacy._id);
+        const newPharmacyFromList = prevPharmacies.find(p => p._id === newlyCreatedPharmacy._id);
+        if (newPharmacyFromList) {
+          const reorderedList = [newPharmacyFromList, ...otherPharmacies];
+          // Only reset if the operation was successful
+          setNewlyCreatedPharmacy(null);
           return reorderedList;
-        });
-        setNewlyCreatedPharmacy(null);
-      }
+        }
+        return prevPharmacies;
+      });
+    }
+  }, [pharmacies, newlyCreatedPharmacy]);
+
+
+  useEffect(() => {
+    if (newlyCreatedPharmacy && pharmacies.some(p => p._id === newlyCreatedPharmacy._id)) {
+      const reorderedList = [
+        newlyCreatedPharmacy,
+        ...pharmacies.filter(p => p._id !== newlyCreatedPharmacy._id),
+      ];
+      setPharmacies(reorderedList);
+      setNewlyCreatedPharmacy(null);
     }
   }, [pharmacies, newlyCreatedPharmacy]);
 
@@ -161,13 +175,14 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
     }
   };
 
-  const handlePharmacyCreated = (newPharmacy: Pharmacy) => {
-    fetchPharmacies();
+  const handlePharmacyCreated = async (newPharmacy: Pharmacy) => {
+    setCreatePharmacyModalOpen(false);
     setForm((prevForm) => ({ ...prevForm, pharmacy: newPharmacy._id }));
     setPharmacySearch("");
-    setCreatePharmacyModalOpen(false);
     setNewlyCreatedPharmacy(newPharmacy);
+    await fetchPharmacies();
   };
+
   
   const providerTypes = [
     { label: "Pharmacy", value: "pharmacy" },
