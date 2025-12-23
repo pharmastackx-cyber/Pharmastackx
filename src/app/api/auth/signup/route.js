@@ -64,6 +64,10 @@ export async function POST(req) {
       }
     }
 
+    if (allData.pharmacy === '') {
+      delete allData.pharmacy;
+    }
+
     const emailVerificationToken = crypto.randomBytes(32).toString('hex');
     const emailVerificationTokenExpires = new Date(Date.now() + 3600000); // 1 hour
 
