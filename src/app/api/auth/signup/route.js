@@ -1,13 +1,14 @@
 
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { dbConnect } from '@/lib/mongoConnect';
 import User from '@/models/User';
+import { transporter, mailOptions } from '@/lib/nodemailer';
 
 export async function POST(req) {
   try {
     await dbConnect();
-    // 1. READ ALL DATA: Capture the entire request body.
     const allData = await req.json();
     const { 
       businessName,
@@ -23,7 +24,6 @@ export async function POST(req) {
 
     const email = originalEmail.toLowerCase();
 
-    // Correctly validate required fields for non-customer roles, excluding pharmacist
     if (role !== 'customer' && role !== 'pharmacist' && (!businessName || !businessAddress)) {
       return NextResponse.json({ error: 'Business name and address are required for this role.' }, { status: 400 });
     }
@@ -64,21 +64,36 @@ export async function POST(req) {
       }
     }
 
-    // 2. SAVE ALL DATA: Create the new user with all data from the form.
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    const emailVerificationTokenExpires = new Date(Date.now() + 3600000); // 1 hour
+
     const newUser = new User({
-      ...allData, // Spread all fields from the request
+      ...allData,
       username,
       email,
       password: hashedPassword,
       role: finalRole,
       slug,
-      isPublished: ['customer', 'pharmacist'].includes(finalRole) // Publish customers and pharmacists by default
+      emailVerificationToken,
+      emailVerificationTokenExpires,
+      isPublished: ['customer', 'pharmacist'].includes(finalRole)
     });
 
     await newUser.save();
 
-    // 3. RETURN NEW USER: Send the complete user object back to the frontend.
-    return NextResponse.json({ message: 'User created successfully.', user: newUser }, { status: 201 });
+    const host = req.headers.get('host');
+    const protocol = host?.startsWith('localhost') ? 'http' : 'https';
+    const verificationUrl = `${protocol}://${host}/api/auth/verify-and-redirect?token=${emailVerificationToken}`;
+
+    await transporter.sendMail({
+        ...mailOptions,
+        to: newUser.email,
+        subject: 'Welcome to PharmastackX! Please Verify Your Email',
+        text: `Welcome to PharmastackX!\n\nPlease click the following link to verify your email address: ${verificationUrl}`,
+        html: `<h2>Welcome to PharmastackX!</h2><p>Please click the following link to verify your email address: <a href="${verificationUrl}">${verificationUrl}</a></p>`,
+    });
+
+    return NextResponse.json({ message: 'User created successfully. A verification email has been sent.', user: newUser }, { status: 201 });
 
   } catch (error) {
     console.error("Signup API Error:", error);
