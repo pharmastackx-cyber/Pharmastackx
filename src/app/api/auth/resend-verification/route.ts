@@ -1,5 +1,5 @@
 
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -9,9 +9,9 @@ import { transporter, mailOptions } from '@/lib/nodemailer';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
-export async function POST() {
+export async function POST(req: NextRequest) {
     await dbConnect();
-    const cookieStore = await cookies();
+    const cookieStore = cookies();
     const sessionToken = cookieStore.get('session_token');
 
     if (!sessionToken) {
@@ -43,7 +43,9 @@ export async function POST() {
         user.emailVerificationTokenExpires = emailVerificationTokenExpires;
         await user.save();
 
-        const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/verify-and-redirect?token=${emailVerificationToken}`;
+        const host = req.headers.get('host');
+        const protocol = host?.startsWith('localhost') ? 'http' : 'https';
+        const verificationUrl = `${protocol}://${host}/api/auth/verify-and-redirect?token=${emailVerificationToken}`;
 
         await transporter.sendMail({
             ...mailOptions,
