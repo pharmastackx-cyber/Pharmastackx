@@ -20,6 +20,7 @@ export interface IUser extends Document {
   };
   passwordResetToken?: string;
   passwordResetExpires?: Date;
+  fcmTokens?: string[];
   mobile?: string;
   stateOfPractice?: string;
   licenseNumber?: string;
@@ -61,6 +62,7 @@ const userSchema: Schema<IUser> = new mongoose.Schema({
   },
   passwordResetToken: { type: String },
   passwordResetExpires: { type: Date },
+  fcmTokens: { type: [String], default: [] },
   mobile: { type: String },
   stateOfPractice: { type: String },
   licenseNumber: { type: String },

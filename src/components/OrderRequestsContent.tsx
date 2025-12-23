@@ -14,6 +14,7 @@ import {
   Avatar,
 } from '@mui/material';
 import ManageRequest from './ManageRequest'; // Import the new component
+import NotificationPermission from './NotificationPermission'; // Import the notification component
 
 // Interfaces
 interface ItemDetail {
@@ -72,6 +73,7 @@ const OrderRequestsContent: React.FC = () => {
         <ManageRequest requestId={selectedRequestId} onBack={handleBackToList} />
       ) : (
         <>
+          
           {loading && <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>}
           {error && <Alert severity="error" sx={{ my: 2 }}>{error}</Alert>}
           {!loading && !error && requests.length === 0 && (

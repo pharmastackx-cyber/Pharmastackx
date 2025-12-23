@@ -29,6 +29,8 @@ import CartContent from "@/components/CartContent";
 import OrdersContent from "@/components/OrdersContent";
 import ReviewRequestContent from "@/components/ReviewRequestContent";
 import StoreManagement from "./components/StoreManagement";
+import { messaging } from '../lib/firebase';
+import { getToken } from 'firebase/messaging';
 
 import { Home as HomeIcon, Chat as ChatIcon, Person as PersonIcon, LocalPharmacy as PharmacyIcon, Medication as MedicationIcon } from '@mui/icons-material';
 
@@ -64,6 +66,50 @@ export default function HomePage() {
   const [otherUser, setOtherUser] = useState<UnifiedUser | null>(null);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [showNotification, setShowNotification] = useState(false);
+  const [permission, setPermission] = useState(Notification.permission);
+
+  const requestPermission = async () => {
+    try {
+      const permissionResult = await Notification.requestPermission();
+      setPermission(permissionResult);
+
+      if (permissionResult === 'granted') {
+        console.log('Notification permission granted.');
+        // Get the token
+        const vapidKey = "BJRiF8tiN4l1QHCuKQ3ePrLsSMBlyDIJcKdnU5TWQK2bhjpmEckbqgUjsm3cYgYr4xMqRDAF1QOHyw7xJ8L3Gqc";
+        const fcmToken = await getToken(messaging(), { vapidKey });
+        
+        if (fcmToken) {
+          console.log('FCM Token:', fcmToken);
+          // Send the token to your server
+          try {
+            const response = await fetch('/api/save-fcm-token', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ token: fcmToken }),
+            });
+
+            if (response.ok) {
+              console.log('FCM token saved successfully.');
+            } else {
+              console.error('Failed to save FCM token.');
+            }
+          } catch (error) {
+            console.error('Error saving FCM token:', error);
+          }
+        } else {
+
+          console.log('Can not get token, need to ask user to enable it in browser settings.');
+        }
+      } else {
+        console.log('Notification permission denied.');
+      }
+    } catch (error) {
+      console.error('An error occurred while requesting permission ', error);
+    }
+  };
 
   const normalizedUser: UnifiedUser | null = user ? { ...user, _id: user.id } : null;
 
@@ -286,7 +332,9 @@ useEffect(() => {
 
 
 const renderPageView = (title: string, layoutId: string, children?: React.ReactNode, fullWidthMobile: boolean = false) => {
-  const showButtons = view !== 'findPharmacy' && view !== 'account' && view !== 'about' && view !== 'contact' && view !== 'reviewRequest';
+  
+  const showButtons = view !== 'findPharmacy' && view !== 'account' && view !== 'about' && view !== 'contact' && view !== 'reviewRequest' && view !== 'orderRequests';
+
 
   return (
     <Box
@@ -362,6 +410,28 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
                             </Button>
                         </Box>
                     )}
+
+{view === 'orderRequests' && permission !== 'granted' && (
+                        <Button
+                            variant="outlined"
+                            onClick={requestPermission}
+                            sx={{
+                                borderRadius: '20px',
+                                borderColor: 'rgba(255, 255, 255, 0.8)',
+                                color: 'white',
+                                textTransform: 'uppercase',
+                                fontWeight: 'bold',
+                                '&:hover': {
+                                  borderColor: 'white',
+                                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                },
+                            }}
+                        >
+                            Enable Notifications
+                        </Button>
+                    )}
+
+
 
 
             </Paper>

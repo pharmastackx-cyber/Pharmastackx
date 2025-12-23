@@ -295,6 +295,17 @@ const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: stri
       setIsRadarModalOpen(true);
       fetchHistory();
 
+      // Notify pharmacists
+      try {
+        await fetch('/api/notify-pharmacists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId: newRequest._id }),
+        });
+      } catch (notifyError) {
+        console.error('Failed to send notification to pharmacists:', notifyError);
+      }
+
     } catch (error) {
       setGlobalError(error instanceof Error ? error.message : 'An unknown error occurred.');
     } finally {
