@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import User from '@/models/User';
 import { dbConnect } from '@/lib/mongoConnect';
-import bcrypt from 'bcryptjs';
 
 export async function POST(request: Request) {
   try {
@@ -14,38 +13,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Token and password are required.' }, { status: 400 });
     }
 
-    // Hash the incoming token to match the one stored in the DB
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(token)
-      .digest('hex');
+    if (password.length < 6) {
+      return NextResponse.json({ message: 'Password must be at least 6 characters long.' }, { status: 400 });
+    }
 
-    // Find the user with the matching token and ensure it has not expired
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
     const user = await User.findOne({
       passwordResetToken: hashedToken,
-      passwordResetExpires: { $gt: Date.now() }, // $gt ensures the expiration date is in the future
+      passwordResetExpires: { $gt: Date.now() },
     });
 
     if (!user) {
       return NextResponse.json({ message: 'Invalid or expired password reset token.' }, { status: 400 });
     }
 
-    // --- Hash New Password ---
-    if (password.length < 6) {
-        return NextResponse.json({ message: 'Password must be at least 6 characters long.' }, { status: 400 });
-    }
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // --- Update User in Database ---
-    user.password = hashedPassword;
-    user.passwordResetToken = undefined; // Clear the token
-    user.passwordResetExpires = undefined; // Clear the expiration
+    // Assign the plain password. The User model's pre-save hook will hash it correctly.
+    user.password = password;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
     await user.save();
 
-    return NextResponse.json({ message: 'Password has been successfully reset. You can now log in with your new password.' }, { status: 200 });
+    return NextResponse.json({ message: 'Password has been successfully reset.' }, { status: 200 });
 
   } catch (error) {
     console.error('Reset Password API Error:', error);
-    return NextResponse.json({ message: 'An unexpected error occurred.' }, { status: 500 });
+    return NextResponse.json({ message: 'An internal server error occurred.' }, { status: 500 });
   }
 }
