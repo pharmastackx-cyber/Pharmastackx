@@ -1,20 +1,29 @@
 
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
   const params = useParams();
-  const token = params?.token;
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Robustly get the token, ensuring it's a string
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (params?.token) {
+      const tokenValue = Array.isArray(params.token) ? params.token[0] : params.token;
+      setToken(tokenValue);
+    }
+  }, [params]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -27,8 +36,8 @@ export default function ResetPasswordPage() {
     }
 
     if (!token) {
-        setError('Invalid or missing reset token.');
-        return;
+      setError('Invalid or missing reset token.');
+      return;
     }
 
     setIsLoading(true);
@@ -40,7 +49,7 @@ export default function ResetPasswordPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          token,
+          token, // This is now guaranteed to be a string
           password,
         }),
       });
@@ -52,7 +61,6 @@ export default function ResetPasswordPage() {
       }
 
       setSuccess(data.message);
-      // Redirect to login page after a short delay
       setTimeout(() => {
         router.push('/auth');
       }, 3000);
@@ -107,7 +115,7 @@ export default function ResetPasswordPage() {
             <div>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !token}
                 className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400"
               >
                 {isLoading ? 'Resetting...' : 'Reset Password'}
