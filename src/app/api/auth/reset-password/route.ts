@@ -1,6 +1,5 @@
 
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
 import User from '@/models/User';
 import { dbConnect } from '@/lib/mongoConnect';
 
@@ -17,10 +16,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Password must be at least 6 characters long.' }, { status: 400 });
     }
 
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
-
+    // Find the user by the raw token, consistent with the rest of the app
     const user = await User.findOne({
-      passwordResetToken: hashedToken,
+      passwordResetToken: token,
       passwordResetExpires: { $gt: Date.now() },
     });
 
@@ -28,7 +26,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid or expired password reset token.' }, { status: 400 });
     }
 
-    // Assign the plain password. The User model's pre-save hook will hash it correctly.
+    // Assign the plain password. The User model's pre-save hook will hash it.
     user.password = password;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;

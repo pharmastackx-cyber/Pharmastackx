@@ -35,29 +35,24 @@ export async function POST(request: Request) {
     const email = originalEmail.toLowerCase();
     const user = await User.findOne({ email });
 
-    // For security, even if the user is not found, we don't reveal it.
-    // The email sending process will only trigger if the user exists.
     if (user) {
       const resetToken = crypto.randomBytes(32).toString('hex');
-      const passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
       const passwordResetExpires = new Date(Date.now() + 3600000); // 1 hour
 
-      user.passwordResetToken = passwordResetToken;
+      // Storing the raw token, consistent with other features
+      user.passwordResetToken = resetToken;
       user.passwordResetExpires = passwordResetExpires;
       await user.save();
       
-      // Directly call the email sending function. If it fails, the catch block below will handle it.
       await sendPasswordResetEmail(user.email, resetToken);
     }
 
-    // Return a generic success message to prevent email enumeration.
     return NextResponse.json({ 
       message: 'If an account with that email exists, a password reset link has been sent.' 
     }, { status: 200 });
 
   } catch (error) {
     console.error('Forgot Password API Error:', error);
-    // This will now catch errors from dbConnect, User.findOne, user.save, AND sendPasswordResetEmail.
     return NextResponse.json({ message: 'An internal server error occurred. Please try again later.' }, { status: 500 });
   }
 }
