@@ -170,25 +170,22 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     }
 
     const renderRoleSpecificDetails = () => {
-        if (detailedUser.role === 'pharmacy' || detailedUser.role === 'pharmacist') {
-            return (
-                <Box sx={{ width: '100%', mt: 2 }}>
-                    {detailedUser.businessName && (
-                        <ListItem>
-                            <ListItemIcon sx={{ color: 'grey.800' }}><Business /></ListItemIcon>
-                            <ListItemText primary="Business Name" secondary={detailedUser.businessName} secondaryTypographyProps={{ color: 'grey.600' }} />
-                        </ListItem>
-                    )}
-                    {detailedUser.businessAddress && (
-                         <ListItem>
-                            <ListItemIcon sx={{ color: 'grey.800' }}><LocationOn /></ListItemIcon>
-                            <ListItemText primary="Location" secondary={`${detailedUser.city}, ${detailedUser.state}`} secondaryTypographyProps={{ color: 'grey.600' }} />
-                        </ListItem>
-                    )}
-                </Box>
-            );
-        }
-        return null;
+        return (
+            <Box sx={{ width: '100%', mt: 2 }}>
+                {(detailedUser.role === 'pharmacy') && detailedUser.businessName && (
+                    <ListItem>
+                        <ListItemIcon sx={{ color: 'grey.800' }}><Business /></ListItemIcon>
+                        <ListItemText primary="Business Name" secondary={detailedUser.businessName} secondaryTypographyProps={{ color: 'grey.600' }} />
+                    </ListItem>
+                )}
+                {(detailedUser.role === 'pharmacy' || detailedUser.role === 'pharmacist') && (detailedUser.city || detailedUser.state) && (
+                     <ListItem>
+                        <ListItemIcon sx={{ color: 'grey.800' }}><LocationOn /></ListItemIcon>
+                        <ListItemText primary="Location" secondary={`${detailedUser.city || ''}, ${detailedUser.state || ''}`} secondaryTypographyProps={{ color: 'grey.600' }} />
+                    </ListItem>
+                )}
+            </Box>
+        );
     };
 
     const renderProfessionalVerification = () => {
@@ -321,7 +318,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                         value={editData.profilePicture || ''}
                         onChange={handleChange}
                     />
-                    {detailedUser.role !== 'user' && (
+                    {detailedUser.role === 'pharmacy' && (
                         <>
                             <TextField
                                 margin="dense"
@@ -341,7 +338,11 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                                 value={editData.businessAddress || ''}
                                 onChange={handleChange}
                             />
-                             <TextField
+                        </>
+                    )}
+                    {(detailedUser.role === 'pharmacy' || detailedUser.role === 'pharmacist') && (
+                        <>
+                            <TextField
                                 margin="dense"
                                 label="City"
                                 type="text"
@@ -350,7 +351,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                                 value={editData.city || ''}
                                 onChange={handleChange}
                             />
-                             <TextField
+                            <TextField
                                 margin="dense"
                                 label="State"
                                 type="text"
