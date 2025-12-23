@@ -1,6 +1,5 @@
 
 import { NextResponse, NextRequest } from 'next/server';
-import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { dbConnect } from '@/lib/mongoConnect';
@@ -11,8 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
 export async function POST(req: NextRequest) {
     await dbConnect();
-    const cookieStore = cookies();
-    const sessionToken = cookieStore.get('session_token');
+    const sessionToken = req.cookies.get('session_token');
 
     if (!sessionToken) {
         return NextResponse.json({ message: 'Not authenticated' }, { status: 401 });
