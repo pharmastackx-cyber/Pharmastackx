@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 
 import { useRouter } from 'next/navigation';
-import { Box, Typography, Paper, TextField, IconButton, Button, Grid, CircularProgress, Badge } from "@mui/material";
+import { Box, Typography, Paper, TextField, IconButton, Button, Grid, CircularProgress, Badge, Snackbar, Alert } from "@mui/material";
 import { motion, AnimatePresence, Variants, LayoutGroup } from "framer-motion";
 import SearchIcon from "@mui/icons-material/Search";
 import { useSession } from "@/context/SessionProvider";
@@ -63,6 +63,7 @@ export default function HomePage() {
   const [view, setView] = useState('home');
   const [otherUser, setOtherUser] = useState<UnifiedUser | null>(null);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+  const [showNotification, setShowNotification] = useState(false);
 
   const normalizedUser: UnifiedUser | null = user ? { ...user, _id: user.id } : null;
 
@@ -89,6 +90,11 @@ useEffect(() => {
   if (!searchParams) return;
 
   const viewParam = searchParams.get('view');
+  const verificationParam = searchParams.get('verification');
+
+  if (verificationParam === 'success') {
+    setShowNotification(true);
+  }
 
   if (viewParam === 'orderMedicines') {
     setView('orderMedicines');
@@ -419,6 +425,16 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
       pb: bottomPadding,
       
     }}>
+       <Snackbar
+        open={showNotification}
+        autoHideDuration={6000}
+        onClose={() => setShowNotification(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setShowNotification(false)} severity="success" sx={{ width: '100%' }}>
+          Verification complete! Check your status in the account tab.
+        </Alert>
+      </Snackbar>
       <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60vh', zIndex: 0 }}>
           <MapBackground />
         </Box>

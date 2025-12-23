@@ -8,10 +8,13 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token');
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+    const host = req.headers.get('host');
+    const protocol = host?.startsWith('localhost') ? 'http' : 'https';
+    const baseUrl = `${protocol}://${host}`;
 
     if (!token) {
-        return NextResponse.redirect(`${appUrl}/auth?error=verification_failed`);
+        return NextResponse.redirect(`${baseUrl}/?error=verification_failed`);
     }
 
     try {
@@ -21,7 +24,7 @@ export async function GET(req: NextRequest) {
         });
 
         if (!user) {
-            return NextResponse.redirect(`${appUrl}/auth?error=invalid_token`);
+            return NextResponse.redirect(`${baseUrl}/?error=invalid_token`);
         }
 
         user.emailVerified = true;
@@ -29,10 +32,11 @@ export async function GET(req: NextRequest) {
         user.emailVerificationTokenExpires = undefined;
         await user.save();
 
-        return NextResponse.redirect(`${appUrl}/account`);
+        // Redirect to the homepage with a success query parameter
+        return NextResponse.redirect(`${baseUrl}/?verification=success`);
 
     } catch (error) {
         console.error('Email verification error:', error);
-        return NextResponse.redirect(`${appUrl}/auth?error=verification_failed`);
+        return NextResponse.redirect(`${baseUrl}/?error=verification_failed`);
     }
 }
