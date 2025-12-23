@@ -22,9 +22,7 @@ export default function ForgotPasswordForm({ onSuccess }: ForgotPasswordFormProp
       await axios.post("/api/auth/forgot-password", { email });
       setSuccess("Password reset link sent! Please check your email.");
       setLoading(false);
-      setTimeout(() => {
-        onSuccess();
-      }, 1500); // Wait 1.5 seconds before calling onSuccess
+      onSuccess(); 
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to send reset link. Please check the email address.");
       setLoading(false);
