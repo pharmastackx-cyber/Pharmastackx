@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { TextField, Button, InputAdornment, IconButton, Box, Typography, Alert } from "@mui/material";
 import { Visibility, VisibilityOff } from '@mui/icons-material';
-import Link from 'next/link';
 import axios from "axios";
 import Cookies from "js-cookie";
 import { useSession } from "@/context/SessionProvider"; // Import useSession
@@ -98,13 +97,6 @@ export default function LoginForm({
           ),
         }}
       />
-      <Box sx={{ textAlign: 'right', mb: 2 }}>
-        <Link href="/auth/forgot-password" passHref>
-          <Typography color="secondary" sx={{ textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
-            Forgot Password?
-          </Typography>
-        </Link>
-      </Box>
       <Button
         type="submit"
         variant="contained"

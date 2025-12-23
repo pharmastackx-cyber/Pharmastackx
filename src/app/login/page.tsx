@@ -15,7 +15,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.post("/api/auth/login", { email, password });
+      const res = await axios.post("/api/auth", { email, password });
       
       // The FIX: Use cookies to store the session token
       Cookies.set("session_token", res.data.token, { expires: 7 });

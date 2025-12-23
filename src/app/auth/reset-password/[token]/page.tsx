@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
       setSuccess(data.message);
       // Redirect to login page after a short delay
       setTimeout(() => {
-        router.push('/auth/login');
+        router.push('/auth');
       }, 3000);
 
     } catch (err: any) {
@@ -118,7 +118,7 @@ export default function ResetPasswordPage() {
           <div className="text-center">
             <p className="text-green-600">{success}</p>
             <p className="mt-4">
-              You will be redirected to the <Link href="/auth/login" className="text-indigo-600 hover:underline">Login</Link> page shortly.
+              You will be redirected to the <Link href="/auth" className="text-indigo-600 hover:underline">Login</Link> page shortly.
             </p>
           </div>
         )}
