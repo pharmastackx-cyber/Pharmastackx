@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from "@/context/SessionProvider";
 import { Box, Typography, Avatar, Button, Paper, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Chip, Grid, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from "@mui/material";
-import { Person, VpnKey, Logout, Info, ContactMail, Business, LocationOn, MarkEmailRead, Pending, VerifiedUser } from "@mui/icons-material";
+import { Person, VpnKey, Logout, Info, ContactMail, Business, LocationOn, MarkEmailRead, Pending, VerifiedUser, ArrowBack } from "@mui/icons-material";
 import FileUpload from './FileUpload';
+import SubscriptionContent from './SubscriptionContent';
 
 interface AccountContentProps {
     setView: (view: string) => void;
@@ -25,10 +26,11 @@ interface DetailedUser {
     city?: string;
     emailVerified: boolean;
     professionalVerificationStatus: 'not_started' | 'pending_review' | 'approved' | 'rejected';
+    subscriptionStatus: 'subscribed' | 'unsubscribed';
 }
 
 const AccountContent = ({ setView }: AccountContentProps) => {
-    const { user: sessionUser, isLoading: isSessionLoading } = useSession();
+    const { user: sessionUser, isLoading: isSessionLoading, refreshSession } = useSession();
     const [detailedUser, setDetailedUser] = useState<DetailedUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -37,6 +39,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     const [resendStatus, setResendStatus] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploadStatus, setUploadStatus] = useState('');
+    const [showSubscription, setShowSubscription] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -154,6 +157,11 @@ const AccountContent = ({ setView }: AccountContentProps) => {
         }
     };
 
+    const handleSubscriptionSuccess = () => {
+        refreshSession(); // Refresh session to get updated user details
+        setShowSubscription(false);
+    };
+
     if (isSessionLoading || isLoading) {
         return <CircularProgress sx={{ display: 'block', margin: 'auto', mt: 4 }} />;
     }
@@ -218,85 +226,100 @@ const AccountContent = ({ setView }: AccountContentProps) => {
 
     return (
         <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, bgcolor: 'white', color: 'black', borderRadius: '16px', width: '100%', maxWidth: '600px', margin: 'auto' }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-                <Avatar src={detailedUser.profilePicture} sx={{ width: 80, height: 80, mb: 2, bgcolor: 'primary.main', color: 'white', fontSize: '2.5rem' }}>
-                    {detailedUser.username?.charAt(0).toUpperCase()}
-                </Avatar>
-                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{detailedUser.username}</Typography>
-                <Typography variant="body1" sx={{ color: 'grey.600' }}>{detailedUser.email}</Typography>
-            </Box>
-
-            <List dense>
-                {renderRoleSpecificDetails()}
-                <ListItem>
-                    <ListItemText primary="Email Verification" />
-                    <Chip 
-                        icon={detailedUser.emailVerified ? <MarkEmailRead /> : undefined}
-                        label={detailedUser.emailVerified ? "Verified" : "Unverified"} 
-                        color={detailedUser.emailVerified ? "success" : "warning"} 
-                        size="small" 
-                    />
-                    {!detailedUser.emailVerified && (
-                        <Button size="small" onClick={handleResendVerification} disabled={resendStatus === 'sending' || resendStatus === 'sent'} sx={{ ml: 1 }}>
-                            {resendStatus === 'sending' ? 'Sending...' : resendStatus === 'sent' ? 'Sent!' : 'Resend'}
-                        </Button>
-                    )}
-                </ListItem>
-                {renderProfessionalVerification()}
-                <ListItem>
-                    <ListItemText primary="Subscription Status" />
-                    <Chip label="Unsubscribed" color="default" size="small" />
-                </ListItem>
-            </List>
-
-            {(detailedUser.role === 'pharmacy' || detailedUser.role === 'pharmacist') && detailedUser.professionalVerificationStatus !== 'approved' && (
-                 <Box sx={{ my: 2 }}>
-                    <Typography variant="h6" sx={{ mb: 1 }}>Submit Verification Documents</Typography>
-                    <FileUpload onFileSelect={handleFileSelect} />
-                    <Button 
-                        variant="contained" 
-                        onClick={handleUpload} 
-                        disabled={!selectedFile || uploadStatus === 'uploading' || uploadStatus === 'success'}
-                        sx={{ mt: 1 }}
-                    >
-                        {uploadStatus === 'uploading' ? 'Uploading...' : uploadStatus === 'success' ? 'Uploaded!' : 'Upload'}
+            {showSubscription ? (
+                <Box>
+                    <Button startIcon={<ArrowBack />} onClick={() => setShowSubscription(false)} sx={{ mb: 2 }}>
+                        Back to Account
                     </Button>
-                 </Box>
+                    <SubscriptionContent onSubscriptionSuccess={handleSubscriptionSuccess} />
+                </Box>
+            ) : (
+                <>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
+                        <Avatar src={detailedUser.profilePicture} sx={{ width: 80, height: 80, mb: 2, bgcolor: 'primary.main', color: 'white', fontSize: '2.5rem' }}>
+                            {detailedUser.username?.charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{detailedUser.username}</Typography>
+                        <Typography variant="body1" sx={{ color: 'grey.600' }}>{detailedUser.email}</Typography>
+                    </Box>
+
+                    <List dense>
+                        {renderRoleSpecificDetails()}
+                        <ListItem>
+                            <ListItemText primary="Email Verification" />
+                            <Chip 
+                                icon={detailedUser.emailVerified ? <MarkEmailRead /> : undefined}
+                                label={detailedUser.emailVerified ? "Verified" : "Unverified"} 
+                                color={detailedUser.emailVerified ? "success" : "warning"} 
+                                size="small" 
+                            />
+                            {!detailedUser.emailVerified && (
+                                <Button size="small" onClick={handleResendVerification} disabled={resendStatus === 'sending' || resendStatus === 'sent'} sx={{ ml: 1 }}>
+                                    {resendStatus === 'sending' ? 'Sending...' : resendStatus === 'sent' ? 'Sent!' : 'Resend'}
+                                </Button>
+                            )}
+                        </ListItem>
+                        {renderProfessionalVerification()}
+                        <ListItem button onClick={() => setShowSubscription(true)}>
+                            <ListItemText primary="Subscription Status" />
+                            <Chip 
+                                label={detailedUser.subscriptionStatus === 'subscribed' ? "Subscribed" : "Unsubscribed"} 
+                                color={detailedUser.subscriptionStatus === 'subscribed' ? "success" : "default"} 
+                                size="small" 
+                            />
+                        </ListItem>
+                    </List>
+
+                    {(detailedUser.role === 'pharmacy' || detailedUser.role === 'pharmacist') && detailedUser.professionalVerificationStatus !== 'approved' && (
+                         <Box sx={{ my: 2 }}>
+                            <Typography variant="h6" sx={{ mb: 1 }}>Submit Verification Documents</Typography>
+                            <FileUpload onFileSelect={handleFileSelect} />
+                            <Button 
+                                variant="contained" 
+                                onClick={handleUpload} 
+                                disabled={!selectedFile || uploadStatus === 'uploading' || uploadStatus === 'success'}
+                                sx={{ mt: 1 }}
+                            >
+                                {uploadStatus === 'uploading' ? 'Uploading...' : uploadStatus === 'success' ? 'Uploaded!' : 'Upload'}
+                            </Button>
+                         </Box>
+                    )}
+
+                    <Divider sx={{ my: 2, borderColor: 'rgba(0,0,0,0.12)' }} />
+
+                    <List dense>
+                         <ListItem button onClick={handleEdit}>
+                            <ListItemIcon sx={{ color: 'grey.800', minWidth: '40px' }}><Person /></ListItemIcon>
+                            <ListItemText primary="Edit Profile" />
+                        </ListItem>
+                        <ListItem button onClick={() => { /* TODO: Implement change password */ }}>
+                            <ListItemIcon sx={{ color: 'grey.800', minWidth: '40px' }}><VpnKey /></ListItemIcon>
+                            <ListItemText primary="Change Password" />
+                        </ListItem>
+                    </List>
+                    
+                    <Divider sx={{ my: 2, borderColor: 'rgba(0,0,0,0.12)' }} />
+
+                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                        <Grid item xs={6}>
+                            <Button fullWidth variant="outlined" startIcon={<Info />} onClick={() => setView('about')} sx={{ color: 'grey.800', borderColor: 'rgba(0,0,0,0.23)' }}>About Us</Button>
+                        </Grid>
+                        <Grid item xs={6}>
+                            <Button fullWidth variant="outlined" startIcon={<ContactMail />} onClick={() => setView('contact')} sx={{ color: 'grey.800', borderColor: 'rgba(0,0,0,0.23)' }}>Contact</Button>
+                        </Grid>
+                    </Grid>
+
+                    <Button
+                        variant="contained"
+                        color="error"
+                        startIcon={<Logout />}
+                        onClick={handleLogout}
+                        fullWidth
+                    >
+                        Logout
+                    </Button>
+                </>
             )}
-
-            <Divider sx={{ my: 2, borderColor: 'rgba(0,0,0,0.12)' }} />
-
-            <List dense>
-                 <ListItem button onClick={handleEdit}>
-                    <ListItemIcon sx={{ color: 'grey.800', minWidth: '40px' }}><Person /></ListItemIcon>
-                    <ListItemText primary="Edit Profile" />
-                </ListItem>
-                <ListItem button onClick={() => { /* TODO: Implement change password */ }}>
-                    <ListItemIcon sx={{ color: 'grey.800', minWidth: '40px' }}><VpnKey /></ListItemIcon>
-                    <ListItemText primary="Change Password" />
-                </ListItem>
-            </List>
-            
-            <Divider sx={{ my: 2, borderColor: 'rgba(0,0,0,0.12)' }} />
-
-            <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={6}>
-                    <Button fullWidth variant="outlined" startIcon={<Info />} onClick={() => setView('about')} sx={{ color: 'grey.800', borderColor: 'rgba(0,0,0,0.23)' }}>About Us</Button>
-                </Grid>
-                <Grid item xs={6}>
-                    <Button fullWidth variant="outlined" startIcon={<ContactMail />} onClick={() => setView('contact')} sx={{ color: 'grey.800', borderColor: 'rgba(0,0,0,0.23)' }}>Contact</Button>
-                </Grid>
-            </Grid>
-
-            <Button
-                variant="contained"
-                color="error"
-                startIcon={<Logout />}
-                onClick={handleLogout}
-                fullWidth
-            >
-                Logout
-            </Button>
             <Dialog open={isEditMode} onClose={handleClose} fullWidth maxWidth="sm">
                 <DialogTitle>Edit Profile</DialogTitle>
                 <DialogContent>

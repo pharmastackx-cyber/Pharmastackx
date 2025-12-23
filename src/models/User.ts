@@ -29,6 +29,9 @@ export interface IUser extends Document {
   emailVerificationTokenExpires?: Date;
   professionalVerificationStatus: 'not_started' | 'pending_review' | 'approved' | 'rejected';
   verificationDocuments: string[];
+  subscriptionStatus: 'subscribed' | 'unsubscribed';
+  subscriptionExpiry?: Date;
+  orderCount: number;
 }
 
 // The schema defines the blueprint for the database
@@ -71,6 +74,9 @@ const userSchema: Schema<IUser> = new mongoose.Schema({
     default: 'not_started',
   },
   verificationDocuments: { type: [String], default: [] },
+  subscriptionStatus: { type: String, enum: ['subscribed', 'unsubscribed'], default: 'unsubscribed' },
+  subscriptionExpiry: { type: Date },
+  orderCount: { type: Number, default: 0 },
 });
 
 // This line creates the model
