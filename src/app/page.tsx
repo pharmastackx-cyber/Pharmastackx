@@ -66,7 +66,8 @@ export default function HomePage() {
   const [otherUser, setOtherUser] = useState<UnifiedUser | null>(null);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [showNotification, setShowNotification] = useState(false);
-  const [permission, setPermission] = useState(Notification.permission);
+  const [permission, setPermission] = useState<'default' | 'granted' | 'denied'>('default');
+
 
   const requestPermission = async () => {
     try {
@@ -150,6 +151,14 @@ useEffect(() => {
     setView('findMedicines');
   }
 }, [searchParams]);
+
+useEffect(() => {
+  // Safely check for notification permission only on the client-side
+  if (typeof window !== 'undefined' && 'Notification' in window) {
+    setPermission(Notification.permission);
+  }
+}, []); // The empty array ensures this runs only once when the component mounts
+
 
 
 
