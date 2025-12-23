@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Button, Typography, Paper, Box } from '@mui/material';
+import { useState } from 'react';
+import { Button, Typography, Paper } from '@mui/material';
 import { messaging } from '../lib/firebase';
 import { getToken } from 'firebase/messaging';
 
@@ -21,7 +21,25 @@ export default function NotificationPermission() {
         
         if (fcmToken) {
           console.log('FCM Token:', fcmToken);
-          // TODO: Send this token to your server to save it
+          // Send this token to your server to save it
+          try {
+            const response = await fetch('/api/save-fcm-token', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ token: fcmToken }),
+            });
+
+            if (response.ok) {
+              console.log('FCM token sent to server successfully.');
+              setPermission('granted'); // Hide component on success
+            } else {
+              console.error('Failed to send FCM token to server:', await response.text());
+            }
+          } catch (error) {
+            console.error('Error sending FCM token to server:', error);
+          }
         } else {
           console.log('Can not get token, need to ask user to enable it in browser settings.');
         }
