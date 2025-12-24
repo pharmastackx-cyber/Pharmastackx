@@ -8,7 +8,11 @@ import User from '@/models/User';
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
 export async function POST(req: NextRequest) {
+  // --- Start of Fix ---
+  // Restore the `await` keyword. The cookies() function is asynchronous.
   const cookieStore = await cookies();
+  // --- End of Fix ---
+  
   const sessionToken = cookieStore.get('session_token');
 
   if (!sessionToken) {
@@ -21,7 +25,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'FCM token is required' }, { status: 400 });
     }
 
-    // Verify the JWT to get the user's ID
     const payload = jwt.verify(sessionToken.value, JWT_SECRET) as { userId: string };
     const userId = payload.userId;
 
@@ -31,16 +34,19 @@ export async function POST(req: NextRequest) {
 
     await dbConnect();
 
-    // Find the user and add the new token if it doesn't already exist
-    await User.findByIdAndUpdate(userId, {
+    // Find the user and add the new token, with a check to ensure it worked.
+    const updatedUser = await User.findByIdAndUpdate(userId, {
       $addToSet: { fcmTokens: token },
-    });
+    }, { new: true });
+
+    if (!updatedUser) {
+      return NextResponse.json({ message: 'User not found or could not be updated.' }, { status: 404 });
+    }
 
     return NextResponse.json({ message: 'FCM token saved successfully' }, { status: 200 });
 
   } catch (error) {
     console.error('Error saving FCM token:', error);
-    // Check for specific JWT errors
     if (error instanceof jwt.JsonWebTokenError) {
       return NextResponse.json({ message: 'Unauthorized: Invalid token' }, { status: 401 });
     }
