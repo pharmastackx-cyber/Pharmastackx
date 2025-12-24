@@ -1,10 +1,8 @@
 
-// Import the Firebase app and messaging libraries
-import { initializeApp } from "firebase/app";
-import { getMessaging } from "firebase/messaging/sw";
+// Scripts for Firebase v9+
+self.importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js');
+self.importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js');
 
-// Your web app's Firebase configuration
-// This needs to be here for the service worker to work
 const firebaseConfig = {
   apiKey: "AIzaSyABreq9YVCdK7k_t6bShsigK8Rmiiz5Um0",
   authDomain: "pharmastackx-a3beb.firebaseapp.com",
@@ -14,9 +12,21 @@ const firebaseConfig = {
   appId: "1:438683670037:web:1424ea0ad070281c5de01c",
 };
 
-// Initialize the Firebase app in the service worker
-const app = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
+firebase.initializeApp(firebaseConfig);
 
-// The service worker can listen for background messages here if needed
-// For now, it just needs to be present to handle notifications
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage((payload) => {
+  console.log(
+    '[firebase-messaging-sw.js] Received background message ',
+    payload
+  );
+  // Customize notification here
+  const notificationTitle = payload.notification.title;
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: '/icons/icon-192x192.png'
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
+});

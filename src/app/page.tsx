@@ -67,50 +67,63 @@ export default function HomePage() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [showNotification, setShowNotification] = useState(false);
   const [permission, setPermission] = useState<'default' | 'granted' | 'denied'>('default');
+  const [notificationSyncStatus, setNotificationSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+
+  useEffect(() => {
+    if (notificationSyncStatus === 'success') {
+        const timer = setTimeout(() => setNotificationSyncStatus('idle'), 3000); // Revert to idle after 3 seconds
+        return () => clearTimeout(timer);
+    }
+}, [notificationSyncStatus]);
 
 
-  const requestPermission = async () => {
-    try {
-      const permissionResult = await Notification.requestPermission();
-      setPermission(permissionResult);
+const requestPermission = async () => {
+  setNotificationSyncStatus('syncing');
+  try {
+    const permissionResult = await Notification.requestPermission();
+    setPermission(permissionResult);
 
-      if (permissionResult === 'granted') {
-        console.log('Notification permission granted.');
-        // Get the token
-        const vapidKey = "BJRiF8tiN4l1QHCuKQ3ePrLsSMBlyDIJcKdnU5TWQK2bhjpmEckbqgUjsm3cYgYr4xMqRDAF1QOHyw7xJ8L3Gqc";
-        const fcmToken = await getToken(messaging(), { vapidKey });
-        
-        if (fcmToken) {
-          console.log('FCM Token:', fcmToken);
-          // Send the token to your server
-          try {
-            const response = await fetch('/api/save-fcm-token', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ token: fcmToken }),
-            });
+    if (permissionResult === 'granted') {
+      console.log('Notification permission granted.');
+      const vapidKey = "BJRiF8tiN4l1QHCuKQ3ePrLsSMBlyDIJcKdnU5TWQK2bhjpmEckbqgUjsm3cYgYr4xMqRDAF1QOHyw7xJ8L3Gqc";
+      const fcmToken = await getToken(messaging(), { vapidKey });
+      
+      if (fcmToken) {
+        console.log('FCM Token:', fcmToken);
+        try {
+          const response = await fetch('/api/save-fcm-token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token: fcmToken }),
+          });
 
-            if (response.ok) {
-              console.log('FCM token saved successfully.');
-            } else {
-              console.error('Failed to save FCM token.');
-            }
-          } catch (error) {
-            console.error('Error saving FCM token:', error);
+          if (response.ok) {
+            console.log('FCM token saved successfully.');
+            setNotificationSyncStatus('success');
+          } else {
+            console.error('Failed to save FCM token.');
+            setNotificationSyncStatus('error');
           }
-        } else {
-
-          console.log('Can not get token, need to ask user to enable it in browser settings.');
+        } catch (error) {
+          console.error('Error saving FCM token:', error);
+          setNotificationSyncStatus('error');
         }
       } else {
-        console.log('Notification permission denied.');
+        console.log('Can not get token, need to ask user to enable it in browser settings.');
+        setNotificationSyncStatus('error');
       }
-    } catch (error) {
-      console.error('An error occurred while requesting permission ', error);
+    } else {
+      console.log('Notification permission denied.');
+      setNotificationSyncStatus('idle'); 
     }
-  };
+  } catch (error) {
+    console.error('An error occurred while requesting permission ', error);
+    setNotificationSyncStatus('error');
+  }
+};
+
 
   const normalizedUser: UnifiedUser | null = user ? { ...user, _id: user.id } : null;
 
@@ -420,25 +433,35 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
                         </Box>
                     )}
 
-{view === 'orderRequests' && permission !== 'granted' && (
-                        <Button
-                            variant="outlined"
-                            onClick={requestPermission}
-                            sx={{
-                                borderRadius: '20px',
-                                borderColor: 'rgba(255, 255, 255, 0.8)',
-                                color: 'white',
-                                textTransform: 'uppercase',
-                                fontWeight: 'bold',
-                                '&:hover': {
-                                  borderColor: 'white',
-                                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                },
-                            }}
-                        >
-                            Enable Notifications
-                        </Button>
-                    )}
+{view === 'orderRequests' && (
+    <Button
+        variant="outlined"
+        onClick={requestPermission}
+        disabled={notificationSyncStatus === 'syncing'}
+        sx={{
+            borderRadius: '20px',
+            borderColor: notificationSyncStatus === 'success' ? 'lightgreen' : 'rgba(255, 255, 255, 0.8)',
+            color: notificationSyncStatus === 'success' ? 'lightgreen' : 'white',
+            textTransform: 'uppercase',
+            fontWeight: 'bold',
+            '&:hover': {
+              borderColor: 'white',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            },
+            transition: 'border-color 0.3s, color 0.3s',
+            '&.Mui-disabled': {
+                color: 'rgba(255, 255, 255, 0.5)',
+                borderColor: 'rgba(255, 255, 255, 0.5)'
+            }
+        }}
+    >
+        {notificationSyncStatus === 'syncing' ? 'Syncing...' : 
+         notificationSyncStatus === 'success' ? 'Sync Successful' :
+         notificationSyncStatus === 'error' ? 'Sync Error - Retry?' :
+         (permission === 'granted' ? 'Resync Notifications' : 'Enable Notifications')}
+    </Button>
+)}
+
 
 
 
