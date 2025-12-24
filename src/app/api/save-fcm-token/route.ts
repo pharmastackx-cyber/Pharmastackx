@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { dbConnect } from '@/lib/mongoConnect';
 import User from '@/models/User';
+import { IUser } from '@/models/User'; // Assuming IUser is exported from your User model
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
@@ -22,8 +23,6 @@ export async function POST(request: Request) {
     }
 
     const sessionCookie = request.headers.get('cookie');
-    console.log("Cookie from request:", sessionCookie);
-
     const sessionToken = sessionCookie?.split('; ').find(c => c.startsWith('session_token='))?.split('=')[1];
 
     if (!sessionToken) {
@@ -42,12 +41,11 @@ export async function POST(request: Request) {
     }
 
     const userBeforeUpdate = await User.findById(userId);
-    console.log("User found before update:", userBeforeUpdate);
-
     if (!userBeforeUpdate) {
         console.log("User with this ID not found in the database.");
         return NextResponse.json({ error: 'User not found.' }, { status: 404 });
     }
+    console.log("User found before update. FCM Tokens:", userBeforeUpdate.fcmTokens);
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
@@ -55,12 +53,18 @@ export async function POST(request: Request) {
       { new: true }
     );
 
-    console.log("User after update:", updatedUser);
+    console.log("User after update attempt:", updatedUser);
 
-    if (updatedUser.fcmTokens.includes(fcmToken)) {
+    if (!updatedUser) {
+        console.log("User was not found for update, despite being found moments before.");
+        return NextResponse.json({ error: 'User disappeared during update operation.' }, { status: 500 });
+    }
+
+    // Check if the fcmTokens array exists and includes the token
+    if (updatedUser.fcmTokens && updatedUser.fcmTokens.includes(fcmToken)) {
       console.log("FCM token successfully added to user's token list.");
     } else {
-      console.log("Token was not added. This is the problem!");
+      console.log("Token was not added after the update operation. This is the problem!");
       console.log("Current fcmTokens array:", updatedUser.fcmTokens);
     }
 
