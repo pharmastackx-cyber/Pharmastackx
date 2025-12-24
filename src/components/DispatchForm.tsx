@@ -262,7 +262,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: stri
       }
   };
 
-  const handleConfirmDispatch = async () => {
+ const handleConfirmDispatch = async () => {
     setIsModalOpen(false);
     setGlobalError(null);
     if (requestedDrugs.length === 0) {
@@ -270,6 +270,9 @@ const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: stri
         return;
     }
     setIsSubmitting(true);
+
+    // Extract drug names for the dynamic notification
+    const drugNames = requestedDrugs.map(drug => drug.name);
 
     const payload = {
       requestType: 'drug-list',
@@ -295,12 +298,15 @@ const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: stri
       setIsRadarModalOpen(true);
       fetchHistory();
 
-      // Notify pharmacists
+      // Notify pharmacists with the dynamic list of drugs
       try {
         await fetch('/api/notify-pharmacists', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requestId: newRequest._id }),
+          body: JSON.stringify({ 
+            requestId: newRequest._id,
+            drugNames: drugNames // Pass the extracted drug names
+          }),
         });
       } catch (notifyError) {
         console.error('Failed to send notification to pharmacists:', notifyError);
@@ -312,6 +318,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: stri
       setIsSubmitting(false);
     }
   };
+
 
   const handleCloseRadarModal = () => {
     setIsRadarModalOpen(false);
