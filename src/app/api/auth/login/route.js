@@ -14,8 +14,7 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
   }
 
-   // Convert email to lowercase before searching
-   const user = await User.findOne({ email: email.toLowerCase() });
+  const user = await User.findOne({ email: email.toLowerCase() });
   
   if (!user) {
     return NextResponse.json({ error: 'No account found with this email.' }, { status: 404 }); 
@@ -32,5 +31,21 @@ export async function POST(req) {
     { expiresIn: '7d' }
   );
 
-  return NextResponse.json({ token, user: { name: user.name, email: user.email, role: user.role } });
+  // --- Start of The Fix ---
+  // Create a response object to return user data
+  const response = NextResponse.json({
+    message: "Login successful",
+    user: { name: user.name, email: user.email, role: user.role }
+  });
+
+  // Set the session token as a secure, HttpOnly cookie
+  response.cookies.set('session_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 7, // 7 days in seconds
+    path: '/', // Available to all paths
+  });
+
+  return response;
+  // --- End of The Fix ---
 }

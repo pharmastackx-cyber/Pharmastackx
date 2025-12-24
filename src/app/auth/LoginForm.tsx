@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { TextField, Button, InputAdornment, IconButton, Box, Typography, Alert } from "@mui/material";
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from "axios";
-import Cookies from "js-cookie";
 import { useSession } from "@/context/SessionProvider"; // Import useSession
 
 export default function LoginForm({
@@ -43,8 +42,11 @@ export default function LoginForm({
     setError("");
     setSuccess("");
     try {
-      const res = await axios.post("/api/auth/login", { email, password });
-      Cookies.set("session_token", res.data.token, { expires: 7 });
+      await axios.post("/api/auth/login", { email, password });
+      // --- Start of The Fix ---
+      // The server now sets the session cookie, so we no longer need to set it here.
+      // Cookies.set("session_token", res.data.token, { expires: 7 });
+      // --- End of The Fix ---
       setSuccess("Login successful! Redirecting...");
       
       // Refresh the session to update the UI
