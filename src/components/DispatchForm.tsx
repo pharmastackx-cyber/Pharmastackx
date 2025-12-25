@@ -335,6 +335,11 @@ const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: stri
       }
   };
 
+  const handleGuestContinue = () => {
+    setIsLoginModalOpen(false);
+    setIsModalOpen(true);
+  };
+
   if (isSessionLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: 'white' }}>
@@ -551,9 +556,12 @@ const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: stri
                 <Typography sx={{ mt: 2 }}>
                     Please log in or create an account to submit your request. Your list will be saved for when you return.
                 </Typography>
-                <Link href="/auth?redirect=/dispatch" passHref>
-                    <Button variant="contained" sx={{ mt: 3 }}>Login / Sign Up</Button>
-                </Link>
+                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
+                    <Link href="/auth?redirect=/dispatch" passHref>
+                        <Button variant="contained">Login / Sign Up</Button>
+                    </Link>
+                    <Button variant="outlined" onClick={handleGuestContinue}>Continue as Guest</Button>
+                </Box>
             </Box>
         </Modal>
     </Box>

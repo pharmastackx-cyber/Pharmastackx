@@ -2,6 +2,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
 import RequestModel from '@/models/Request';
+import UserModel from '@/models/User';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
@@ -25,14 +26,26 @@ export async function POST(req: NextRequest) {
   console.log('[LOG] Database connected.');
 
   const session = await getSession(req);
-  if (!session?.userId) {
-    console.error('[ERROR] Session validation failed. Session:', session);
-    return NextResponse.json({ message: 'Unauthorized: Session is invalid or missing user ID' }, { status: 401 });
-  }
-
-  console.log(`[LOG] Session validated for userId: ${session.userId}`);
+  let userId;
 
   try {
+    if (session?.userId) {
+      console.log(`[LOG] Session found for userId: ${session.userId}`);
+      userId = session.userId;
+    } else {
+      console.log('[LOG] No session found. Creating placeholder user.');
+      const uniqueId = 'guest_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+      const newUser = new UserModel({
+        username: uniqueId,
+        email: `${uniqueId}@placeholder.com`,
+        password: `GuestPassword_${uniqueId}`, // This should be securely generated and handled
+        role: 'customer',
+      });
+      await newUser.save();
+      userId = newUser._id;
+      console.log(`[LOG] Placeholder user created with ID: ${userId}`);
+    }
+
     const body = await req.json();
     console.log('[LOG] Request body parsed:', body);
 
@@ -48,8 +61,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Request type is required' }, { status: 400 });
     }
 
-    const requestData = {
-      user: session.userId,
+    const requestData: any = {
+      user: userId,
       requestType,
       items: items || [],
       status: 'pending',
@@ -64,9 +77,12 @@ export async function POST(req: NextRequest) {
     console.log('[LOG] Save successful! Document ID:', newRequest._id);
     return NextResponse.json(newRequest, { status: 201 });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('[FATAL] Error creating request in database:', error);
-    return NextResponse.json({ message: 'Internal Server Error while creating request.' }, { status: 500 });
+    if (error.name === 'ValidationError') {
+      return NextResponse.json({ message: 'Validation failed', errors: error.errors }, { status: 400 });
+    }
+    return NextResponse.json({ message: 'Internal Server Error while creating request.', error: error.message }, { status: 500 });
   }
 }
 
