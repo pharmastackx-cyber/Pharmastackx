@@ -21,6 +21,9 @@ import OrderRequestsContent from "@/components/OrderRequestsContent";
 import FindPharmacistContent from "@/components/FindPharmacistContent";
 import FindMedicinesContent from "@/components/FindMedicinesContent";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import ShareButton from '@/components/ShareButton';
+import SharePrompt from '@/components/SharePrompt';
+
 
 import AccountContent from "@/components/AccountContent";
 import Chat from "@/components/Chat";
@@ -76,6 +79,9 @@ export default function HomePage() {
     }
 }, [notificationSyncStatus]);
 
+const [showSharePrompt, setShowSharePrompt] = useState(false);
+
+
 
 const requestPermission = async () => {
   setNotificationSyncStatus('syncing');
@@ -123,6 +129,18 @@ const requestPermission = async () => {
     setNotificationSyncStatus('error');
   }
 };
+
+useEffect(() => {
+  if (user && ['pharmacist', 'pharmacy'].includes(user.role)) {
+    const hasSeenPrompt = localStorage.getItem('hasSeenSharePrompt');
+    if (!hasSeenPrompt) {
+      setShowSharePrompt(true);
+      localStorage.setItem('hasSeenSharePrompt', 'true');
+    }
+  }
+}, [user]);
+
+
 
 
   const normalizedUser: UnifiedUser | null = user ? { ...user, _id: user.id } : null;
@@ -607,6 +625,11 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
         </Box>
       </Box>
 
+      <AnimatePresence>
+  {showSharePrompt && <SharePrompt onDismiss={() => setShowSharePrompt(false)} />}
+</AnimatePresence>
+
+
       <Box
         sx={{
             position: 'fixed',
@@ -622,6 +645,7 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
             pb: 2
         }}
       >
+
         <AnimatePresence>
         {view === 'home' && (
             <motion.div
@@ -689,6 +713,8 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
                 <PersonIcon />
                 Account
             </Button>
+            
+
         </Paper>
 
       </Box>
