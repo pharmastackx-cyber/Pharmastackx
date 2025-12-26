@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { dbConnect } from '@/lib/mongoConnect';
 import User from '@/models/User';
-import { IUser } from '@/models/User'; // Assuming IUser is exported from your User model
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
@@ -60,15 +59,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'User disappeared during update operation.' }, { status: 500 });
     }
 
-    // Check if the fcmTokens array exists and includes the token
+    // CORRECTED LOGIC: Check if the token was actually added
     if (updatedUser.fcmTokens && updatedUser.fcmTokens.includes(fcmToken)) {
       console.log("FCM token successfully added to user's token list.");
+      return NextResponse.json({ message: 'FCM token saved successfully.' });
     } else {
-      console.log("Token was not added after the update operation. This is the problem!");
-      console.log("Current fcmTokens array:", updatedUser.fcmTokens);
+      console.error("CRITICAL: Token was not added after the database update operation.");
+      console.error("Current fcmTokens array on server:", updatedUser.fcmTokens);
+      return NextResponse.json({ error: 'Failed to save FCM token to the database.' }, { status: 500 });
     }
-
-    return NextResponse.json({ message: 'FCM token saved successfully.' });
 
   } catch (error) {
     console.error("--- ERROR in /api/save-fcm-token ---");
