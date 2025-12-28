@@ -21,8 +21,10 @@ import OrderRequestsContent from "@/components/OrderRequestsContent";
 import FindPharmacistContent from "@/components/FindPharmacistContent";
 import FindMedicinesContent from "@/components/FindMedicinesContent";
 import WhatsAppButton from "@/components/WhatsAppButton";
-import ShareButton from '@/components/ShareButton';
-import SharePrompt from '@/components/SharePrompt';
+
+import Image from 'next/image';
+import { Modal, Fade, Backdrop } from '@mui/material';
+
 
 
 import AccountContent from "@/components/AccountContent";
@@ -79,7 +81,18 @@ export default function HomePage() {
     }
 }, [notificationSyncStatus]);
 
-const [showSharePrompt, setShowSharePrompt] = useState(false);
+const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+
+useEffect(() => {
+  // Show prompt for first-time pharmacists/pharmacies
+  if (user && ['pharmacist', 'pharmacy'].includes(user.role)) {
+    const hasSeenInstallPrompt = localStorage.getItem('hasSeenInstallPrompt');
+    if (!hasSeenInstallPrompt) {
+      setShowInstallPrompt(true);
+      localStorage.setItem('hasSeenInstallPrompt', 'true');
+    }
+  }
+}, [user]);
 
 
 
@@ -129,19 +142,6 @@ const requestPermission = async () => {
     setNotificationSyncStatus('error');
   }
 };
-
-useEffect(() => {
-  if (user && ['pharmacist', 'pharmacy'].includes(user.role)) {
-    const hasSeenPrompt = localStorage.getItem('hasSeenSharePrompt');
-    if (!hasSeenPrompt) {
-      setShowSharePrompt(true);
-      localStorage.setItem('hasSeenSharePrompt', 'true');
-    }
-  }
-}, [user]);
-
-
-
 
   const normalizedUser: UnifiedUser | null = user ? { ...user, _id: user.id } : null;
 
@@ -625,9 +625,56 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
         </Box>
       </Box>
 
-      <AnimatePresence>
-  {showSharePrompt && <SharePrompt onDismiss={() => setShowSharePrompt(false)} />}
-</AnimatePresence>
+      <Modal
+  open={showInstallPrompt}
+  onClose={() => setShowInstallPrompt(false)}
+  closeAfterTransition
+  slots={{ backdrop: Backdrop }}
+  slotProps={{
+    backdrop: {
+      timeout: 500,
+    },
+  }}
+>
+  <Fade in={showInstallPrompt}>
+    <Box sx={{
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: { xs: '90%', sm: 400 },
+      bgcolor: 'background.paper',
+      borderRadius: '8px',
+      boxShadow: 24,
+      p: 2,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center'
+    }}>
+      <Typography variant="h6" component="h2" sx={{ mb: 1, textAlign: 'center' }}>
+  To Receive Drug Search Notifications
+</Typography>
+<Typography variant="body1" sx={{ mb: 2, textAlign: 'center' }}>
+  To receive alerts, add this app to your home screen. Tap the <strong>Share</strong> icon, then select '<strong>Add to Home Screen</strong>'.
+</Typography>
+
+      
+      {/* IMPORTANT: Replace with the actual path to your image */}
+      <Image
+  src="/install-guide.png" 
+  alt="How to add to home screen"
+  width={300} 
+  height={500} 
+  style={{ width: '100%', height: 'auto', borderRadius: '4px' }}
+/>
+
+
+      <Button onClick={() => setShowInstallPrompt(false)} sx={{ mt: 2 }} variant="contained">
+        Close
+      </Button>
+    </Box>
+  </Fade>
+</Modal>
 
 
       <Box
