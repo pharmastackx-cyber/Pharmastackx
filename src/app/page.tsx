@@ -95,6 +95,19 @@ useEffect(() => {
 }, [user]);
 
 
+const [os, setOs] = useState<'Android' | 'iOS' | 'Other'>('Other');
+
+useEffect(() => {
+  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+  if (/android/i.test(userAgent)) {
+    setOs('Android');
+  }
+  // Apple device detection
+  else if (/iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream) {
+    setOs('iOS');
+  }
+}, []);
+
 
 const requestPermission = async () => {
   setNotificationSyncStatus('syncing');
@@ -654,21 +667,26 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
       alignItems: 'center'
     }}>
       <Typography variant="h6" component="h2" sx={{ mb: 1, textAlign: 'center' }}>
-  To Receive Drug Search Notifications
-</Typography>
-<Typography variant="body1" sx={{ mb: 2, textAlign: 'center' }}>
-  To receive alerts, add this app to your home screen. Tap the <strong>Share</strong> icon, then select '<strong>Add to Home Screen</strong>'.
+      <strong>To Receive Drug Search Notifications</strong>
 </Typography>
 
-      
-      {/* IMPORTANT: Replace with the actual path to your image */}
-      <Image
-  src="/install-guide.png" 
-  alt="How to add to home screen"
-  width={180} 
-  height={300} 
-  style={{ maxWidth: '100%', height: 'auto', borderRadius: '4px' }}
-/>
+{os === 'Android' ? (
+        <Typography variant="body2" sx={{ mb: 2, textAlign: 'center' }}>
+          For order alerts, add this app to your home screen. Tap the <strong>three dots</strong> in the corner, then select '<strong>Install app</strong>' or '<strong>Add to Home Screen</strong>'.
+        </Typography>
+      ) : ( // Default to iOS/Other
+        <Typography variant="body2" sx={{ mb: 2, textAlign: 'center' }}>
+          For order alerts, add the app to your home screen. Tap the <strong>Share</strong> icon, then '<strong>Add to Home Screen</strong>'.
+        </Typography>
+      )}
+
+<Image
+        src={os === 'Android' ? "/install-guide-android.png" : "/install-guide.png"}
+        alt="How to add to home screen"
+        width={180}
+        height={300}
+        style={{ maxWidth: '100%', height: 'auto', borderRadius: '4px' }}
+      />
 
 
       <Button onClick={() => setShowInstallPrompt(false)} sx={{ mt: 2 }} variant="contained">
