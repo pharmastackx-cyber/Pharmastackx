@@ -642,11 +642,13 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
       top: '50%',
       left: '50%',
       transform: 'translate(-50%, -50%)',
-      width: { xs: '90%', sm: 400 },
+      width: { xs: '85%', sm: 320 }, // Reduced width
+      maxHeight: '85vh', // Added for safety on small screens
+      overflowY: 'auto', // Added to allow scrolling
       bgcolor: 'background.paper',
       borderRadius: '8px',
       boxShadow: 24,
-      p: 2,
+      p: { xs: 2, sm: 3 },
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center'
@@ -663,9 +665,9 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
       <Image
   src="/install-guide.png" 
   alt="How to add to home screen"
-  width={300} 
-  height={500} 
-  style={{ width: '100%', height: 'auto', borderRadius: '4px' }}
+  width={180} 
+  height={300} 
+  style={{ maxWidth: '100%', height: 'auto', borderRadius: '4px' }}
 />
 
 
