@@ -78,22 +78,10 @@ export async function PATCH(req: NextRequest, { params: paramsPromise }: { param
 
         switch (action) {
             case 'submit-quote': {
-                const { items, notes } = body;
+                const { items, notes, coordinates } = body;
                 if (!session.userId) {
                      return NextResponse.json({ message: 'Unauthorized: Only registered users can submit quotes.' }, { status: 403 });
                 }
-
-                // --- FIXED: Use .lean() for a reliable check on a plain JS object ---
-                const pharmacyUser = await User.findById(session.userId).select('businessCoordinates').lean();
-                if (!pharmacyUser || !pharmacyUser.businessCoordinates || 
-                    typeof pharmacyUser.businessCoordinates.latitude === 'undefined' || 
-                    typeof pharmacyUser.businessCoordinates.longitude === 'undefined') {
-                    return NextResponse.json({ 
-                        message: 'Your business location is not set. Please update your profile in the Store Management page before submitting a quote.' 
-                    }, { status: 400 });
-                }
-                // --- END FIX --- 
-
                 const existingQuote = originalRequest.quotes.find(
                     (q: any) => q.pharmacy.toString() === session.userId
                 );
@@ -105,6 +93,7 @@ export async function PATCH(req: NextRequest, { params: paramsPromise }: { param
                     pharmacy: session.userId, 
                     items: items,
                     notes: notes,
+                    coordinates: coordinates,
                 };
                 originalRequest.quotes.push(newQuote);
                 break;

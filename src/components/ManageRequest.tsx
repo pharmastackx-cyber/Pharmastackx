@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -22,12 +21,18 @@ import {
   IconButton,
   Paper,
   Modal,
-  Backdrop
+  Backdrop,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'; 
+import { useSession } from '@/context/SessionProvider';
 
 // Interfaces
 interface ManualItem { name: string; price: number; pharmacyQuantity: number; isAvailable: boolean; }
@@ -42,6 +47,7 @@ interface ManageRequestProps {
 }
 
 const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
+  const { user } = useSession();
   const [request, setRequest] = useState<FullRequest | null>(null);
   const [manualItems, setManualItems] = useState<ManualItem[]>([ { name: '', price: 0, pharmacyQuantity: 1, isAvailable: true } ]);
   const [notes, setNotes] = useState('');
@@ -49,6 +55,9 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [locationPromptOpen, setLocationPromptOpen] = useState(false);
+
+  const isLocationMissing = !user?.businessCoordinates || !user.businessCoordinates[0] || !user.businessCoordinates[1];
 
   useEffect(() => {
     if (requestId) {
@@ -78,13 +87,20 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
   const removeItem = (index: number) => { setManualItems(manualItems.filter((_, i) => i !== index)); };
   const handleExistingItemChange = (index: number, field: keyof ExistingItemDetail, value: any) => { if (!request) return; const u = [...(request.items as ExistingItemDetail[])]; u[index] = { ...u[index], [field]: value }; if(field === 'isAvailable' && !value) u[index].price = 0; setRequest({ ...request, items: u }); };
   
-  const handleSubmitQuote = async () => {
+  const handleSubmitQuote = async (coordinates?: GeolocationCoordinates) => {
     if (!request) return;
     setIsSubmitting(true);
     setError(null);
+    setLocationPromptOpen(false);
+
     const itemsToSubmit = request.requestType === 'image-upload' 
       ? manualItems.filter(item => item.name.trim() !== '') 
       : request.items;
+
+    let submissionCoordinates = user?.businessCoordinates;
+    if (coordinates) {
+      submissionCoordinates = [coordinates.longitude, coordinates.latitude];
+    }
 
     try {
       const response = await fetch(`/api/requests/${requestId}`, {
@@ -93,7 +109,8 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
         body: JSON.stringify({ 
           action: 'submit-quote', 
           items: itemsToSubmit, 
-          notes: notes 
+          notes: notes, 
+          coordinates: submissionCoordinates 
         }),
       });
       if (!response.ok) {
@@ -105,6 +122,32 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleInitialSubmit = () => {
+    if (isLocationMissing) {
+      setLocationPromptOpen(true);
+    } else {
+      handleSubmitQuote();
+    }
+  };
+
+  const handleLocationPromptClose = (agreed: boolean) => {
+    setLocationPromptOpen(false);
+    if (agreed) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            handleSubmitQuote(position.coords);
+          },
+          (error) => {
+            setError("Failed to get location. Please enable location services or set a permanent location in your profile.");
+          }
+        );
+      } else {
+        setError("Geolocation is not supported by this browser.");
+      }
     }
   };
   
@@ -127,19 +170,9 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
     <>
       <Container maxWidth="lg" sx={{ py: 4 }}>
         
-        {/* --- FIXED: Improved error display for submission errors --- */}
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
-            {error.includes('Store Management') && (
-              <Box sx={{ mt: 1 }}>
-                <Link href="/dashboard/store-management" passHref>
-                  <Button variant="outlined" color="inherit" size="small">
-                    Click here to update your profile
-                  </Button>
-                </Link>
-              </Box>
-            )}
           </Alert>
         )}
 
@@ -210,13 +243,26 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
              </Box>
 
             <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
-                 <Button variant="contained" color="primary" onClick={handleSubmitQuote} disabled={isSubmitting} sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' } }}>
+                 <Button variant="contained" color="primary" onClick={handleInitialSubmit} disabled={isSubmitting} sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' } }}>
                    {isSubmitting ? <CircularProgress size={24} /> : 'Submit Quote to Patient'}
                  </Button>
             </Box>
           </Paper>
         )}
       </Container>
+
+      <Dialog open={locationPromptOpen} onClose={() => handleLocationPromptClose(false)}>
+        <DialogTitle>Location Required</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            To submit this quote, we need to use your current location. This will only be used for this quote and will not be saved to your profile, please ensure youre in your pharmacy premises.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => handleLocationPromptClose(false)}>Cancel</Button>
+          <Button onClick={() => handleLocationPromptClose(true)} autoFocus>Agree</Button>
+        </DialogActions>
+      </Dialog>
 
       <Modal open={!!selectedImage} onClose={() => setSelectedImage(null)} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
         <Box sx={modalStyle}>

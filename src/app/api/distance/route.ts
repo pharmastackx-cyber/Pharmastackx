@@ -15,6 +15,7 @@ interface PopulatedQuote {
       longitude?: number;
     };
   };
+  coordinates?: [number, number];
 }
 
 // Defines the shape of the object we create for the Google Maps API
@@ -81,7 +82,6 @@ export async function GET(req: NextRequest) {
     const origin = { lat: parseFloat(userLat), lon: parseFloat(userLon) };
 
     const request = await RequestModel.findById(requestId)
-      .select('quotes.pharmacy')
       .populate<{ quotes: PopulatedQuote[] }>({
         path: 'quotes.pharmacy',
         model: UserModel,
@@ -95,18 +95,30 @@ export async function GET(req: NextRequest) {
     const destinations = request.quotes
       .map((quote: PopulatedQuote): DestinationObject | null => {
         const pharmacy = quote.pharmacy;
-        if (pharmacy && pharmacy.businessCoordinates && typeof pharmacy.businessCoordinates.latitude !== 'undefined' && typeof pharmacy.businessCoordinates.longitude !== 'undefined') {
+        const pharmacyId = pharmacy?._id.toString();
+
+        if (!pharmacyId) return null;
+
+        // --- Definitive Fix: Prioritize quote.coordinates, then fall back to pharmacy.businessCoordinates ---
+        if (quote.coordinates && quote.coordinates.length === 2) {
           return {
-            id: pharmacy._id.toString(),
+            id: pharmacyId,
+            coords: { lat: quote.coordinates[1], lon: quote.coordinates[0] }
+          };
+        }
+
+        if (pharmacy.businessCoordinates && typeof pharmacy.businessCoordinates.latitude !== 'undefined' && typeof pharmacy.businessCoordinates.longitude !== 'undefined') {
+          return {
+            id: pharmacyId,
             coords: {
               lat: pharmacy.businessCoordinates.latitude,
               lon: pharmacy.businessCoordinates.longitude,
             }
           };
         }
+
         return null;
       })
-      // --- DEFINITIVE FIX: Use the correct type name in the type guard ---
       .filter((d: DestinationObject | null): d is DestinationObject => d !== null);
 
     const travelTimes = await getTravelTimes(origin, destinations);

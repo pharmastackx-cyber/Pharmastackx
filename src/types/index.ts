@@ -13,6 +13,7 @@ export interface User {
   isVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
+  businessCoordinates?: [number, number];
 }
 
 export interface Business extends User {

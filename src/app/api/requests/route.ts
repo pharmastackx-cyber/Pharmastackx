@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       body.requestType = 'drug-list';
     }
 
-    const { requestType, items } = body;
+    const { requestType, items, phoneNumber } = body;
 
     if (!requestType) {
       console.error('[ERROR] Validation failed: requestType is missing.');
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
       requestType,
       items: items || [],
       status: 'pending',
+      phoneNumber: phoneNumber,
     };
 
     console.log('[LOG] Data prepared for database model:', requestData);

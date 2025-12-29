@@ -14,8 +14,10 @@ import {
     Typography,
     Box,
     Chip,
-    CircularProgress
+    CircularProgress,
+    TextField
 } from '@mui/material';
+import { useState } from 'react';
 
 interface DrugRequest {
   id: number;
@@ -30,12 +32,24 @@ interface DrugRequest {
 interface ConfirmationModalProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (phoneNumber: string) => void;
   requests: DrugRequest[];
   isSubmitting: boolean;
 }
 
 export default function ConfirmationModal({ open, onClose, onConfirm, requests, isSubmitting }: ConfirmationModalProps) {
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneError, setPhoneError] = useState(false);
+
+  const handleConfirm = () => {
+    if (phoneNumber.trim() === '') {
+      setPhoneError(true);
+    } else {
+      setPhoneError(false);
+      onConfirm(phoneNumber);
+    }
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 600, borderBottom: '1px solid #ddd' }}>Confirm Your Request</DialogTitle>
@@ -70,10 +84,30 @@ export default function ConfirmationModal({ open, onClose, onConfirm, requests, 
             )
           })}
         </List>
+        
+        <TextField
+          autoFocus
+          margin="dense"
+          id="phone"
+          label="Phone Number for Notifications"
+          type="tel"
+          fullWidth
+          variant="outlined"
+          value={phoneNumber}
+          onChange={(e) => {
+            setPhoneNumber(e.target.value);
+            if(phoneError) setPhoneError(false);
+          }}
+          required
+          error={phoneError}
+          helperText={phoneError ? "A phone number is required to receive quote notifications." : "Please enter a phone number."}
+          sx={{mt: 2}}
+        />
+
       </DialogContent>
       <DialogActions sx={{ p: '16px 24px', borderTop: '1px solid #ddd' }}>
         <Button onClick={onClose} color="inherit" disabled={isSubmitting}>Go Back</Button>
-        <Button onClick={onConfirm} variant="contained" autoFocus sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' }, minWidth: 130 }} disabled={isSubmitting}>
+        <Button onClick={handleConfirm} variant="contained" autoFocus sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' }, minWidth: 130 }} disabled={isSubmitting || !phoneNumber}>
           {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Begin Search'}
         </Button>
       </DialogActions>

@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 const QuoteSchema = new mongoose.Schema({
   pharmacy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', // CORRECTED: This now correctly refers to the User model.
+    ref: 'User',
     required: true,
   },
   // The pharmacy's version of the items, with their pricing and availability
@@ -25,6 +25,9 @@ const QuoteSchema = new mongoose.Schema({
       enum: ['offered', 'accepted', 'rejected'],
       default: 'offered'
   },
+  coordinates: {
+    type: [Number], // [longitude, latitude]
+  },
   quotedAt: {
     type: Date,
     default: Date.now,
@@ -36,6 +39,9 @@ const RequestSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
+  },
+  phoneNumber: {
+    type: String,
   },
   // The user's original requested items.
   items: [{
