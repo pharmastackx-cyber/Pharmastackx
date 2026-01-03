@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
@@ -19,27 +18,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<any>(null);
 
   const fetchSession = useCallback(async () => {
-    console.log('Attempting to fetch session...');
     setIsLoading(true);
     try {
       const response = await fetch('/api/auth/session');
       
       if (!response.ok) {
-        console.log('Fetch response not OK. User is likely not authenticated.');
         setUser(null);
       } else {
         const data = await response.json();
-        console.log('Session data received:', data);
         if (data && data.user && data.user._id) {
-            console.log('User session set:', data.user);
             setUser(data.user);
         } else {
-            console.log('No user data in response.');
             setUser(null);
         }
       }
     } catch (fetchError) {
-      console.error('Session fetch error:', fetchError);
       setError(fetchError);
     } finally {
       setIsLoading(false);

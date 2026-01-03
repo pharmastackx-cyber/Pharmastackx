@@ -22,6 +22,8 @@ import FindPharmacistContent from "@/components/FindPharmacistContent";
 import FindMedicinesContent from "@/components/FindMedicinesContent";
 import WhatsAppButton from "@/components/WhatsAppButton";
 
+import MedicineRestock from "@/components/MedicineRestock";
+
 import Image from 'next/image';
 import { Modal, Fade, Backdrop } from '@mui/material';
 
@@ -156,7 +158,8 @@ const requestPermission = async () => {
   }
 };
 
-  const normalizedUser: UnifiedUser | null = user ? { ...user, _id: user.id } : null;
+const normalizedUser: UnifiedUser | null = user ? { ...user, _id: (user as any)._id } : null;
+
 
   const bottomPadding = view === 'home' ? { xs: '140px', sm: '150px' } : { xs: '70px', sm: '80px' };
 
@@ -226,7 +229,9 @@ useEffect(() => {
   const handleBackNavigation = () => {
     if (view === 'chat') {
       setView(normalizedUser?.role === 'pharmacist' ? 'conversations' : 'consult');
-    } else if (view === 'about' || view === 'contact' || view === 'reviewRequest') {
+    } 
+      else if (view === 'about' || view === 'contact' || view === 'reviewRequest' || view === 'medicineRestock') {
+
       setView('orderMedicines');
     } else {
       setView('home');
@@ -290,90 +295,72 @@ useEffect(() => {
       </motion.div>
 
       {!isLoading && (
-        normalizedUser && ['pharmacy', 'pharmacist'].includes(normalizedUser.role) ? (
-          <div>
-              <Grid container spacing={2} sx={{ flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'left', justifyContent: 'center' }}>
-                  <Grid item xs="auto">
-                    <motion.div 
-                    layoutId="store-management-header"{...(isMobile ? {
-                      ...mobileButtonAnimation,
-                      transition: { ...mobileButtonAnimation.transition, delay: 0.15 } 
-                  } : {})}
-              >
-                     <Button variant="contained" onClick={() => setView('storeManagement')}
-  sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' },
-  px: { xs: 2, sm: 4 },
-  py: { xs: 0.75, sm: 1 },
-  whiteSpace: 'nowrap', 
-  transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', 
-  color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
-      Store Management
-</Button>
+            <Grid container spacing={2} sx={{ flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'left', justifyContent: 'center' }}>
+                
+                {/* Store Management Button: Pharmacy/Pharmacist only */}
+                {normalizedUser && ['pharmacy', 'pharmacist'].includes(normalizedUser.role) && (
+                    <Grid item xs="auto">
+                        <motion.div layoutId="store-management-header">
+                            <Button variant="contained" onClick={() => setView('storeManagement')}
+                                sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' }, px: { xs: 2, sm: 4 }, py: { xs: 0.75, sm: 1 }, whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
+                                Store Management
+                            </Button>
+                        </motion.div>
+                    </Grid>
+                )}
+        
+                {/* Order Requests Button: Pharmacy/Pharmacist only */}
+                {normalizedUser && ['pharmacy', 'pharmacist'].includes(normalizedUser.role) && (
+                    <Grid item xs="auto">
+                        <motion.div layoutId="order-requests-header">
+                            <Button variant="contained" size="small" onClick={() => setView('orderRequests')}
+                                sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' }, px: { xs: 2, sm: 4 }, py: { xs: 0.75, sm: 1 }, whiteSpace: 'nowrap', bgcolor: 'rgb(1, 61, 63)', color: 'rgb(243, 247, 246)', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.05)', borderColor: 'rgb(1, 61, 63)', backgroundColor: 'rgb(1, 61, 63)' } }}>
+                                Order Requests
+                            </Button>
+                        </motion.div>
+                    </Grid>
+                )}
+        
+                {/* Medicine Restock Button: Pharmacy/Pharmacist/Clinic only */}
+                {normalizedUser && ['pharmacy', 'pharmacist', 'clinic'].includes(normalizedUser.role) && (
+                    <Grid item xs="auto">
+                        <motion.div>
+                            <Button variant="contained" size="small" onClick={() => setView('medicineRestock')}
+                                sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' }, px: { xs: 2, sm: 4 }, py: { xs: 0.75, sm: 1 }, whiteSpace: 'nowrap', bgcolor: '#004D40', color: 'white', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.05)', bgcolor: '#00382e' } }}>
+                                Medicine Restock
+                            </Button>
+                        </motion.div>
+                    </Grid>
+                )}
+        
+                {/* Order Medicines Button: Not Pharmacy/Pharmacist */}
+                {(!normalizedUser || !['pharmacy', 'pharmacist'].includes(normalizedUser.role)) && (
+                    <Grid item xs="auto">
+                        <motion.div layoutId="order-medicines-header">
+                            <Button variant="contained" size="small" onClick={() => setView('orderMedicines')}
+                                sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' }, px: { xs: 2, sm: 4 }, py: { xs: 0.75, sm: 1 }, whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
+                                Order Medicines
+                            </Button>
+                        </motion.div>
+                    </Grid>
+                )}
+        
+                {/* View Catalog Button: Not Pharmacy/Pharmacist */}
+                {(!normalizedUser || !['pharmacy', 'pharmacist'].includes(normalizedUser.role)) && (
+                    <Grid item xs="auto">
+                        <motion.div layoutId="find-pharmacy-header">
+                            <Button variant="contained" size="small" onClick={() => setView('findMedicines')}
+                                sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' }, px: { xs: 2, sm: 4 }, py: { xs: 0.75, sm: 1 }, whiteSpace: 'nowrap', bgcolor: 'rgb(1, 61, 63)', color: 'rgb(243, 247, 246)', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.05)', borderColor: 'rgb(1, 61, 63)', backgroundColor: 'rgb(1, 61, 63)' } }}>
+                                View catalog
+                            </Button>
+                        </motion.div>
+                    </Grid>
+                )}
+        
+            </Grid>
+          )}
 
-                    </motion.div>
-                  </Grid>
-                  <Grid item xs="auto">
-                    <motion.div layoutId="order-requests-header"{...(isMobile ? {
-        ...mobileButtonAnimation,
-        transition: { ...mobileButtonAnimation.transition, delay: 0.15 } 
-    } : {})}
->
-                      <Button variant="contained" size="small" onClick={() => setView('orderRequests')} 
-                      sx={{ borderRadius: '20px', 
-                        fontSize: { xs: '0.75rem', sm: '0.9rem' },
-                      px: { xs: 2, sm: 4 },
-                      py: { xs: 0.75, sm: 1 },
-                      whiteSpace: 'nowrap', 
-                      bgcolor: 'rgb(1, 61, 63)', color: 'rgb(243, 247, 246)', 
-                      transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.05)', 
-                      borderColor: 'rgb(1, 61, 63)', backgroundColor: 'rgb(1, 61, 63)' } }}>
-                          Order Requests
-                      </Button>
-                    </motion.div>
-                  </Grid>
-              </Grid>
-          </div>
-        ) : (
-          <div>
-              <Grid container spacing={2} sx={{ flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'left', justifyContent: 'center' }}>
-                  <Grid item xs="auto">
-                    <motion.div layoutId="order-medicines-header"
-                    {...(isMobile ? {
-                      ...mobileButtonAnimation,
-                      transition: { ...mobileButtonAnimation.transition, delay: 0.15 } 
-                  } : {})}
-              >
-                    <Button variant="contained" size="small" onClick={() => setView('orderMedicines')} 
-                    sx={{ borderRadius: '20px', 
-                      fontSize: { xs: '0.75rem', sm: '0.9rem' },
-                      px: { xs: 2, sm: 4 },
-                      py: { xs: 0.75, sm: 1 }, 
-                    whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
-                            Order Medicines
-                        </Button>
-                    </motion.div>
-                  </Grid>
-                  <Grid item xs="auto">
-                    <motion.div layoutId="find-pharmacy-header"
-                    {...(isMobile ? {
-        ...mobileButtonAnimation,
-        transition: { ...mobileButtonAnimation.transition, delay: 0.15 } 
-    } : {})}
->
-                    <Button variant="contained" size="small" onClick={() => setView('findMedicines')} 
-                    sx={{ borderRadius: '20px', 
-                      fontSize: { xs: '0.75rem', sm: '0.9rem' },
-                      px: { xs: 2, sm: 4 },
-                      py: { xs: 0.75, sm: 1 },
-                    whiteSpace: 'nowrap', bgcolor: 'rgb(1, 61, 63)', color: 'rgb(243, 247, 246)', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.05)', borderColor: 'rgb(1, 61, 63)', backgroundColor: 'rgb(1, 61, 63)' } }}>
-                          View catalog
-                      </Button>
-                    </motion.div>
-                  </Grid>
-              </Grid>
-          </div>
-        )
-      )}
+
     </Box>
   );
 
@@ -538,7 +525,12 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
         if (selectedRequestId) {
             return renderPageView('Review Request', 'review-request-header', <ReviewRequestContent requestId={selectedRequestId} setView={setView} />);
         }
-        return <CircularProgress />;
+        case 'medicineRestock':
+          if (normalizedUser) {
+              return renderPageView('Medicine Restock', 'medicine-restock-header', <MedicineRestock onBack={() => setView('default')} userId={normalizedUser._id} />);
+          }
+          return <CircularProgress />;
+  
       case 'chat':
         if (otherUser) {
             return renderPageView('Chat', 'chat-header', <Chat user={otherUser} onBack={handleBackNavigation} />);
