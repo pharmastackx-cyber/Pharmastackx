@@ -18,7 +18,15 @@ import {
   List, 
   ListItem, 
   ListItemText,
-  Skeleton
+  Skeleton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  Select,
+  MenuItem,
+  SelectChangeEvent
 } from '@mui/material';
 import { useCart } from '@/contexts/CartContext';
 
@@ -61,6 +69,72 @@ interface Request {
   status: 'pending' | 'quoted' | 'awaiting-confirmation' | 'confirmed' | 'dispatched' | 'rejected' | 'cancelled';
   items: OriginalItem[];
   quotes: Quote[];
+}
+
+// --- HELPERS ---
+
+type SortByType = 'efficiency' | 'price' | 'distance' | 'date';
+
+const sortDescriptions: Record<SortByType, string> = {
+    efficiency: 'Quotes are sorted by our Best Match algorithm (closest and cheapest).',
+    price: 'Quotes are sorted by price from lowest to highest.',
+    distance: 'Quotes are sorted by distance from nearest to furthest.',
+    date: 'Quotes are sorted by date from newest to oldest.'
+};
+
+// --- LOCATION MODAL --- 
+
+const LocationPermissionModal: React.FC<{ open: boolean; onClose: () => void; onConfirm: (location: { latitude: number, longitude: number }) => void; }> = ({ open, onClose, onConfirm }) => {
+    const [isRequesting, setIsRequesting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleRequestLocation = () => {
+        if (!navigator.geolocation) {
+            setError("Geolocation is not supported by this browser.");
+            return;
+        }
+
+        setIsRequesting(true);
+        setError(null);
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                onConfirm({ latitude, longitude });
+                setIsRequesting(false);
+                onClose(); 
+            },
+            (geoError) => {
+                let errorMessage = "An unknown error occurred.";
+                switch(geoError.code) {
+                    case geoError.PERMISSION_DENIED: errorMessage = "You denied the request for Geolocation."; break;
+                    case geoError.POSITION_UNAVAILABLE: errorMessage = "Location information is unavailable."; break;
+                    case geoError.TIMEOUT: errorMessage = "The request to get user location timed out."; break;
+                }
+                setError(errorMessage + " Please enable location services in your browser settings to proceed.");
+                setIsRequesting(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    };
+
+  return (
+    <Dialog open={open} onClose={() => { if (!isRequesting) onClose(); }} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ fontWeight: 600, borderBottom: '1px solid #ddd' }}>Location Access Needed</DialogTitle>
+      <DialogContent sx={{py: 3}}>
+        <Typography variant="body1" color="text.secondary" sx={{mb: 2}}>
+            To calculate distances to pharmacies, we need to access your current location.
+        </Typography>
+        {error && <Alert severity="error" sx={{mt: 2}}>{error}</Alert>}
+      </DialogContent>
+      <DialogActions sx={{ p: '16px 24px', borderTop: '1px solid #ddd' }}>
+        <Button onClick={onClose} color="inherit" disabled={isRequesting}>Cancel</Button>
+        <Button onClick={handleRequestLocation} variant="contained" autoFocus sx={{ minWidth: 150 }} disabled={isRequesting}>
+          {isRequesting ? <CircularProgress size={24} color="inherit" /> : 'Allow Location'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 }
 
 
@@ -149,10 +223,13 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
 
   const [request, setRequest] = useState<Request | null>(null);
   const [distances, setDistances] = useState<{ [pharmacyId: string]: string }>({});
+  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [isLocationModalOpen, setLocationModalOpen] = useState(false);
   const [isFetchingDistances, setIsFetchingDistances] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sortBy, setSortBy] = useState<SortByType>('efficiency');
 
   useEffect(() => {
     if (requestId) {
@@ -173,31 +250,33 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
   }, [requestId]);
 
   useEffect(() => {
-    if (request && request.status === 'quoted' && request.quotes.length > 0) {
-      setIsFetchingDistances(true);
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          try {
-            const response = await fetch(`/api/distance?requestId=${requestId}&lat=${latitude}&lon=${longitude}`);
-            if (response.ok) {
-              setDistances(await response.json());
-            }
-          } catch (err) {
-            console.error("Failed to fetch distances:", err);
-          } finally {
-            setIsFetchingDistances(false);
-          }
-        },
-        (geoError) => {
-          console.error("Geolocation error:", geoError.message);
-          setError("Couldn't get your location. Please enable location services to see pharmacy distances.");
-          setIsFetchingDistances(false);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
+    if (request && request.status === 'quoted' && request.quotes.length > 0 && !userLocation) {
+      setLocationModalOpen(true);
     }
-  }, [request, requestId]);
+  }, [request, userLocation]);
+
+  useEffect(() => {
+    if (userLocation && requestId) {
+      const fetchDistances = async () => {
+        setIsFetchingDistances(true);
+        try {
+          const { latitude, longitude } = userLocation;
+          const response = await fetch(`/api/distance?requestId=${requestId}&lat=${latitude}&lon=${longitude}`);
+          if (response.ok) {
+            setDistances(await response.json());
+          } else {
+              throw new Error('Failed to fetch pharmacy distances.');
+          }
+        } catch (err) {
+          console.error("Failed to fetch distances:", err);
+          setError(err instanceof Error ? err.message : 'Could not load pharmacy distances.');
+        } finally {
+          setIsFetchingDistances(false);
+        }
+      };
+      fetchDistances();
+    }
+  }, [userLocation, requestId]);
 
   const handleAcceptQuote = async (quoteId: string, itemsToAdd: any[]) => {
       setIsSubmitting(true);
@@ -218,13 +297,12 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                   price: item.price,
                   image: request?.items.find(i => i.name === item.name)?.image || '',
                   activeIngredients: request?.items.find(i => i.name === item.name)?.strength || '',
-                  pharmacy: enrichedQuotes.find(q => q._id === quoteId)?.pharmacy.name || 'Pharmacy',
+                  pharmacy: sortedQuotes.find(q => q._id === quoteId)?.pharmacy.name || 'Pharmacy',
                   drugClass: 'From Quote',
               });
               updateQuantity(numericId, item.pharmacyQuantity);
           });
           
-          // Navigate to cart view within the homepage
           setView('cart');
 
       } catch (err) {
@@ -262,10 +340,56 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
     }));
   }, [request?.quotes, distances]);
 
+  const sortedQuotes = useMemo(() => {
+    const parseDistance = (distanceStr: string | undefined): number => {
+        if (!distanceStr) return Infinity;
+        const match = distanceStr.match(/(\d+(\.\d+)?)/);
+        return match ? parseFloat(match[1]) : Infinity;
+    };
+
+    const calculateTotalPrice = (items: QuoteItem[]): number => {
+        return items
+            .filter(item => item.isAvailable && typeof item.price === 'number' && typeof item.pharmacyQuantity === 'number' && item.pharmacyQuantity > 0)
+            .reduce((acc, item) => acc + (item.price! * item.pharmacyQuantity!), 0);
+    };
+
+    return [...enrichedQuotes].sort((a, b) => {
+        switch (sortBy) {
+            case 'price':
+                return calculateTotalPrice(a.items) - calculateTotalPrice(b.items);
+            case 'distance':
+                return parseDistance(a.pharmacy.distance) - parseDistance(b.pharmacy.distance);
+            case 'date':
+                return new Date(b.quotedAt).getTime() - new Date(a.quotedAt).getTime();
+            case 'efficiency':
+            default:
+                const distanceA = parseDistance(a.pharmacy.distance);
+                const distanceB = parseDistance(b.pharmacy.distance);
+                if (distanceA !== distanceB) {
+                    return distanceA - distanceB;
+                }
+                return calculateTotalPrice(a.items) - calculateTotalPrice(b.items);
+        }
+    });
+  }, [enrichedQuotes, sortBy]);
+
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Box>;
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, color: 'text.primary' }}>
+        
+      <LocationPermissionModal 
+        open={isLocationModalOpen}
+        onClose={() => {
+            setLocationModalOpen(false);
+            
+        }}
+        onConfirm={(location) => {
+            setUserLocation(location);
+            setLocationModalOpen(false);
+        }}
+      />
+
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {!request ? <Alert severity="warning">Could not load your request details.</Alert> : (
         <Grid container spacing={{ xs: 2, md: 4 }}>
@@ -287,15 +411,36 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                     {acceptedQuote && (
                         <Box>
                             <Typography variant="h6" color="success.main" sx={{mb: 2}}>You have accepted this quote:</Typography>
-                            <QuoteCard quote={enrichedQuotes.find(q=>q._id === acceptedQuote._id)!} onRequestDecision={() => {}} isActionDisabled={true} isFetchingDistance={false} />
+                            <QuoteCard quote={sortedQuotes.find(q=>q._id === acceptedQuote._id)!} onRequestDecision={() => {}} isActionDisabled={true} isFetchingDistance={false} />
                         </Box>
                     )}
 
                     {request.status === 'pending' && <Alert severity="info">Waiting for pharmacies to respond to your request...</Alert>}
                     
-                    {request.status === 'quoted' && enrichedQuotes.length > 0 && (
+                    {request.status === 'quoted' && (userLocation || request.quotes.length === 0) && sortedQuotes.length > 0 && (
                         <Box>
-                            {enrichedQuotes.map(quote => (
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+                                <FormControl size="small" sx={{ minWidth: 180 }}>
+                                    <Select
+                                        value={sortBy}
+                                        onChange={(e: SelectChangeEvent) => setSortBy(e.target.value as SortByType)}
+                                    >
+                                        <MenuItem value="efficiency">Sort by: Best Match</MenuItem>
+                                        <MenuItem value="price">Sort by: Price (Low to High)</MenuItem>
+                                        <MenuItem value="distance">Sort by: Distance (Nearest)</MenuItem>
+                                        <MenuItem value="date">Sort by: Date (Newest)</MenuItem>
+                                    </Select>
+                                </FormControl>
+                                <Alert severity="info" icon={false} sx={{ flexGrow: 1, p: '0 12px' }}>{sortDescriptions[sortBy]}</Alert>
+                            </Box>
+
+                            {sortedQuotes.length > 0 && sortedQuotes.length < 5 && !acceptedQuote && (
+                                <Alert severity="info" sx={{ mb: 2 }}>
+                                    <strong>Pro-Tip:</strong> If you wait a bit longer, you might receive offers of lower amounts from even shorter distance pharmacies.
+                                </Alert>
+                            )}
+
+                            {sortedQuotes.map(quote => (
                                 <QuoteCard 
                                     key={quote._id} 
                                     quote={quote} 
@@ -307,10 +452,9 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                         </Box>
                     )}
                     
-                    {request.status === 'quoted' && enrichedQuotes.length === 0 && (
+                    {request.status === 'quoted' && sortedQuotes.length === 0 && (
                          <Alert severity="warning">No quotes have been submitted for this request yet.</Alert>
                     )}
-
 
                     {request.status === 'quoted' && (
                         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>

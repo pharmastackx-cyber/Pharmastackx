@@ -57,7 +57,6 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
 
-  const isLocationMissing = !user?.businessCoordinates || !user.businessCoordinates[0] || !user.businessCoordinates[1];
 
   useEffect(() => {
     if (requestId) {
@@ -69,7 +68,6 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
           if (data.requestType === 'drug-list' && Array.isArray(data.items)) {
             data.items = (data.items as ExistingItemDetail[]).map(item => ({ ...item, pharmacyQuantity: item.pharmacyQuantity || item.quantity, isAvailable: item.isAvailable !== false }));
           }
-          // For image-upload requests that are already quoted, initialize manualItems with the existing quote.
           if (data.requestType === 'image-upload' && data.prescriptionImage && Array.isArray(data.items) && data.items.length > 0 && typeof data.items[0] !== 'string') {
             setManualItems(data.items as ManualItem[]);
           }
@@ -87,7 +85,7 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
   const removeItem = (index: number) => { setManualItems(manualItems.filter((_, i) => i !== index)); };
   const handleExistingItemChange = (index: number, field: keyof ExistingItemDetail, value: any) => { if (!request) return; const u = [...(request.items as ExistingItemDetail[])]; u[index] = { ...u[index], [field]: value }; if(field === 'isAvailable' && !value) u[index].price = 0; setRequest({ ...request, items: u }); };
   
-  const handleSubmitQuote = async (coordinates?: GeolocationCoordinates) => {
+  const handleSubmitQuote = async (coordinates: GeolocationCoordinates) => {
     if (!request) return;
     setIsSubmitting(true);
     setError(null);
@@ -97,11 +95,6 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
       ? manualItems.filter(item => item.name.trim() !== '') 
       : request.items;
 
-    let submissionCoordinates = user?.businessCoordinates;
-    if (coordinates) {
-      submissionCoordinates = [coordinates.longitude, coordinates.latitude];
-    }
-
     try {
       const response = await fetch(`/api/requests/${requestId}`, {
         method: 'PATCH',
@@ -110,7 +103,7 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
           action: 'submit-quote', 
           items: itemsToSubmit, 
           notes: notes, 
-          coordinates: submissionCoordinates 
+          coordinates: [coordinates.longitude, coordinates.latitude]
         }),
       });
       if (!response.ok) {
@@ -126,27 +119,27 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
   };
 
   const handleInitialSubmit = () => {
-    if (isLocationMissing) {
       setLocationPromptOpen(true);
-    } else {
-      handleSubmitQuote();
-    }
   };
 
   const handleLocationPromptClose = (agreed: boolean) => {
     setLocationPromptOpen(false);
     if (agreed) {
+      setIsSubmitting(true); // Show loading indicator immediately
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
             handleSubmitQuote(position.coords);
           },
           (error) => {
-            setError("Failed to get location. Please enable location services or set a permanent location in your profile.");
-          }
+            setError("Failed to get location. Please enable location services and try again.");
+            setIsSubmitting(false);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
       } else {
         setError("Geolocation is not supported by this browser.");
+        setIsSubmitting(false);
       }
     }
   };
@@ -160,7 +153,6 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
     return '';
   };
 
-  // This error is for the initial page load
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}><CircularProgress /></Box>;
   if (!request && !loading) return <Container sx={{ py: 4 }}><Alert severity="error">{error || 'Could not load the request.'}</Alert></Container>;
   
@@ -255,12 +247,12 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
         <DialogTitle>Location Required</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            To submit this quote, we need to use your current location. This will only be used for this quote and will not be saved to your profile, please ensure youre in your pharmacy premises.
+            To submit this quote, we need to use your current location to ensure accurate delivery calculations. This will only be used for this quote. Please ensure you are at your pharmacy.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => handleLocationPromptClose(false)}>Cancel</Button>
-          <Button onClick={() => handleLocationPromptClose(true)} autoFocus>Agree</Button>
+          <Button onClick={() => handleLocationPromptClose(false)} disabled={isSubmitting}>Cancel</Button>
+          <Button onClick={() => handleLocationPromptClose(true)} autoFocus disabled={isSubmitting}>Agree</Button>
         </DialogActions>
       </Dialog>
 

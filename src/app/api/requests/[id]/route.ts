@@ -30,10 +30,13 @@ export async function GET(req: NextRequest, { params: paramsPromise }: { params:
         const params = await paramsPromise; 
         const dispatchRequest = await RequestModel.findById(params.id)
             .populate({
-                path: 'quotes.pharmacy',
+                path: 'quotes.pharmacy', // Populate the user who made the quote (a pharmacist)
                 model: User,
-                // IMPORTANT: Select the coordinates for the distance feature
-                select: 'businessName businessAddress businessCoordinates'
+                populate: {
+                    path: 'pharmacy', // **NESTED POPULATE**: Now populate the pharmacy linked to the pharmacist
+                    model: User,
+                    select: 'businessName businessAddress businessCoordinates' // Select the fields from the main pharmacy doc
+                }
             });
 
         if (!dispatchRequest) {
@@ -43,8 +46,15 @@ export async function GET(req: NextRequest, { params: paramsPromise }: { params:
         const aRequest = dispatchRequest.toObject();
         aRequest.quotes.forEach((q: any) => {
             if (q.pharmacy) {
-                q.pharmacy.name = q.pharmacy.businessName;
-                q.pharmacy.address = q.pharmacy.businessAddress;
+                // Check if the nested pharmacy object exists (for new users)
+                if (q.pharmacy.pharmacy) {
+                    q.pharmacy.name = q.pharmacy.pharmacy.businessName;
+                    q.pharmacy.address = q.pharmacy.pharmacy.businessAddress;
+                } else {
+                    // Fallback for old system where the pharmacy user quoted directly
+                    q.pharmacy.name = q.pharmacy.businessName;
+                    q.pharmacy.address = q.pharmacy.businessAddress;
+                }
             }
         });
 

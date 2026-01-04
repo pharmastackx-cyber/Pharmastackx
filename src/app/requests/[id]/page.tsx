@@ -49,6 +49,7 @@ const ManageRequestPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -61,7 +62,6 @@ const ManageRequestPage: React.FC = () => {
           if (data.requestType === 'drug-list' && Array.isArray(data.items)) {
             data.items = (data.items as ExistingItemDetail[]).map(item => ({ ...item, pharmacyQuantity: item.pharmacyQuantity || item.quantity, isAvailable: item.isAvailable !== false }));
           }
-          // For image-upload requests that are already quoted, initialize manualItems with the existing quote.
           if (data.requestType === 'image-upload' && data.prescriptionImage && Array.isArray(data.items) && data.items.length > 0 && typeof data.items[0] !== 'string') {
             setManualItems(data.items as ManualItem[]);
           }
@@ -79,7 +79,7 @@ const ManageRequestPage: React.FC = () => {
   const removeItem = (index: number) => { setManualItems(manualItems.filter((_, i) => i !== index)); };
   const handleExistingItemChange = (index: number, field: keyof ExistingItemDetail, value: any) => { if (!request) return; const u = [...(request.items as ExistingItemDetail[])]; u[index] = { ...u[index], [field]: value }; if(field === 'isAvailable' && !value) u[index].price = 0; setRequest({ ...request, items: u }); };
   
-  const handleSubmitQuote = async () => {
+  const handleSubmitQuote = async (location: { latitude: number; longitude: number }) => {
     if (!request) return;
     setIsSubmitting(true);
     setError(null);
@@ -94,7 +94,8 @@ const ManageRequestPage: React.FC = () => {
         body: JSON.stringify({ 
           action: 'submit-quote', 
           items: itemsToSubmit, 
-          notes: notes 
+          notes: notes, 
+          coordinates: [location.longitude, location.latitude] // GEOJSON format: [longitude, latitude]
         }),
       });
       if (!response.ok) {
@@ -104,9 +105,35 @@ const ManageRequestPage: React.FC = () => {
       router.push('/requests');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
-    } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Only set submitting to false on error
     }
+  };
+
+  const handleGetLocationAndSubmit = () => {
+    setIsGettingLocation(true);
+    setError(null);
+
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser. Please use a modern browser.");
+      setIsGettingLocation(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        handleSubmitQuote({ latitude, longitude });
+        // No need to set isGettingLocation to false here, as handleSubmitQuote will handle the loading state.
+      },
+      (geoError) => {
+        let msg = "Could not get your location. ";
+        if (geoError.code === 1) msg += "Permission denied. Please enable location in your browser settings.";
+        else msg += "Please ensure you have a stable internet connection and try again.";
+        setError(msg);
+        setIsGettingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
   
   const getImageUrl = () => {
@@ -118,7 +145,6 @@ const ManageRequestPage: React.FC = () => {
     return '';
   };
 
-  // This error is for the initial page load
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
   if (!request && !loading) return <Container sx={{ py: 4 }}><Alert severity="error">{error || 'Could not load the request.'}</Alert></Container>;
   
@@ -129,7 +155,6 @@ const ManageRequestPage: React.FC = () => {
       <Navbar />
       <Container maxWidth="lg" sx={{ py: 4 }}>
         
-        {/* --- FIXED: Improved error display for submission errors --- */}
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
@@ -212,8 +237,8 @@ const ManageRequestPage: React.FC = () => {
              </Box>
 
             <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
-                 <Button variant="contained" color="primary" onClick={handleSubmitQuote} disabled={isSubmitting} sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' } }}>
-                   {isSubmitting ? <CircularProgress size={24} /> : 'Submit Quote to Patient'}
+                 <Button variant="contained" color="primary" onClick={handleGetLocationAndSubmit} disabled={isSubmitting || isGettingLocation} sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' } }}>
+                   {(isSubmitting || isGettingLocation) ? <CircularProgress size={24} /> : 'Submit Quote to Patient'}
                  </Button>
             </Box>
           </Paper>
