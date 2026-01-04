@@ -112,7 +112,7 @@ const LocationPermissionModal: React.FC<{ open: boolean; onClose: () => void; on
                     case geoError.POSITION_UNAVAILABLE: errorMessage = "Location information is unavailable."; break;
                     case geoError.TIMEOUT: errorMessage = "The request to get user location timed out."; break;
                 }
-                setError(errorMessage + " Please enable location services in your browser settings to proceed.");
+                setError(errorMessage + " Please enable location services in your browser settings to proceed or try again.");
                 setIsRequesting(false);
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -131,7 +131,7 @@ const LocationPermissionModal: React.FC<{ open: boolean; onClose: () => void; on
       <DialogActions sx={{ p: '16px 24px', borderTop: '1px solid #ddd' }}>
         <Button onClick={onClose} color="inherit" disabled={isRequesting}>Cancel</Button>
         <Button onClick={handleRequestLocation} variant="contained" autoFocus sx={{ minWidth: 150 }} disabled={isRequesting}>
-          {isRequesting ? <CircularProgress size={24} color="inherit" /> : 'Allow Location'}
+          {isRequesting ? <CircularProgress size={24} color="inherit" /> : (error ? "Try Again" : "Allow Location")}
         </Button>
       </DialogActions>
     </Dialog>
