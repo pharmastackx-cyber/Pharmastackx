@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         }
 
         const admin = getFirebaseAdmin();
-        const notificationUrl = `/dispatch/manage-request/${requestId}`;
+        const notificationUrl = `/review-request/${requestId}`;
 
         // Create the dynamic title and body
         const notificationTitle = createDynamicTitle(drugNames);
