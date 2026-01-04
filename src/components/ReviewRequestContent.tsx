@@ -156,7 +156,8 @@ const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, i
                           )}
                            {!isFetchingDistance && !quote.pharmacy.distance && (
                                 <Typography variant="body2" color="error" component="span" sx={{ fontWeight: 'bold', ml: 1 }}>
-                                    • {distanceError || 'Distance not available'}
+                                    • {distanceError || 'Location permission not provided'}
+
                                 </Typography>
                             )}
                         </Box>
@@ -274,6 +275,12 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
     }
   }, [requestId]);
 
+  const handleModalClose = () => {
+      setLocationModalOpen(false);
+      if (Object.keys(distances).length === 0) {
+          setDistanceError('Location access is required to calculate distances.');
+      }
+  };
 
   const handleAcceptQuote = async (quoteId: string, itemsToAdd: any[]) => {
       setIsSubmitting(true);
@@ -377,7 +384,7 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
         
       <LocationPermissionModal 
         open={isLocationModalOpen}
-        onClose={() => setLocationModalOpen(false)}
+        onClose={handleModalClose}
         onConfirm={handleRequestLocation}
         isRequesting={isRequestingLocation}
         error={distanceError}
@@ -440,7 +447,7 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                                     <Typography>Calculating distances...</Typography>
                                 </Box>
                             )}
-                            {distanceError && <Alert severity="error" sx={{mb:2}}>{distanceError}</Alert>}
+                            {distanceError && !isFetchingDistances && <Alert severity="error" sx={{mb:2}}>{distanceError}</Alert>}
 
                             {!isFetchingDistances && (
                                 <>
