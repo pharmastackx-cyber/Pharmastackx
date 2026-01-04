@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Container,
@@ -83,42 +83,14 @@ const sortDescriptions: Record<SortByType, string> = {
     date: 'Quotes are sorted by date from newest to oldest.'
 };
 
-// --- LOCATION MODAL --- 
-
-const LocationPermissionModal: React.FC<{ open: boolean; onClose: () => void; onConfirm: (location: { latitude: number, longitude: number }) => void; }> = ({ open, onClose, onConfirm }) => {
-    const [isRequesting, setIsRequesting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const handleRequestLocation = () => {
-        if (!navigator.geolocation) {
-            setError("Geolocation is not supported by this browser.");
-            return;
-        }
-
-        setIsRequesting(true);
-        setError(null);
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                onConfirm({ latitude, longitude });
-                setIsRequesting(false);
-                onClose(); 
-            },
-            (geoError) => {
-                let errorMessage = "An unknown error occurred.";
-                switch(geoError.code) {
-                    case geoError.PERMISSION_DENIED: errorMessage = "You denied the request for Geolocation."; break;
-                    case geoError.POSITION_UNAVAILABLE: errorMessage = "Location information is unavailable."; break;
-                    case geoError.TIMEOUT: errorMessage = "The request to get user location timed out."; break;
-                }
-                setError(errorMessage + " Please enable location services in your browser settings to proceed or try again.");
-                setIsRequesting(false);
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-    };
-
+// --- LOCATION MODAL ---
+const LocationPermissionModal: React.FC<{ 
+    open: boolean; 
+    onClose: () => void; 
+    onConfirm: () => void;
+    isRequesting: boolean;
+    error: string | null;
+}> = ({ open, onClose, onConfirm, isRequesting, error }) => {
   return (
     <Dialog open={open} onClose={() => { if (!isRequesting) onClose(); }} maxWidth="xs" fullWidth>
       <DialogTitle sx={{ fontWeight: 600, borderBottom: '1px solid #ddd' }}>Location Access Needed</DialogTitle>
@@ -130,14 +102,13 @@ const LocationPermissionModal: React.FC<{ open: boolean; onClose: () => void; on
       </DialogContent>
       <DialogActions sx={{ p: '16px 24px', borderTop: '1px solid #ddd' }}>
         <Button onClick={onClose} color="inherit" disabled={isRequesting}>Cancel</Button>
-        <Button onClick={handleRequestLocation} variant="contained" autoFocus sx={{ minWidth: 150 }} disabled={isRequesting}>
+        <Button onClick={onConfirm} variant="contained" autoFocus sx={{ minWidth: 150 }} disabled={isRequesting}>
           {isRequesting ? <CircularProgress size={24} color="inherit" /> : (error ? "Try Again" : "Allow Location")}
         </Button>
       </DialogActions>
     </Dialog>
   );
 }
-
 
 const getStatusChip = (status: Request['status']) => {
     switch (status) {
@@ -168,12 +139,6 @@ const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, i
         validItems.reduce((acc, item) => acc + (item.price! * item.pharmacyQuantity!), 0), 
         [validItems]
     );
-
-    useEffect(() => {
-        if (!isFetchingDistance && !quote.pharmacy.distance) {
-            console.error(`Distance not available for pharmacy: ${quote.pharmacy.name} (${quote.pharmacy._id})`);
-        }
-    }, [isFetchingDistance, quote.pharmacy.distance, quote.pharmacy.name, quote.pharmacy._id]);
 
     return (
         <Card variant="outlined" sx={{ mb: 2, borderRadius: '16px', border: quote.status === 'accepted' ? '2px solid' : '', borderColor: 'success.main' }}>
@@ -230,20 +195,61 @@ const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, i
 // --- MAIN COMPONENT --- 
 
 const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string) => void; }> = ({ requestId, setView }) => {
-  const router = useRouter();
   const { addToCart, updateQuantity } = useCart();
 
   const [request, setRequest] = useState<Request | null>(null);
   const [distances, setDistances] = useState<{ [pharmacyId: string]: string }>({});
-  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [isLocationModalOpen, setLocationModalOpen] = useState(false);
   const [isFetchingDistances, setIsFetchingDistances] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [distanceError, setDistanceError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRequestingLocation, setIsRequestingLocation] = useState(false);
   const [sortBy, setSortBy] = useState<SortByType>('efficiency');
   const [isOriginalItemsExpanded, setOriginalItemsExpanded] = useState(false);
+
+  const handleRequestLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+        setDistanceError("Geolocation is not supported by this browser.");
+        return;
+    }
+    setIsRequestingLocation(true);
+    setDistanceError(null);
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            const { latitude, longitude } = position.coords;
+            setLocationModalOpen(false);
+            setIsRequestingLocation(false);
+            setIsFetchingDistances(true);
+            try {
+                const response = await fetch(`/api/distance?requestId=${requestId}&lat=${latitude}&lon=${longitude}`);
+                if (response.ok) {
+                    setDistances(await response.json());
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to fetch pharmacy distances.');
+                }
+            } catch (err) {
+                const errorMessage = err instanceof Error ? err.message : 'Could not load pharmacy distances.';
+                setDistanceError(errorMessage);
+            } finally {
+                setIsFetchingDistances(false);
+            }
+        },
+        (geoError) => {
+            let errorMessage = "An unknown error occurred.";
+            switch(geoError.code) {
+                case geoError.PERMISSION_DENIED: errorMessage = "Location permission denied."; break;
+                case geoError.POSITION_UNAVAILABLE: errorMessage = "Location information unavailable."; break;
+                case geoError.TIMEOUT: errorMessage = "Location request timed out."; break;
+            }
+            setDistanceError(errorMessage + " Please enable location services and try again.");
+            setIsRequestingLocation(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, [requestId]);
 
 
   useEffect(() => {
@@ -253,7 +259,11 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
           setLoading(true);
           const response = await fetch(`/api/requests/${requestId}`);
           if (!response.ok) throw new Error('Failed to fetch your request details.');
-          setRequest(await response.json());
+          const data = await response.json();
+          setRequest(data);
+          if (data.status === 'quoted' && data.quotes.length > 0) {
+              setLocationModalOpen(true);
+          }
         } catch (err) {
           setError(err instanceof Error ? err.message : 'An unknown error occurred');
         } finally {
@@ -264,37 +274,6 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
     }
   }, [requestId]);
 
-  useEffect(() => {
-    if (request && request.status === 'quoted' && request.quotes.length > 0 && !userLocation) {
-      setLocationModalOpen(true);
-    }
-  }, [request, userLocation]);
-
-  useEffect(() => {
-    if (userLocation && requestId) {
-      const fetchDistances = async () => {
-        setIsFetchingDistances(true);
-        setDistanceError(null);
-        try {
-          const { latitude, longitude } = userLocation;
-          const response = await fetch(`/api/distance?requestId=${requestId}&lat=${latitude}&lon=${longitude}`);
-          if (response.ok) {
-            setDistances(await response.json());
-          } else {
-              const errorData = await response.json();
-              const errorMessage = errorData.message || 'Failed to fetch pharmacy distances.';
-              throw new Error(errorMessage);
-          }
-        } catch (err) {
-          console.error("Failed to fetch distances:", err);
-          setDistanceError(err instanceof Error ? err.message : 'Could not load pharmacy distances.');
-        } finally {
-          setIsFetchingDistances(false);
-        }
-      };
-      fetchDistances();
-    }
-  }, [userLocation, requestId]);
 
   const handleAcceptQuote = async (quoteId: string, itemsToAdd: any[]) => {
       setIsSubmitting(true);
@@ -345,7 +324,7 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
   };
   
   const isActionDisabled = useMemo(() => isSubmitting || request?.status !== 'quoted', [isSubmitting, request?.status]);
-  const acceptedQuote = useMemo(() => request?.quotes.find(q => q.status === 'accepted'), [request]);
+  const acceptedQuote = useMemo(() => request?.quotes.find(q => q.status === 'accepted'), [request?.quotes]);
 
   const enrichedQuotes = useMemo(() => {
     if (!request?.quotes) return [];
@@ -398,14 +377,10 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
         
       <LocationPermissionModal 
         open={isLocationModalOpen}
-        onClose={() => {
-            setLocationModalOpen(false);
-            
-        }}
-        onConfirm={(location) => {
-            setUserLocation(location);
-            setLocationModalOpen(false);
-        }}
+        onClose={() => setLocationModalOpen(false)}
+        onConfirm={handleRequestLocation}
+        isRequesting={isRequestingLocation}
+        error={distanceError}
       />
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -457,33 +432,43 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
 
                     {request.status === 'pending' && <Alert severity="info">Waiting for pharmacies to respond to your request...</Alert>}
                     
-                    {request.status === 'quoted' && (userLocation || request.quotes.length === 0) && sortedQuotes.length > 0 && (
+                    {request.status === 'quoted' && sortedQuotes.length > 0 && (
                         <Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-                                <FormControl size="small" sx={{ minWidth: 180 }}>
-                                    <Select
-                                        value={sortBy}
-                                        onChange={(e: SelectChangeEvent) => setSortBy(e.target.value as SortByType)}
-                                    >
-                                        <MenuItem value="efficiency">Sort by: Best Match</MenuItem>
-                                        <MenuItem value="price">Sort by: Price (Low to High)</MenuItem>
-                                        <MenuItem value="distance">Sort by: Distance (Nearest)</MenuItem>
-                                        <MenuItem value="date">Sort by: Date (Newest)</MenuItem>
-                                    </Select>
-                                </FormControl>
-                                <Alert severity="info" icon={false} sx={{ flexGrow: 1, p: '0 12px' }}>{sortDescriptions[sortBy]}</Alert>
-                            </Box>
+                             {isFetchingDistances && (
+                                <Box sx={{textAlign: 'center', my: 2}}>
+                                    <CircularProgress />
+                                    <Typography>Calculating distances...</Typography>
+                                </Box>
+                            )}
+                            {distanceError && <Alert severity="error" sx={{mb:2}}>{distanceError}</Alert>}
 
-                            {sortedQuotes.map(quote => (
-                                <QuoteCard 
-                                    key={quote._id} 
-                                    quote={quote} 
-                                    onRequestDecision={handleAcceptQuote} 
-                                    isActionDisabled={isActionDisabled}
-                                    isFetchingDistance={isFetchingDistances}
-                                    distanceError={distanceError}
-                                />
-                            ))}
+                            {!isFetchingDistances && (
+                                <>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+                                    <FormControl size="small" sx={{ minWidth: 180 }}>
+                                        <Select
+                                            value={sortBy}
+                                            onChange={(e: SelectChangeEvent) => setSortBy(e.target.value as SortByType)}
+                                        >
+                                            <MenuItem value="efficiency">Sort by: Best Match</MenuItem>
+                                            <MenuItem value="price">Sort by: Price (Low to High)</MenuItem>
+                                            <MenuItem value="distance">Sort by: Distance (Nearest)</MenuItem>
+                                            <MenuItem value="date">Sort by: Date (Newest)</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                    <Alert severity="info" icon={false} sx={{ flexGrow: 1, p: '0 12px' }}>{sortDescriptions[sortBy]}</Alert>
+                                </Box>
+                                {sortedQuotes.map(quote => (
+                                    <QuoteCard 
+                                        key={quote._id} 
+                                        quote={quote} 
+                                        onRequestDecision={handleAcceptQuote} 
+                                        isActionDisabled={isActionDisabled}
+                                        isFetchingDistance={isFetchingDistances}
+                                        distanceError={distanceError}
+                                    />
+                                ))}
+                                </>)}
 
                             {sortedQuotes.length > 0 && sortedQuotes.length < 5 && !acceptedQuote && (
                                 <Alert severity="info" sx={{ mt: 2 }}>
@@ -493,7 +478,7 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                         </Box>
                     )}
                     
-                    {request.status === 'quoted' && sortedQuotes.length === 0 && (
+                    {request.status === 'quoted' && sortedQuotes.length === 0 && !isFetchingDistances && (
                          <Alert severity="warning">No quotes have been submitted for this request yet.</Alert>
                     )}
 
