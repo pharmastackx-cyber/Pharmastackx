@@ -26,7 +26,8 @@ import {
   FormControl,
   Select,
   MenuItem,
-  SelectChangeEvent
+  SelectChangeEvent,
+  Collapse
 } from '@mui/material';
 import { useCart } from '@/contexts/CartContext';
 
@@ -152,8 +153,8 @@ const getStatusChip = (status: Request['status']) => {
 
 // --- QUOTE CARD COMPONENT --- 
 
-const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, items: any[]) => void; isActionDisabled: boolean; isFetchingDistance: boolean; }> = 
-({ quote, onRequestDecision, isActionDisabled, isFetchingDistance }) => {
+const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, items: any[]) => void; isActionDisabled: boolean; isFetchingDistance: boolean; distanceError: string | null; }> = 
+({ quote, onRequestDecision, isActionDisabled, isFetchingDistance, distanceError }) => {
 
     const validItems = useMemo(() => 
         quote.items.filter(item => 
@@ -168,6 +169,12 @@ const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, i
         [validItems]
     );
 
+    useEffect(() => {
+        if (!isFetchingDistance && !quote.pharmacy.distance) {
+            console.error(`Distance not available for pharmacy: ${quote.pharmacy.name} (${quote.pharmacy._id})`);
+        }
+    }, [isFetchingDistance, quote.pharmacy.distance, quote.pharmacy.name, quote.pharmacy._id]);
+
     return (
         <Card variant="outlined" sx={{ mb: 2, borderRadius: '16px', border: quote.status === 'accepted' ? '2px solid' : '', borderColor: 'success.main' }}>
             <CardContent>
@@ -177,11 +184,16 @@ const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, i
                         <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
                           <Typography variant="body2" color="text.secondary" component="span">{quote.pharmacy.address}</Typography>
                           {isFetchingDistance && <Skeleton width={80} sx={{ ml: 1, display: 'inline-block' }} />}
-                          {quote.pharmacy.distance && (
+                          {!isFetchingDistance && quote.pharmacy.distance && (
                             <Typography variant="body2" color="text.secondary" component="span" sx={{ fontWeight: 'bold', ml: 1 }}>
                               • {quote.pharmacy.distance}
                             </Typography>
                           )}
+                           {!isFetchingDistance && !quote.pharmacy.distance && (
+                                <Typography variant="body2" color="error" component="span" sx={{ fontWeight: 'bold', ml: 1 }}>
+                                    • {distanceError || 'Distance not available'}
+                                </Typography>
+                            )}
                         </Box>
                     </Box>
                     {quote.status === 'accepted' && <Chip label="Accepted" color="success" />}
@@ -228,8 +240,11 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
   const [isFetchingDistances, setIsFetchingDistances] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [distanceError, setDistanceError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sortBy, setSortBy] = useState<SortByType>('efficiency');
+  const [isOriginalItemsExpanded, setOriginalItemsExpanded] = useState(false);
+
 
   useEffect(() => {
     if (requestId) {
@@ -259,17 +274,20 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
     if (userLocation && requestId) {
       const fetchDistances = async () => {
         setIsFetchingDistances(true);
+        setDistanceError(null);
         try {
           const { latitude, longitude } = userLocation;
           const response = await fetch(`/api/distance?requestId=${requestId}&lat=${latitude}&lon=${longitude}`);
           if (response.ok) {
             setDistances(await response.json());
           } else {
-              throw new Error('Failed to fetch pharmacy distances.');
+              const errorData = await response.json();
+              const errorMessage = errorData.message || 'Failed to fetch pharmacy distances.';
+              throw new Error(errorMessage);
           }
         } catch (err) {
           console.error("Failed to fetch distances:", err);
-          setError(err instanceof Error ? err.message : 'Could not load pharmacy distances.');
+          setDistanceError(err instanceof Error ? err.message : 'Could not load pharmacy distances.');
         } finally {
           setIsFetchingDistances(false);
         }
@@ -395,8 +413,30 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
         <Grid container spacing={{ xs: 2, md: 4 }}>
             <Grid item xs={12} md={4}>
                 <Paper elevation={2} sx={{ p: 2, borderRadius: '16px', position: 'sticky', top: '80px' }}>
-                    <Typography variant="h6" gutterBottom>Your Original Request</Typography>
-                    <List dense>{request.items.map((item, i) => <ListItem key={i} disableGutters><ListItemText primary={item.name} secondary={`Qty: ${item.quantity}`} /></ListItem>)}</List>
+                    <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>Your Original Request</Typography>
+                    <List dense>
+                        {request.items.slice(0, 1).map((item, i) => (
+                            <ListItem key={i} disableGutters>
+                                <ListItemText primary={item.name} secondary={`Qty: ${item.quantity}`} />
+                            </ListItem>
+                        ))}
+                        <Collapse in={isOriginalItemsExpanded}>
+                            {request.items.slice(1).map((item, i) => (
+                                <ListItem key={i + 1} disableGutters>
+                                    <ListItemText primary={item.name} secondary={`Qty: ${item.quantity}`} />
+                                </ListItem>
+                            ))}
+                        </Collapse>
+                    </List>
+                    {request.items.length > 1 && (
+                        <Button
+                            size="small"
+                            onClick={() => setOriginalItemsExpanded(!isOriginalItemsExpanded)}
+                            sx={{ mt: 1 }}
+                        >
+                            {isOriginalItemsExpanded ? 'Show Less' : `Show ${request.items.length - 1} More...`}
+                        </Button>
+                    )}
                 </Paper>
             </Grid>
 
@@ -411,7 +451,7 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                     {acceptedQuote && (
                         <Box>
                             <Typography variant="h6" color="success.main" sx={{mb: 2}}>You have accepted this quote:</Typography>
-                            <QuoteCard quote={sortedQuotes.find(q=>q._id === acceptedQuote._id)!} onRequestDecision={() => {}} isActionDisabled={true} isFetchingDistance={false} />
+                            <QuoteCard quote={sortedQuotes.find(q=>q._id === acceptedQuote._id)!} onRequestDecision={() => {}} isActionDisabled={true} isFetchingDistance={false} distanceError={distanceError} />
                         </Box>
                     )}
 
@@ -434,12 +474,6 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                                 <Alert severity="info" icon={false} sx={{ flexGrow: 1, p: '0 12px' }}>{sortDescriptions[sortBy]}</Alert>
                             </Box>
 
-                            {sortedQuotes.length > 0 && sortedQuotes.length < 5 && !acceptedQuote && (
-                                <Alert severity="info" sx={{ mb: 2 }}>
-                                    <strong>Pro-Tip:</strong> If you wait a bit longer, you might receive offers of lower amounts from even shorter distance pharmacies.
-                                </Alert>
-                            )}
-
                             {sortedQuotes.map(quote => (
                                 <QuoteCard 
                                     key={quote._id} 
@@ -447,8 +481,15 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                                     onRequestDecision={handleAcceptQuote} 
                                     isActionDisabled={isActionDisabled}
                                     isFetchingDistance={isFetchingDistances}
+                                    distanceError={distanceError}
                                 />
                             ))}
+
+                            {sortedQuotes.length > 0 && sortedQuotes.length < 5 && !acceptedQuote && (
+                                <Alert severity="info" sx={{ mt: 2 }}>
+                                    <strong>Pro-Tip:</strong> If you wait a bit longer, you might receive offers of lower amounts from even shorter distance pharmacies.
+                                </Alert>
+                            )}
                         </Box>
                     )}
                     
