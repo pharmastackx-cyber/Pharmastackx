@@ -87,13 +87,29 @@ export async function POST(req: NextRequest) {
   }
 }
 
-
-// --- FIX STARTS HERE ---
 export async function GET(req: NextRequest) {
     await dbConnect();
-    const session = await getSession(req);
+    const { searchParams } = new URL(req.url, `http://${req.headers.get('host')}`);
+    const userId = searchParams.get('userId');
+    const source = searchParams.get('source');
   
+    // For the dispatch form, we ONLY want to fetch by the provided userId.
+    if (source === 'dispatch' && userId) {
+      try {
+        const requests = await RequestModel.find({ user: userId })
+          .populate('user', 'name email')
+          .sort({ createdAt: -1 });
+        return NextResponse.json(requests, { status: 200 });
+      } catch (error) {
+        console.error('Error fetching requests for user:', error);
+        return NextResponse.json({ message: 'Internal Server Error while fetching user requests.' }, { status: 500 });
+      }
+    }
+  
+    // Fallback to existing session-based logic for other parts of the application
+    const session = await getSession(req);
     if (!session?.userId) {
+      // If there's no session and it's not a dispatch request, return unauthorized.
       return NextResponse.json({ message: 'Unauthorized: No valid session found' }, { status: 401 });
     }
   
@@ -102,7 +118,7 @@ export async function GET(req: NextRequest) {
         const pharmacistRoles = ['pharmacist', 'pharmacy'];
 
         if (pharmacistRoles.includes(session.role)) {
-            // Pharmacists see requests that are open OR requests where their quote was accepted.
+            // Pharmacists see open requests or requests where their quote was accepted.
             query = {
                 $or: [
                     { status: { $in: ['pending', 'quoted'] } },
@@ -113,7 +129,7 @@ export async function GET(req: NextRequest) {
             // Admins see all requests.
             query = {};
         } else {
-            // Regular users only see their own requests.
+            // Regular users see their own requests.
             query = { user: session.userId };
         }
 
@@ -127,5 +143,4 @@ export async function GET(req: NextRequest) {
       console.error('Error fetching requests:', error);
       return NextResponse.json({ message: 'Internal Server Error while fetching requests.' }, { status: 500 });
     }
-  }
-// --- FIX ENDS HERE ---
+}

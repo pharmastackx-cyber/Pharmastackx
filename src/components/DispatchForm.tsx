@@ -99,7 +99,8 @@ const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: stri
   const fetchHistory = useCallback(async () => {
       if (!user) return;
       try {
-          const response = await fetch('/api/requests?source=dispatch');
+        const response = await fetch(`/api/requests?source=dispatch&userId=${user._id}`);
+
           if (response.ok) {
               const data = await response.json();
               data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
