@@ -3,8 +3,8 @@ import React, { useState, useCallback, useEffect } from "react";
 import { TextField, Button, MenuItem, Box, Typography, InputAdornment, IconButton, ListSubheader, Alert, CircularProgress } from "@mui/material";
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from "axios";
-import Cookies from "js-cookie";
 import CreatePharmacyModal from "../components/CreatePharmacyModal";
+import { useSession } from "@/context/SessionProvider";
 
 const nigerianStates = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
@@ -20,6 +20,7 @@ interface Pharmacy {
 }
 
 export default function SignupForm({ redirectUrl }: { redirectUrl: string | null; }) {
+  const { refreshSession } = useSession();
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -138,9 +139,9 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
     try {
       await axios.post("/api/auth/signup", { ...form, role: "customer" });
       const loginResponse = await axios.post("/api/auth/login", { email: form.email, password: form.password });
-      Cookies.set("session_token", loginResponse.data.token, { expires: 7 });
       setSuccess("Signup successful! Redirecting...");
-      setTimeout(() => redirectToApp(loginResponse.data.user?.role), 1000);
+      await refreshSession();
+      redirectToApp(loginResponse.data.user?.role);
     } catch (err: any) {
       setError(err.response?.data?.error || "Signup failed. Please try again.");
       setLoading(false);
@@ -166,9 +167,9 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
     try {
       await axios.post("/api/auth/signup", payload);
       const res = await axios.post("/api/auth/login", { email: form.email, password: form.password });
-      Cookies.set("session_token", res.data.token, { expires: 7 });
       setSuccess("Provider signup successful! Redirecting...");
-      setTimeout(() => redirectToApp(res.data.user?.role), 1000);
+      await refreshSession();
+      redirectToApp(res.data.user?.role);
     } catch (err: any) {
       setError(err.response?.data?.error || "Provider signup failed. Please check your information.");
       setProviderLoading(false);
