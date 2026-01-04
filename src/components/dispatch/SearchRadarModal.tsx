@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Modal, Box, Typography, keyframes, Grid, Chip, Avatar, Button, Slide, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import Image from 'next/image';
+import { useSession } from '@/context/SessionProvider';
 
 // Define the shape of the drug request for the props
 interface DrugRequest {
@@ -101,6 +102,9 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
   const [os, setOs] = useState<'iOS' | 'Android' | 'Other'>('Other');
   const [isStandalone, setIsStandalone] = useState(false);
   const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const { user } = useSession();
+  const router = useRouter();
+  const [showLoginOverlay, setShowLoginOverlay] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -114,9 +118,17 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
       } else if (/iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream) {
         setOs('iOS');
       }
-    }
-  }, [open]);
 
+      if (!user) {
+        const timer = setTimeout(() => {
+          setShowLoginOverlay(true);
+        }, 2500);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      setShowLoginOverlay(false);
+    }
+  }, [open, user]);
 
   const handleReviewClick = () => {
     onReview();
@@ -130,6 +142,9 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
     setInstallGuideOpen(false);
   };
 
+  const handleLoginRedirect = () => {
+    router.push('/auth');
+  };
 
   return (
     <>
@@ -139,7 +154,42 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
         aria-labelledby="searching-modal-title"
       >
         <Box sx={modalStyle}>
-          
+          {showLoginOverlay && (
+            <Box sx={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                bgcolor: 'rgba(0, 20, 15, 0.95)',
+                zIndex: 100,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                p: 4,
+                textAlign: 'center'
+            }}>
+                <Typography variant="h5" component="h2" sx={{ fontWeight: 700, mb: 2, color: '#66ff99' }}>
+                    Login to View Quotes
+                </Typography>
+                <Typography sx={{ color: '#e0f2f1', mb: 4, maxWidth: 350 }}>
+                    When a pharmacist sends a quote for your request, you'll need to be logged in to view and accept it.
+                </Typography>
+                <Button
+                    variant="contained"
+                    onClick={handleLoginRedirect}
+                    sx={{
+                        bgcolor: '#00c853',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        px: 5,
+                        py: 1.5,
+                        '&:hover': { bgcolor: '#009624' },
+                    }}
+                >
+                    Login to Continue
+                </Button>
+            </Box>
+          )}
+
           <Slide direction="down" in={isQuoteReady} mountOnEnter unmountOnExit>
             <Box
                   sx={{
@@ -268,4 +318,4 @@ const SearchRadarModal: React.FC<SearchRadarModalProps> = ({ open, onClose, requ
   );
 };
 
-export default SearchRadarModal; 
+export default SearchRadarModal;
