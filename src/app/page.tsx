@@ -239,6 +239,28 @@ useEffect(() => {
     setInputValue('');
   };
 
+  useEffect(() => {
+    // On component mount, check if running as a PWA and if notification permission is default.
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(display-mode: standalone)').matches &&
+      'Notification' in window
+    ) {
+      const promptedInSession = sessionStorage.getItem('notificationPrompted');
+  
+      if (Notification.permission === 'default' && !promptedInSession) {
+        requestPermission();
+        sessionStorage.setItem('notificationPrompted', 'true');
+      } else {
+        setPermission(Notification.permission);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty array ensures this runs only once on mount
+  
+  
+
+
   const renderWelcomeView = () => (
     <Box
       key="welcome"
