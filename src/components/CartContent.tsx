@@ -328,7 +328,7 @@ const total = finalTotal;
       label={
         <Box>
           <Typography variant="body2" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
-            Pickup from Pharmacy - Free
+          Free Delivery (Pickup from Pharmacy)
           </Typography>
           <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>
           You will receive the pharmacy's location and phone number to arrange pickup.
@@ -341,7 +341,7 @@ const total = finalTotal;
 </Box>
 
 {deliveryOption === 'pickup' && (
-  <Paper sx={{ p: 2, mt: 2, border: '1px solid #006D5B', bgcolor: '#e8f5e8' }}>
+  <Paper sx={{ p: 2, mt: 2, mb: 3, border: '1px solid #006D5B', bgcolor: '#e8f5e8' }}>
     <Typography sx={{ fontWeight: 600, color: '#004D40', mb: 1 }}>
       {uniquePharmacies.length > 1 ? 'Pickup Locations' : 'Pickup Location'}
     </Typography>
@@ -351,7 +351,7 @@ const total = finalTotal;
       </Box>
     ))}
     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
-      Please proceed to the respective pharmacy addresses for pickup. Full details will be provided on the Orders page after checkout.
+      Full details will be provided on the Orders page after checkout.
     </Typography>
   </Paper>
 )}
