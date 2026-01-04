@@ -110,6 +110,18 @@ const ManageRequest: React.FC<ManageRequestProps> = ({ requestId, onBack }) => {
           const errorData = await response.json();
           throw new Error(errorData.message || 'Failed to submit quote');
       }
+
+      // Notify patient after successful quote submission
+      try {
+        await fetch('/api/notify-patient', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestId: request._id }),
+        });
+      } catch (notificationError) {
+        console.error('Failed to send notification to patient:', notificationError);
+      }
+
       onBack(); // Go back to the list view
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
