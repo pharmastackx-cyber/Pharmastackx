@@ -6,16 +6,13 @@ import UserModel from '@/models/User';
 
 // Defines the shape of the quote object after being populated with pharmacy data
 interface PopulatedQuote {
+  _id: string; // The ID of the quote itself
   pharmacy: {
     _id: {
       toString(): string;
     };
-    businessCoordinates?: {
-      latitude?: number;
-      longitude?: number;
-    };
   };
-  coordinates?: [number, number];
+  coordinates?: [number, number]; // [longitude, latitude]
 }
 
 // Defines the shape of the object we create for the Google Maps API
@@ -26,7 +23,11 @@ async function getTravelTimes(origin: { lat: number; lon: number }, destinations
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     console.error("Google Maps API key is missing.");
-    return {};
+    const results: { [pharmacyId: string]: string } = {};
+    for (const dest of destinations) {
+        results[dest.id] = "Distance calculation failed.";
+    }
+    return results;
   }
   if (destinations.length === 0) {
     return {};
@@ -40,13 +41,16 @@ async function getTravelTimes(origin: { lat: number; lon: number }, destinations
   try {
     const response = await fetch(url);
     const data = await response.json();
+    const results: { [pharmacyId: string]: string } = {};
 
     if (data.status !== 'OK') {
       console.error('Error fetching travel time from Google Maps:', data.error_message || data.status);
-      return {};
+      for (const dest of destinations) {
+        results[dest.id] = "Distance calculation failed.";
+      }
+      return results;
     }
 
-    const results: { [pharmacyId: string]: string } = {};
     const elements = data.rows[0].elements;
 
     elements.forEach((element: any, index: number) => {
@@ -54,7 +58,7 @@ async function getTravelTimes(origin: { lat: number; lon: number }, destinations
       if (element.status === 'OK') {
         results[pharmacyId] = element.duration.text; // e.g., "23 mins"
       } else {
-        results[pharmacyId] = 'Not available';
+        results[pharmacyId] = "Distance calculation failed."; // Specific error as requested
       }
     });
 
@@ -62,7 +66,11 @@ async function getTravelTimes(origin: { lat: number; lon: number }, destinations
 
   } catch (error) {
     console.error("Error calling Google Maps API:", error);
-    return {};
+    const results: { [pharmacyId: string]: string } = {};
+    for (const dest of destinations) {
+        results[dest.id] = "Distance calculation failed.";
+    }
+    return results;
   }
 }
 
@@ -72,8 +80,9 @@ export async function GET(req: NextRequest) {
   const userLat = searchParams.get('lat');
   const userLon = searchParams.get('lon');
 
+  // lat and lon are now required for the user's location
   if (!requestId || !userLat || !userLon) {
-    return NextResponse.json({ message: 'Missing required parameters: requestId, lat, and lon.' }, { status: 400 });
+    return NextResponse.json({ message: 'User location not taken. Missing required parameters: requestId, lat, and lon.' }, { status: 400 });
   }
 
   try {
@@ -85,43 +94,43 @@ export async function GET(req: NextRequest) {
       .populate<{ quotes: PopulatedQuote[] }>({
         path: 'quotes.pharmacy',
         model: UserModel,
-        select: 'businessCoordinates'
+        select: '_id' // Only select the ID to be efficient
       });
 
     if (!request) {
       return NextResponse.json({ message: 'Request not found' }, { status: 404 });
     }
 
-    const destinations = request.quotes
-      .map((quote: PopulatedQuote): DestinationObject | null => {
-        const pharmacy = quote.pharmacy;
-        const pharmacyId = pharmacy?._id.toString();
+    const travelTimes: { [pharmacyId: string]: string } = {};
+    const destinationsToFetch: DestinationObject[] = [];
 
-        if (!pharmacyId) return null;
+    const populatedQuotes = request.quotes as PopulatedQuote[];
 
-        // --- Definitive Fix: Prioritize quote.coordinates, then fall back to pharmacy.businessCoordinates ---
-        if (quote.coordinates && quote.coordinates.length === 2) {
-          return {
-            id: pharmacyId,
-            coords: { lat: quote.coordinates[1], lon: quote.coordinates[0] }
-          };
-        }
+    for (const quote of populatedQuotes) {
+      const pharmacyId = quote.pharmacy?._id?.toString();
 
-        if (pharmacy.businessCoordinates && typeof pharmacy.businessCoordinates.latitude !== 'undefined' && typeof pharmacy.businessCoordinates.longitude !== 'undefined') {
-          return {
-            id: pharmacyId,
-            coords: {
-              lat: pharmacy.businessCoordinates.latitude,
-              lon: pharmacy.businessCoordinates.longitude,
-            }
-          };
-        }
+      if (!pharmacyId) {
+        continue; // Should not happen with valid data
+      }
 
-        return null;
-      })
-      .filter((d: DestinationObject | null): d is DestinationObject => d !== null);
+      // Per user instruction: only use quote.coordinates
+      if (quote.coordinates && quote.coordinates.length === 2) {
+        destinationsToFetch.push({
+          id: pharmacyId,
+          // Assuming GeoJSON order [longitude, latitude]
+          coords: { lat: quote.coordinates[1], lon: quote.coordinates[0] }
+        });
+      } else {
+        // If no coordinates, set the specific error message.
+        travelTimes[pharmacyId] = "Pharmacist location not recorded.";
+      }
+    }
 
-    const travelTimes = await getTravelTimes(origin, destinations);
+    // Fetch travel times for the destinations that had coordinates
+    if (destinationsToFetch.length > 0) {
+        const googleMapsResults = await getTravelTimes(origin, destinationsToFetch);
+        Object.assign(travelTimes, googleMapsResults);
+    }
 
     return NextResponse.json(travelTimes, { status: 200 });
 
@@ -131,3 +140,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'Internal Server Error', error: errorMessage }, { status: 500 });
   }
 }
+

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Container,
   Typography,
@@ -19,10 +18,6 @@ import {
   ListItem, 
   ListItemText,
   Skeleton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   FormControl,
   Select,
   MenuItem,
@@ -83,33 +78,6 @@ const sortDescriptions: Record<SortByType, string> = {
     date: 'Quotes are sorted by date from newest to oldest.'
 };
 
-// --- LOCATION MODAL ---
-const LocationPermissionModal: React.FC<{ 
-    open: boolean; 
-    onClose: () => void; 
-    onConfirm: () => void;
-    isRequesting: boolean;
-    error: string | null;
-}> = ({ open, onClose, onConfirm, isRequesting, error }) => {
-  return (
-    <Dialog open={open} onClose={() => { if (!isRequesting) onClose(); }} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ fontWeight: 600, borderBottom: '1px solid #ddd' }}>Location Access Needed</DialogTitle>
-      <DialogContent sx={{py: 3}}>
-        <Typography variant="body1" color="text.secondary" sx={{mb: 2}}>
-            To calculate distances to pharmacies, we need to access your current location.
-        </Typography>
-        {error && <Alert severity="error" sx={{mt: 2}}>{error}</Alert>}
-      </DialogContent>
-      <DialogActions sx={{ p: '16px 24px', borderTop: '1px solid #ddd' }}>
-        <Button onClick={onClose} color="inherit" disabled={isRequesting}>Cancel</Button>
-        <Button onClick={onConfirm} variant="contained" autoFocus sx={{ minWidth: 150 }} disabled={isRequesting}>
-          {isRequesting ? <CircularProgress size={24} color="inherit" /> : (error ? "Try Again" : "Allow Location")}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
 const getStatusChip = (status: Request['status']) => {
     switch (status) {
       case 'pending': return <Chip label="Waiting for Quotes" color="default" />;
@@ -124,8 +92,8 @@ const getStatusChip = (status: Request['status']) => {
 
 // --- QUOTE CARD COMPONENT --- 
 
-const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, items: any[]) => void; isActionDisabled: boolean; isFetchingDistance: boolean; distanceError: string | null; }> = 
-({ quote, onRequestDecision, isActionDisabled, isFetchingDistance, distanceError }) => {
+const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, items: any[]) => void; isActionDisabled: boolean; isFetchingDistance: boolean; }> = 
+({ quote, onRequestDecision, isActionDisabled, isFetchingDistance }) => {
 
     const validItems = useMemo(() => 
         quote.items.filter(item => 
@@ -139,6 +107,9 @@ const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, i
         validItems.reduce((acc, item) => acc + (item.price! * item.pharmacyQuantity!), 0), 
         [validItems]
     );
+    
+    const isDistanceError = quote.pharmacy.distance && 
+        ["Pharmacist location not recorded.", "Distance calculation failed.", "User location not taken."].includes(quote.pharmacy.distance);
 
     return (
         <Card variant="outlined" sx={{ mb: 2, borderRadius: '16px', border: quote.status === 'accepted' ? '2px solid' : '', borderColor: 'success.main' }}>
@@ -150,14 +121,13 @@ const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, i
                           <Typography variant="body2" color="text.secondary" component="span">{quote.pharmacy.address}</Typography>
                           {isFetchingDistance && <Skeleton width={80} sx={{ ml: 1, display: 'inline-block' }} />}
                           {!isFetchingDistance && quote.pharmacy.distance && (
-                            <Typography variant="body2" color="text.secondary" component="span" sx={{ fontWeight: 'bold', ml: 1 }}>
-                              • {quote.pharmacy.distance}
+                             <Typography variant="body2" component="span" sx={{ fontWeight: 'bold', ml: 1, color: isDistanceError ? 'error.main' : 'text.secondary' }}>
+                                • {quote.pharmacy.distance}
                             </Typography>
                           )}
-                           {!isFetchingDistance && !quote.pharmacy.distance && (
-                                <Typography variant="body2" color="error" component="span" sx={{ fontWeight: 'bold', ml: 1 }}>
-                                    • {distanceError || 'Location permission not provided'}
-
+                           {!isFetchingDistance && !quote.pharmacy.distance && !isDistanceError && (
+                                <Typography variant="body2" color="text.secondary" component="span" sx={{ fontWeight: 'bold', ml: 1 }}>
+                                    • Distance not available
                                 </Typography>
                             )}
                         </Box>
@@ -200,87 +170,81 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
 
   const [request, setRequest] = useState<Request | null>(null);
   const [distances, setDistances] = useState<{ [pharmacyId: string]: string }>({});
-  const [isLocationModalOpen, setLocationModalOpen] = useState(false);
-  const [isFetchingDistances, setIsFetchingDistances] = useState(false);
+  const [isFetchingDistances, setIsFetchingDistances] = useState(true); // Start true
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [distanceError, setDistanceError] = useState<string | null>(null);
+  const [distanceError, setDistanceError] = useState<string | null>(null); // To hold the single, overarching distance error
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRequestingLocation, setIsRequestingLocation] = useState(false);
   const [sortBy, setSortBy] = useState<SortByType>('efficiency');
   const [isOriginalItemsExpanded, setOriginalItemsExpanded] = useState(false);
 
-  const handleRequestLocation = useCallback(() => {
+  const fetchDistances = useCallback(async (latitude: number, longitude: number) => {
+    setIsFetchingDistances(true);
+    setDistanceError(null);
+    try {
+        const response = await fetch(`/api/distance?requestId=${requestId}&lat=${latitude}&lon=${longitude}`);
+        const data = await response.json();
+        if (response.ok) {
+            setDistances(data);
+        } else {
+            throw new Error(data.message || 'Failed to fetch pharmacy distances.');
+        }
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Could not load pharmacy distances.';
+        setDistanceError(errorMessage);
+    } finally {
+        setIsFetchingDistances(false);
+    }
+  }, [requestId]);
+
+  const requestUserLocation = useCallback(() => {
     if (!navigator.geolocation) {
         setDistanceError("Geolocation is not supported by this browser.");
+        setIsFetchingDistances(false);
         return;
     }
-    setIsRequestingLocation(true);
-    setDistanceError(null);
     navigator.geolocation.getCurrentPosition(
-        async (position) => {
-            const { latitude, longitude } = position.coords;
-            setLocationModalOpen(false);
-            setIsRequestingLocation(false);
-            setIsFetchingDistances(true);
-            try {
-                const response = await fetch(`/api/distance?requestId=${requestId}&lat=${latitude}&lon=${longitude}`);
-                if (response.ok) {
-                    setDistances(await response.json());
-                } else {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to fetch pharmacy distances.');
-                }
-            } catch (err) {
-                const errorMessage = err instanceof Error ? err.message : 'Could not load pharmacy distances.';
-                setDistanceError(errorMessage);
-            } finally {
-                setIsFetchingDistances(false);
-            }
+        (position) => {
+            fetchDistances(position.coords.latitude, position.coords.longitude);
         },
         (geoError) => {
-            let errorMessage = "An unknown error occurred.";
-            switch(geoError.code) {
-                case geoError.PERMISSION_DENIED: errorMessage = "Location permission denied."; break;
-                case geoError.POSITION_UNAVAILABLE: errorMessage = "Location information unavailable."; break;
-                case geoError.TIMEOUT: errorMessage = "Location request timed out."; break;
-            }
-            setDistanceError(errorMessage + " Please enable location services and try again.");
-            setIsRequestingLocation(false);
+            // As per instructions, set the specific error message.
+            setDistanceError("User location not taken.");
+            setIsFetchingDistances(false);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [requestId]);
+  }, [fetchDistances]);
 
 
   useEffect(() => {
-    if (requestId) {
-      const fetchRequest = async () => {
-        try {
-          setLoading(true);
-          const response = await fetch(`/api/requests/${requestId}`);
-          if (!response.ok) throw new Error('Failed to fetch your request details.');
-          const data = await response.json();
-          setRequest(data);
-          if (data.status === 'quoted' && data.quotes.length > 0) {
-              setLocationModalOpen(true);
-          }
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'An unknown error occurred');
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchRequest();
-    }
-  }, [requestId]);
+    const fetchRequestAndDistances = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/requests/${requestId}`);
+        if (!response.ok) throw new Error('Failed to fetch your request details.');
+        const data = await response.json();
+        setRequest(data);
 
-  const handleModalClose = () => {
-      setLocationModalOpen(false);
-      if (Object.keys(distances).length === 0) {
-          setDistanceError('Location access is required to calculate distances.');
+        if (data.status === 'quoted' && data.quotes.length > 0) {
+            requestUserLocation();
+        } else {
+            setIsFetchingDistances(false);
+        }
+
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        setIsFetchingDistances(false);
+      } finally {
+        setLoading(false);
       }
-  };
+    };
+    
+    if (requestId) {
+      fetchRequestAndDistances();
+    }
+  }, [requestId, requestUserLocation]);
+
 
   const handleAcceptQuote = async (quoteId: string, itemsToAdd: any[]) => {
       setIsSubmitting(true);
@@ -339,14 +303,17 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
       ...quote,
       pharmacy: {
         ...quote.pharmacy,
-        distance: distances[quote.pharmacy._id] || ''
+        // The distance is now either the calculated value or a specific error message
+        distance: distances[quote.pharmacy._id] || (distanceError ? (quote.pharmacy.distance || distanceError) : undefined)
       }
     }));
-  }, [request?.quotes, distances]);
+  }, [request?.quotes, distances, distanceError]);
 
   const sortedQuotes = useMemo(() => {
     const parseDistance = (distanceStr: string | undefined): number => {
-        if (!distanceStr) return Infinity;
+        if (!distanceStr || ["Pharmacist location not recorded.", "Distance calculation failed.", "User location not taken."].includes(distanceStr)) {
+            return Infinity;
+        }
         const match = distanceStr.match(/(\d+(\.\d+)?)/);
         return match ? parseFloat(match[1]) : Infinity;
     };
@@ -382,14 +349,6 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, color: 'text.primary' }}>
         
-      <LocationPermissionModal 
-        open={isLocationModalOpen}
-        onClose={handleModalClose}
-        onConfirm={handleRequestLocation}
-        isRequesting={isRequestingLocation}
-        error={distanceError}
-      />
-
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {!request ? <Alert severity="warning">Could not load your request details.</Alert> : (
         <Grid container spacing={{ xs: 2, md: 4 }}>
@@ -433,7 +392,7 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                     {acceptedQuote && (
                         <Box>
                             <Typography variant="h6" color="success.main" sx={{mb: 2}}>You have accepted this quote:</Typography>
-                            <QuoteCard quote={sortedQuotes.find(q=>q._id === acceptedQuote._id)!} onRequestDecision={() => {}} isActionDisabled={true} isFetchingDistance={false} distanceError={distanceError} />
+                            <QuoteCard quote={sortedQuotes.find(q=>q._id === acceptedQuote._id)!} onRequestDecision={() => {}} isActionDisabled={true} isFetchingDistance={false} />
                         </Box>
                     )}
 
@@ -447,6 +406,7 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                                     <Typography>Calculating distances...</Typography>
                                 </Box>
                             )}
+                            {/* Display a single, high-level error if one exists */}
                             {distanceError && !isFetchingDistances && <Alert severity="error" sx={{mb:2}}>{distanceError}</Alert>}
 
                             {!isFetchingDistances && (
@@ -472,7 +432,6 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                                         onRequestDecision={handleAcceptQuote} 
                                         isActionDisabled={isActionDisabled}
                                         isFetchingDistance={isFetchingDistances}
-                                        distanceError={distanceError}
                                     />
                                 ))}
                                 </>)}
