@@ -220,7 +220,6 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
   useEffect(() => {
     const fetchRequestAndDistances = async () => {
       try {
-        setLoading(true);
         const response = await fetch(`/api/requests/${requestId}`);
         if (!response.ok) throw new Error('Failed to fetch your request details.');
         const data = await response.json();
@@ -241,9 +240,13 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
     };
     
     if (requestId) {
-      fetchRequestAndDistances();
+      fetchRequestAndDistances(); // Initial fetch
+      const interval = setInterval(fetchRequestAndDistances, 5000); // Poll every 5 seconds
+
+      return () => clearInterval(interval); // Cleanup on component unmount
     }
   }, [requestId, requestUserLocation]);
+
 
 
   const handleAcceptQuote = async (quoteId: string, itemsToAdd: any[]) => {

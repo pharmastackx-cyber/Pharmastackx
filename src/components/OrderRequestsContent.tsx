@@ -41,7 +41,6 @@ const OrderRequestsContent: React.FC = () => {
     // Only fetch requests if we are in the list view
     if (!selectedRequestId) {
       const fetchRequests = async () => {
-        setLoading(true);
         try {
           const response = await fetch('/api/requests');
           if (!response.ok) throw new Error('Failed to fetch requests');
@@ -55,6 +54,10 @@ const OrderRequestsContent: React.FC = () => {
         }
       };
       fetchRequests();
+
+      const interval = setInterval(fetchRequests, 5000); // polling every 5 seconds
+
+      return () => clearInterval(interval);
     }
   }, [selectedRequestId]); // Re-run when we come back to the list view
 
