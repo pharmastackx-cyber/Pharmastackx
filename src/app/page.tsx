@@ -87,8 +87,11 @@ export default function HomePage() {
 const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
 useEffect(() => {
-  // Show prompt for first-time pharmacists/pharmacies
-  if (user && ['pharmacist', 'pharmacy'].includes(user.role)) {
+  // Check if the app is running as an installed PWA
+  const isPWA = typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches;
+
+  // Show install prompt ONLY on the regular website for first-time pharmacists/pharmacies
+  if (!isPWA && user && ['pharmacist', 'pharmacy'].includes(user.role)) {
     const hasSeenInstallPrompt = localStorage.getItem('hasSeenInstallPrompt');
     if (!hasSeenInstallPrompt) {
       setShowInstallPrompt(true);
@@ -96,6 +99,7 @@ useEffect(() => {
     }
   }
 }, [user]);
+
 
 
 const [os, setOs] = useState<'Android' | 'iOS' | 'Other'>('Other');
