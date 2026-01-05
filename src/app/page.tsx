@@ -241,27 +241,28 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    // On PWA launch, handle notification permission
-    if (
-      typeof window !== 'undefined' &&
-      window.matchMedia('(display-mode: standalone)').matches &&
-      'Notification' in window
-    ) {
+    // This effect runs when the component mounts and whenever the user session changes.
+    const isPWA = typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches;
+    const hasNotificationSupport = 'Notification' in window;
+
+    // Only proceed if running as a PWA, notification API is available, and the user is logged in.
+    if (isPWA && hasNotificationSupport && user) {
       const currentPermission = Notification.permission;
-      setPermission(currentPermission); // Keep our state in sync
+      setPermission(currentPermission); // Keep state in sync
 
       if (currentPermission === 'default') {
-        // If permission has not been asked, show our custom prompt.
+        // If permission hasn't been decided and user is logged in, show our custom prompt.
         setShowNotificationPrompt(true);
       } else if (currentPermission === 'granted') {
-        // If permission is already granted, sync the token silently in the background.
-        console.log('Permission already granted. Syncing token...');
-        requestPermission(); // This won't re-prompt the user, just gets the token.
+        // If permission is already granted, just sync the token for the logged-in user.
+        console.log('Permission granted. Syncing token for user...');
+        requestPermission();
       }
-      // If permission is 'denied', we do nothing.
+      // If 'denied', do nothing.
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user]); // The key change: This hook now re-runs when the user logs in or out.
+
 
   
   
