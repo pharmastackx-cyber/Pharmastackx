@@ -85,6 +85,7 @@ export default function HomePage() {
 }, [notificationSyncStatus]);
 
 const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+const [showContinueOnAppMessage, setShowContinueOnAppMessage] = useState(false);
 
 useEffect(() => {
   console.log('--- Install Prompt Check Running ---');
@@ -627,6 +628,27 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
           Verification complete! Check your status in the account tab.
         </Alert>
       </Snackbar>
+
+      <Snackbar
+  open={showContinueOnAppMessage}
+  autoHideDuration={4000}
+  onClose={() => setShowContinueOnAppMessage(false)}
+  anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+  sx={{ mt: 30 }}
+>
+  <Alert
+    onClose={() => setShowContinueOnAppMessage(false)}
+    severity="info"
+    elevation={6}
+    variant="filled"
+    sx={{ width: '100%', bgcolor: 'rgb(1, 61, 63)' }}
+  >
+    You should now continue on the app.
+  </Alert>
+</Snackbar>
+
+
+
       <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60vh', zIndex: 0 }}>
           <MapBackground />
         </Box>
@@ -748,7 +770,10 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
       />
 
 
-      <Button onClick={() => setShowInstallPrompt(false)} sx={{ mt: 2 }} variant="contained">
+      <Button onClick={() => {
+  setShowInstallPrompt(false);
+  setShowContinueOnAppMessage(true);
+}} sx={{ mt: 2 }} variant="contained">
         Close
       </Button>
     </Box>
