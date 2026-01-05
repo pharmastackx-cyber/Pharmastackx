@@ -240,23 +240,17 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    // On component mount, check if running as a PWA and if notification permission is default.
+    // On PWA launch, request notification permission to sync the token.
     if (
       typeof window !== 'undefined' &&
       window.matchMedia('(display-mode: standalone)').matches &&
       'Notification' in window
     ) {
-      const promptedInSession = sessionStorage.getItem('notificationPrompted');
-  
-      if (Notification.permission === 'default' && !promptedInSession) {
-        requestPermission();
-        sessionStorage.setItem('notificationPrompted', 'true');
-      } else {
-        setPermission(Notification.permission);
-      }
+      requestPermission();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty array ensures this runs only once on mount
+  }, []); // Runs once when the component mounts
+  
   
   
 
