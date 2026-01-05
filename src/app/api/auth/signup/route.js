@@ -68,9 +68,6 @@ export async function POST(req) {
       delete allData.pharmacy;
     }
 
-    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-    const emailVerificationTokenExpires = new Date(Date.now() + 3600000); // 1 hour
-
     const newUser = new User({
       ...allData,
       username,
@@ -78,12 +75,19 @@ export async function POST(req) {
       password: hashedPassword,
       role: finalRole,
       slug,
-      emailVerificationToken,
-      emailVerificationTokenExpires,
       isPublished: ['customer', 'pharmacist'].includes(finalRole)
     });
 
     await newUser.save();
+    
+    // Use the reliable verification method from the "resend" flow.
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    const emailVerificationTokenExpires = new Date(Date.now() + 3600000); // 1 hour
+
+    newUser.emailVerificationToken = emailVerificationToken;
+    newUser.emailVerificationTokenExpires = emailVerificationTokenExpires;
+    await newUser.save();
+
 
     const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
     const protocol = req.headers.get('x-forwarded-proto') || 'https';
