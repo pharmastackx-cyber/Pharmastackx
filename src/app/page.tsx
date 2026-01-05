@@ -87,31 +87,58 @@ export default function HomePage() {
 const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
 useEffect(() => {
-  // Check if the app is running as an installed PWA
-  const isPWA = typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches;
+  console.log('--- Install Prompt Check Running ---');
 
-  // Show install prompt ONLY on the regular website for first-time pharmacists/pharmacies
-  if (!isPWA && user && ['pharmacist', 'pharmacy'].includes(user.role)) {
-    const hasSeenInstallPrompt = localStorage.getItem('hasSeenInstallPrompt');
-    if (!hasSeenInstallPrompt) {
-      setTimeout(() => {
-        setShowInstallPrompt(true);
-        localStorage.setItem('hasSeenInstallPrompt', 'true');
-      }, 100); // 100ms delay
-    }
+  // Condition 1: Must be on the home screen to show the prompt.
+  if (view !== 'home') {
+    console.log(`[Prompt Debug] Stop: View is currently '${view}', not 'home'.`);
+    return;
   }
-}, [user]);
+
+  // Condition 2: Must have a logged-in user object available.
+  if (!user) {
+    console.log('[Prompt Debug] Stop: User data is not loaded yet.');
+    return;
+  }
+
+  // If we get here, we have a user and are on the home screen. Let's log the details.
+  console.log(`[Prompt Debug] State: view='${view}', user.role='${user.role}'`);
+
+  const isPWA = typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches;
+  const hasSeenInstallPrompt = localStorage.getItem('hasSeenInstallPrompt');
+
+  // Condition 3: Check all conditions required to show the prompt.
+  if (!isPWA && ['pharmacist', 'pharmacy'].includes(user.role) && !hasSeenInstallPrompt) {
+    console.log('[Prompt Debug] SUCCESS: All conditions met. Showing install prompt.');
+    setShowInstallPrompt(true);
+    localStorage.setItem('hasSeenInstallPrompt', 'true');
+  } else {
+    // If we don't show it, log exactly why.
+    console.log('[Prompt Debug] Stop: Conditions not met.', {
+        isPWA,
+        isCorrectRole: ['pharmacist', 'pharmacy'].includes(user.role),
+        hasSeenPrompt: !!hasSeenInstallPrompt
+    });
+  }
+}, [view, user]); // Rerun this logic when the view or user changes.
 
 
 
 
-const [os, setOs] = useState<'Android' | 'iOS' | 'Other'>('Other');
+
+const [os, setOs] = useState<'Android' | 'iOS' | 'Windows' | 'Other'>('Other');
 
 useEffect(() => {
   const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
   if (/android/i.test(userAgent)) {
     setOs('Android');
   }
+
+    // Windows detection
+    else if (/Win/i.test(userAgent)) {
+      setOs('Windows');
+    }
+  
   // Apple device detection
   else if (/iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream) {
     setOs('iOS');
@@ -713,7 +740,7 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
       )}
 
 <Image
-        src={os === 'Android' ? "/install-guide-android.png" : "/install-guide.png"}
+        src={(os === 'Android' || os === 'Windows') ? "/install-guide-android.png" : "/install-guide.png"}
         alt="How to add to home screen"
         width={180}
         height={300}
