@@ -241,27 +241,30 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    // This effect runs when the component mounts and whenever the user session changes.
+    // This effect runs on mount and whenever the user session changes.
     const isPWA = typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches;
     const hasNotificationSupport = 'Notification' in window;
-
-    // Only proceed if running as a PWA, notification API is available, and the user is logged in.
-    if (isPWA && hasNotificationSupport && user) {
+  
+    // Only proceed if running as a PWA and notifications are supported.
+    if (isPWA && hasNotificationSupport) { // <-- The '&& user' check is removed here
       const currentPermission = Notification.permission;
-      setPermission(currentPermission); // Keep state in sync
-
+      setPermission(currentPermission); // Keep our state in sync
+  
       if (currentPermission === 'default') {
-        // If permission hasn't been decided and user is logged in, show our custom prompt.
+        // If permission has not been decided, show our custom prompt.
+        // This now works on initial launch (user is null) AND after login.
         setShowNotificationPrompt(true);
-      } else if (currentPermission === 'granted') {
-        // If permission is already granted, just sync the token for the logged-in user.
-        console.log('Permission granted. Syncing token for user...');
+      } else if (currentPermission === 'granted' && user) {
+        // If permission is already granted AND a user is logged in,
+        // silently sync their token to ensure it's up-to-date.
+        console.log('Permission granted. Syncing token for logged-in user...');
         requestPermission();
       }
-      // If 'denied', do nothing.
+      // If permission is 'denied', we respect that and do nothing.
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]); // The key change: This hook now re-runs when the user logs in or out.
+  }, [user]); // Re-running when user changes is still correct for the login case.
+  
 
 
   
