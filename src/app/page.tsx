@@ -94,11 +94,14 @@ useEffect(() => {
   if (!isPWA && user && ['pharmacist', 'pharmacy'].includes(user.role)) {
     const hasSeenInstallPrompt = localStorage.getItem('hasSeenInstallPrompt');
     if (!hasSeenInstallPrompt) {
-      setShowInstallPrompt(true);
-      localStorage.setItem('hasSeenInstallPrompt', 'true');
+      setTimeout(() => {
+        setShowInstallPrompt(true);
+        localStorage.setItem('hasSeenInstallPrompt', 'true');
+      }, 100); // 100ms delay
     }
   }
 }, [user]);
+
 
 
 
