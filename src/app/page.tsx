@@ -75,6 +75,7 @@ export default function HomePage() {
   const [showNotification, setShowNotification] = useState(false);
   const [permission, setPermission] = useState<'default' | 'granted' | 'denied'>('default');
   const [notificationSyncStatus, setNotificationSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
   useEffect(() => {
     if (notificationSyncStatus === 'success') {
@@ -240,16 +241,28 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    // On PWA launch, request notification permission to sync the token.
+    // On PWA launch, handle notification permission
     if (
       typeof window !== 'undefined' &&
       window.matchMedia('(display-mode: standalone)').matches &&
       'Notification' in window
     ) {
-      requestPermission();
+      const currentPermission = Notification.permission;
+      setPermission(currentPermission); // Keep our state in sync
+
+      if (currentPermission === 'default') {
+        // If permission has not been asked, show our custom prompt.
+        setShowNotificationPrompt(true);
+      } else if (currentPermission === 'granted') {
+        // If permission is already granted, sync the token silently in the background.
+        console.log('Permission already granted. Syncing token...');
+        requestPermission(); // This won't re-prompt the user, just gets the token.
+      }
+      // If permission is 'denied', we do nothing.
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Runs once when the component mounts
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   
   
   
@@ -704,6 +717,53 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
   </Fade>
 </Modal>
 
+<Modal
+        open={showNotificationPrompt}
+        onClose={() => setShowNotificationPrompt(false)}
+        closeAfterTransition
+        slots={{ backdrop: Backdrop }}
+        slotProps={{
+          backdrop: {
+            timeout: 500,
+          },
+        }}
+      >
+        <Fade in={showNotificationPrompt}>
+          <Box sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: { xs: '85%', sm: 350 },
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+            borderRadius: '8px',
+            boxShadow: 24,
+            p: { xs: 2, sm: 3 },
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center'
+          }}>
+            <Typography variant="h6" component="h2" sx={{ mb: 2, fontWeight: 'bold' }}>
+              Enable Notifications
+            </Typography>
+            
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', width: '100%' }}>
+              
+              <Button
+                onClick={() => {
+                  setShowNotificationPrompt(false);
+                  requestPermission();
+                }}
+                variant="contained"
+              >
+                Enable
+              </Button>
+            </Box>
+          </Box>
+        </Fade>
+      </Modal>
 
       <Box
         sx={{
