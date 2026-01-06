@@ -235,6 +235,20 @@ const createOrderFromCart = useCallback(async () => {
     const result = await addOrder(orderData);
 
     if (result.success) {
+            // If the order was created from a request, confirm it
+            if (requestId) {
+              try {
+                await fetch(`/api/requests/${requestId}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'confirm-request' }),
+                });
+              } catch (error) {
+                console.error('Failed to confirm request:', error);
+                // This is a background task, so we won't block the UI
+              }
+            }
+      
       setPostPaymentStatus('success');
       setPostPaymentMessage('Order successfully created!');
       clearCart(); // Clear the cart on success
@@ -308,6 +322,18 @@ useEffect(() => {
       requestId, quoteId // Also pass request/quote ID for free orders
     }).then((res) => {
       if(res.success){
+                // If the order was created from a request, confirm it
+                if (requestId) {
+                  fetch(`/api/requests/${requestId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'confirm-request' }),
+                  }).catch(error => {
+                    // Best-effort, log error but don't disrupt user flow
+                    console.error('Failed to confirm request for free order:', error);
+                  });
+                }
+        
         // Keep existing success behavior for the "Order Confirmed!" popup
         setTimeout(() => {
             clearCart();

@@ -67,7 +67,7 @@ export async function GET(req: NextRequest, { params: paramsPromise }: { params:
 
 
 // UPDATE a dispatch request. This now handles multiple actions.
-export async function PATCH(req: NextRequest, { params: paramsPromise }: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: NextRequest, { params: paramsPromise }: { params: Promise<{ id:string }> }) {
     const session = await getSession(req);
     if (!session?.userId) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
@@ -115,7 +115,7 @@ export async function PATCH(req: NextRequest, { params: paramsPromise }: { param
                     return NextResponse.json({ message: 'Unauthorized: You are not the owner of this request.' }, { status: 403 });
                 }
 
-                const quoteToAccept = originalRequest.quotes.find((q: any) => q._id.toString() === quoteId);
+                const quoteToAccept = originalRequest.quotes..find((q: any) => q._id.toString() === quoteId);
 
                 if (!quoteToAccept) {
                     return NextResponse.json({ message: 'Quote not found.' }, { status: 404 });
@@ -132,6 +132,14 @@ export async function PATCH(req: NextRequest, { params: paramsPromise }: { param
                 originalRequest.status = 'awaiting-confirmation';
                 break;
             }
+
+            case 'confirm-request': {
+                if (originalRequest.user.toString() !== session.userId) {
+                    return NextResponse.json({ message: 'Unauthorized: You cannot confirm this request.' }, { status: 403 });
+                }
+                originalRequest.status = 'confirmed';
+                break;
+            }
             
             case 'cancel-request': {
                  if (originalRequest.user.toString() !== session.userId) {
@@ -141,7 +149,7 @@ export async function PATCH(req: NextRequest, { params: paramsPromise }: { param
                 break;
             }
 
-            case 'stop-search': { // Added this case
+            case 'stop-search': { 
                 if (originalRequest.user.toString() !== session.userId) {
                    return NextResponse.json({ message: 'Unauthorized: You cannot stop this search.' }, { status: 403 });
                }
