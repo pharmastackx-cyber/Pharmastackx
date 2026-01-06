@@ -207,7 +207,8 @@ const ReviewRequestPage: React.FC = () => {
           if (!response.ok) throw new Error((await response.json()).message || 'Failed to accept the quote.');
 
           itemsToAdd.forEach((item, index) => {
-              const numericId = Date.now() + index;
+            const numericId = (Date.now() + index).toString();
+
               addToCart({
                   id: numericId,
                   name: item.name,
