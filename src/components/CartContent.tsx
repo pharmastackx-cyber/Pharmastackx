@@ -181,8 +181,16 @@ const createOrderFromCart = useCallback(async () => {
     }
 
     const itemsForBackend = items.reduce((acc, item) => {
-      // If it's a quote item, it's always valid.
-      if (item.isQuoteItem) {
+      const productId = item.id ? String(item.id).split('-')[0] : null;
+
+      if (productId && productId !== 'undefined') {
+        // This handles regular products with a valid ID
+        acc.push({
+          productId: productId,
+          qty: item.quantity,
+        });
+      } else if (item.name && typeof item.price === 'number') {
+        // This handles your request-based items by treating them as quote items
         acc.push({
           isQuoteItem: true,
           name: item.name,
@@ -190,21 +198,12 @@ const createOrderFromCart = useCallback(async () => {
           qty: item.quantity,
           image: item.image,
         });
-        return acc;
       }
-
-      // For regular products, extract and validate the ID.
-      const productId = item.id ? String(item.id).split('-')[0] : null;
-      if (productId && productId !== 'undefined') {
-        acc.push({
-          productId: productId,
-          qty: item.quantity,
-        });
-      }
+      // Any item that fails both checks is safely ignored.
       
-      // Silently ignore items with invalid IDs by not pushing them to the accumulator.
       return acc;
     }, [] as any[]);
+
 
         // START: Add this new block
         if (itemsForBackend.length === 0) {
@@ -266,8 +265,16 @@ useEffect(() => {
     event({ action: 'begin_checkout', category: 'ecommerce', label: 'Free Checkout', value: 0 });
     
     const itemsForBackend = items.reduce((acc, item) => {
-      // If it's a quote item, it's always valid.
-      if (item.isQuoteItem) {
+      const productId = item.id ? String(item.id).split('-')[0] : null;
+
+      if (productId && productId !== 'undefined') {
+        // This handles regular products with a valid ID
+        acc.push({
+          productId: productId,
+          qty: item.quantity,
+        });
+      } else if (item.name && typeof item.price === 'number') {
+        // This handles your request-based items by treating them as quote items
         acc.push({
           isQuoteItem: true,
           name: item.name,
@@ -275,21 +282,12 @@ useEffect(() => {
           qty: item.quantity,
           image: item.image,
         });
-        return acc;
       }
-
-      // For regular products, extract and validate the ID.
-      const productId = item.id ? String(item.id).split('-')[0] : null;
-      if (productId && productId !== 'undefined') {
-        acc.push({
-          productId: productId,
-          qty: item.quantity,
-        });
-      }
+      // Any item that fails both checks is safely ignored.
       
-      // Silently ignore items with invalid IDs by not pushing them to the accumulator.
       return acc;
     }, [] as any[]);
+
 
             // START: Add this new block
             if (itemsForBackend.length === 0) {
