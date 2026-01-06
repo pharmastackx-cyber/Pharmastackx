@@ -93,7 +93,6 @@ export async function POST(request) {
     await dbConnect();
     const body = await request.json();
 
-    // 1. Destructure all expected data from the client
     const { 
       patientName, 
       deliveryPhone, 
@@ -102,48 +101,58 @@ export async function POST(request) {
       businesses,
       orderType,
       deliveryOption,
-      coupon 
+      coupon,
+      requestId, // Captured for quote-based orders
+      quoteId,   // Captured for quote-based orders
     } = body;
+
     if (!itemsFromClient || itemsFromClient.length === 0) {
       return NextResponse.json({ message: 'No items in order' }, { status: 400 });
     }
-    // 2. Prepare for server-side calculation
+
     let serverCalculatedTotal = 0;
     const finalOrderItems = [];
-    // 3. Loop through client items and get authoritative data from the DB
-    for (const clientItem of itemsFromClient) {
-      // Find the product in the database using the ID provided by the client
-      const product = await Product.findById(clientItem.productId).lean();
-      
-      if (!product) {
-        return NextResponse.json({ message: `Product with ID ${clientItem.productId} not found` }, { status: 404 });
-      }
-      // CORRECTED: Use the correct field names from the Product model
-      finalOrderItems.push({
-        name: product.itemName,   
-        qty: clientItem.qty,
-        amount: product.amount,   
-        image: product.imageUrl,
-      });
-      // CORRECTED: Use product.amount for calculation
-      serverCalculatedTotal += product.amount * clientItem.qty;
-    }
 
-    
-    
+    // --- START OF CRITICAL CHANGE ---
+    // Loop through client items, handling quote items and standard products differently.
+    for (const clientItem of itemsFromClient) {
+      if (clientItem.isQuoteItem) {
+        // This is a temporary item from a quote. Trust the client data.
+        finalOrderItems.push({
+          name: clientItem.name,
+          qty: clientItem.qty,
+          amount: clientItem.price, // Use price from the quote
+          image: clientItem.image || '',
+        });
+        serverCalculatedTotal += clientItem.price * clientItem.qty;
+      } else {
+        // This is a standard product. Look it up in the database.
+        const product = await Product.findById(clientItem.productId).lean();
+        
+        if (!product) {
+          // This was the source of the crash for quote items
+          return NextResponse.json({ message: `Order creation failed: Product with ID ${clientItem.productId} not found` }, { status: 404 });
+        }
+        
+        finalOrderItems.push({
+          name: product.itemName,
+          qty: clientItem.qty,
+          amount: product.amount,
+          image: product.imageUrl,
+        });
+        serverCalculatedTotal += product.amount * clientItem.qty;
+      }
+    }
+    // --- END OF CRITICAL CHANGE ---
+
     let finalAmount = serverCalculatedTotal;
 
-    // 4. Validate coupon and apply discount on the server-calculated total
     if (coupon && coupon === 'ALLFREE') {
       finalAmount = 0; 
     }
 
     const newOrderData = {
-      user: {
-        name: patientName,
-        phone: deliveryPhone,
-        email: deliveryEmail
-      },
+      user: { name: patientName, phone: deliveryPhone, email: deliveryEmail },
       orderType,
       deliveryOption,
       items: finalOrderItems,
@@ -151,6 +160,9 @@ export async function POST(request) {
       totalAmount: finalAmount,
       coupon: coupon || null,
       status: 'Pending',
+      // Add the quote/request references if they exist
+      requestId: requestId || null,
+      quoteId: quoteId || null,
     };
 
     const order = await Order.create(newOrderData);
@@ -159,18 +171,14 @@ export async function POST(request) {
     if (order.businesses && order.businesses.length > 0) {
       const businessPhoneNumbers = new Set();
       for (const business of order.businesses) {
-        // Find the user (pharmacy/vendor) associated with the business name
         const businessUser = await User.findOne({ businessName: business.name }).lean();
-        // If the user and their phone number exist, add it to our set
         if (businessUser && businessUser.phoneNumber) {
           businessPhoneNumbers.add(businessUser.phoneNumber);
         } else {
           console.log(`Could not find phone number for business: ${business.name}`);
         }
       }
-      // Send a notification to each unique business phone number
       for (const phoneNumber of businessPhoneNumbers) {
-        // Avoid re-notifying the admin if their number is also a business number
         if (phoneNumber !== process.env.RECIPIENT_PHONE_NUMBER) {
              await sendWhatsAppNotification(order, phoneNumber);
         }
@@ -181,9 +189,12 @@ export async function POST(request) {
 
   } catch (error) {
     console.error("Error creating order:", error);
-    return NextResponse.json({ message: "Failed to create order", error: error.message }, { status: 500 });
+    // Provide a more specific error message if possible
+    const errorMessage = error.message || "An unexpected error occurred.";
+    return NextResponse.json({ message: "Failed to create order", error: errorMessage }, { status: 500 });
   }
 }
+
 
 // PUT (update) an existing order's status - NOW SECURED
 export async function PUT(request) {

@@ -209,15 +209,18 @@ const ReviewRequestPage: React.FC = () => {
           itemsToAdd.forEach((item, index) => {
             const numericId = (Date.now() + index).toString();
 
-              addToCart({
-                  id: numericId,
-                  name: item.name,
-                  price: item.price,
-                  image: request?.items.find(i => i.name === item.name)?.image || '',
-                  activeIngredients: request?.items.find(i => i.name === item.name)?.strength || '',
-                  pharmacy: enrichedQuotes.find(q => q._id === quoteId)?.pharmacy.name || 'Pharmacy',
-                  drugClass: 'From Quote',
-              });
+            addToCart({
+              id: numericId,
+              name: item.name,
+              price: item.price,
+              image: request?.items.find(i => i.name === item.name)?.image || '',
+              activeIngredients: request?.items.find(i => i.name === item.name)?.strength || '',
+              pharmacy: enrichedQuotes.find(q => q._id === quoteId)?.pharmacy.name || 'Pharmacy',
+              drugClass: 'From Quote',
+              isQuoteItem: true,
+              quoteId: quoteId,
+          });
+          
               updateQuantity(numericId, item.pharmacyQuantity);
           });
           router.push('/cart');

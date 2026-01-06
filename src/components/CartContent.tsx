@@ -180,11 +180,23 @@ const createOrderFromCart = useCallback(async () => {
       return;
     }
 
-    const itemsForBackend = items.map(item => ({
-      // Use the full item.id since it's already unique
-      productId: item.id,
-      qty: item.quantity,
-    }));
+    const itemsForBackend = items.map(item => {
+      // If it's a quote item, send the full details. Otherwise, just send the ID.
+      if (item.isQuoteItem) {
+        return {
+          isQuoteItem: true,
+          name: item.name,
+          price: item.price,
+          qty: item.quantity,
+          image: item.image,
+        };
+      }
+      return {
+        productId: item.id,
+        qty: item.quantity,
+      };
+    });
+    
 
     const orderData = {
       patientName, patientAge, patientCondition,
@@ -231,8 +243,24 @@ useEffect(() => {
     setIsProcessingFreeOrder(true);
     event({ action: 'begin_checkout', category: 'ecommerce', label: 'Free Checkout', value: 0 });
     
-    const itemsForBackend = items.map(item => ({ productId: item.id, qty: item.quantity }));
-
+    const itemsForBackend = items.map(item => {
+      // If it's a quote item, send the full details. Otherwise, just send the ID.
+      if (item.isQuoteItem) {
+        return {
+          isQuoteItem: true,
+          name: item.name,
+          price: item.price,
+          qty: item.quantity,
+          image: item.image,
+        };
+      }
+      return {
+        productId: item.id,
+        qty: item.quantity,
+      };
+    });
+    
+    
     addOrder({
       patientName, patientAge, patientCondition, deliveryEmail, deliveryPhone, deliveryAddress,
       deliveryCity, deliveryState, items: itemsForBackend, coupon: activePromo.code,
