@@ -115,7 +115,7 @@ export async function PATCH(req: NextRequest, { params: paramsPromise }: { param
                     return NextResponse.json({ message: 'Unauthorized: You are not the owner of this request.' }, { status: 403 });
                 }
 
-                const quoteToAccept = originalRequest.quotes..find((q: any) => q._id.toString() === quoteId);
+                const quoteToAccept = originalRequest.quotes.find((q: any) => q._id.toString() === quoteId);
 
                 if (!quoteToAccept) {
                     return NextResponse.json({ message: 'Quote not found.' }, { status: 404 });
