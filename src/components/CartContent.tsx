@@ -192,9 +192,10 @@ const createOrderFromCart = useCallback(async () => {
         };
       }
       return {
-        productId: item.id,
+        productId: item.id.split('-')[0], // FIX: Extract the real product ID
         qty: item.quantity,
       };
+
     });
     
 
@@ -255,9 +256,10 @@ useEffect(() => {
         };
       }
       return {
-        productId: item.id,
+        productId: item.id.split('-')[0], // FIX: Extract the real product ID
         qty: item.quantity,
       };
+
     });
     
     
