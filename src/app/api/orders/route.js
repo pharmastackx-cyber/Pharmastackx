@@ -127,6 +127,16 @@ export async function POST(request) {
         serverCalculatedTotal += clientItem.price * clientItem.qty;
       } else {
         // This is a standard product. Look it up in the database.
+
+        // --- START DEBUGGING BLOCK ---
+        if (!clientItem.productId) {
+            console.error("DEBUG: Malformed item received by backend", clientItem);
+            return NextResponse.json({
+                message: `Order creation failed: An item in your cart is missing a Product ID. Problematic item: ${JSON.stringify(clientItem)}`
+            }, { status: 400 });
+        }
+        // --- END DEBUGGING BLOCK ---
+
         const product = await Product.findById(clientItem.productId).lean();
         
         if (!product) {
