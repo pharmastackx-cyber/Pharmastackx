@@ -51,7 +51,8 @@ export const dynamic = "force-dynamic";
 const STANDARD_DELIVERY_FEE = 900;
 const EXPRESS_DELIVERY_FEE = 2000;
 
-export default function CartContent({ setView }: { setView: (view: string) => void }) {
+export default function CartContent({ setView }: { setView?: (view: string) => void }) {
+
 
   const { user } = useSession();
   const { items, updateQuantity, removeFromCart, clearCart, requestId, quoteId } = useCart();
@@ -61,6 +62,22 @@ export default function CartContent({ setView }: { setView: (view: string) => vo
   const { addOrder } = useOrders();
   const router = useRouter();
   const searchParams = useSearchParams(); 
+
+    // This new navigate function handles both navigation cases
+    const navigate = (view: string) => {
+      if (setView) {
+        // If setView is provided, use it (for the main modal view)
+        setView(view);
+      } else {
+        // Otherwise, use the router (for the standalone /cart page)
+        const routeMap: { [key: string]: string } = {
+          orders: '/orders',
+          findMedicines: '/', // Navigate to home/search page
+        };
+        router.push(routeMap[view] || '/');
+      }
+    };
+  
 
   const [postPaymentStatus, setPostPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [postPaymentMessage, setPostPaymentMessage] = useState('');
@@ -227,7 +244,8 @@ useEffect(() => {
         setTimeout(() => {
             clearCart();
             removePromo();
-            setView('orders'); // Use setView to navigate
+            navigate('orders'); // Use the new navigate function
+
         }, 1500);
       } else {
           // If it fails, show the main error overlay
@@ -237,7 +255,8 @@ useEffect(() => {
       }
     });
   }
-}, [total, items.length, activePromo, isProcessingFreeOrder, isFormValid, user, addOrder, actualOrderType, clearCart, deliveryOption, patientAge, patientCondition, patientName, deliveryAddress, deliveryCity, deliveryEmail, deliveryPhone, deliveryState, removePromo, router, uniquePharmacies, setView, requestId, quoteId]);
+}, [total, items.length, activePromo, isProcessingFreeOrder, isFormValid, user, addOrder, actualOrderType, clearCart, deliveryOption, patientAge, patientCondition, patientName, deliveryAddress, deliveryCity, deliveryEmail, deliveryPhone, deliveryState, removePromo, router, uniquePharmacies, navigate, requestId, quoteId]);
+
 
 
   return (
@@ -256,7 +275,8 @@ useEffect(() => {
 
                 <Typography sx={{ mb: 3, minHeight: '40px' }}>{postPaymentMessage}</Typography>
 
-                <Button variant="contained" onClick={() => setView('orders')} disabled={postPaymentStatus !== 'success'}>
+                <Button variant="contained" onClick={() => navigate('orders')} disabled={postPaymentStatus !== 'success'}>
+
                     View Orders
                 </Button>
             </Paper>
@@ -267,7 +287,8 @@ useEffect(() => {
           <Paper elevation={1} sx={{ p: 6, textAlign: 'center', borderRadius: '16px' }}>
             <ShoppingCart sx={{ fontSize: 64, color: '#ccc', mb: 2 }} />
             <Typography variant="h5" sx={{ mb: 2, color: '#666' }}>Your cart is empty</Typography>
-            <Button onClick={() => setView('findMedicines')} variant="contained" sx={{ background: 'linear-gradient(135deg, #006D5B 0%, #004D40 100%)' }}>
+            <Button onClick={() => navigate('findMedicines')} variant="contained" sx={{ background: 'linear-gradient(135deg, #006D5B 0%, #004D40 100%)' }}>
+
   Browse Medicines
 </Button>
 
