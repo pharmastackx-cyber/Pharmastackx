@@ -40,6 +40,7 @@ interface QuoteItem {
   price?: number;
   pharmacyQuantity?: number;
   isAvailable?: boolean;
+  productId: string;
 }
 
 interface Quote {
@@ -260,10 +261,9 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
           });
           if (!response.ok) throw new Error((await response.json()).message || 'Failed to accept the quote.');
 
-          itemsToAdd.forEach((item, index) => {
-              const numericId = Date.now() + index;
+          itemsToAdd.forEach(item => {
               addToCart({
-                  id: numericId,
+                  id: item.productId,
                   name: item.name,
                   price: item.price,
                   image: request?.items.find(i => i.name === item.name)?.image || '',
@@ -271,7 +271,7 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                   pharmacy: sortedQuotes.find(q => q._id === quoteId)?.pharmacy.name || 'Pharmacy',
                   drugClass: 'From Quote',
               });
-              updateQuantity(numericId, item.pharmacyQuantity);
+              updateQuantity(item.productId, item.pharmacyQuantity);
           });
           
           setView('cart');
