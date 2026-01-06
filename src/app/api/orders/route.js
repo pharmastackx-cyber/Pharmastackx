@@ -201,7 +201,7 @@ export async function POST(request) {
     console.error("Error creating order:", error);
     // Provide a more specific error message if possible
     const errorMessage = error.message || "An unexpected error occurred.";
-    return NextResponse.json({ message: "Failed to create order", error: errorMessage }, { status: 500 });
+    return NextResponse.json({ message: `Failed to create order: ${errorMessage}` }, { status: 500 });
   }
 }
 
