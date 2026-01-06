@@ -180,23 +180,34 @@ const createOrderFromCart = useCallback(async () => {
       return;
     }
 
-    const itemsForBackend = items.map(item => {
-      // If it's a quote item, send the full details. Otherwise, just send the ID.
+    const itemsForBackend = items.reduce((acc, item) => {
+      // If it's a quote item, it's always valid.
       if (item.isQuoteItem) {
-        return {
+        acc.push({
           isQuoteItem: true,
           name: item.name,
           price: item.price,
           qty: item.quantity,
           image: item.image,
-        };
+        });
+        return acc;
       }
-      return {
-        productId: item.id.split('-')[0], // FIX: Extract the real product ID
-        qty: item.quantity,
-      };
 
-    });
+      // For regular products, extract and validate the ID.
+      const productId = item.id ? String(item.id).split('-')[0] : null;
+      if (productId && productId !== 'undefined') {
+        acc.push({
+          productId: productId,
+          qty: item.quantity,
+        });
+      }
+      
+      // Silently ignore items with invalid IDs by not pushing them to the accumulator.
+      return acc;
+    }, [] as any[]);
+
+
+      
     
 
     const orderData = {
@@ -244,23 +255,33 @@ useEffect(() => {
     setIsProcessingFreeOrder(true);
     event({ action: 'begin_checkout', category: 'ecommerce', label: 'Free Checkout', value: 0 });
     
-    const itemsForBackend = items.map(item => {
-      // If it's a quote item, send the full details. Otherwise, just send the ID.
+    const itemsForBackend = items.reduce((acc, item) => {
+      // If it's a quote item, it's always valid.
       if (item.isQuoteItem) {
-        return {
+        acc.push({
           isQuoteItem: true,
           name: item.name,
           price: item.price,
           qty: item.quantity,
           image: item.image,
-        };
+        });
+        return acc;
       }
-      return {
-        productId: item.id.split('-')[0], // FIX: Extract the real product ID
-        qty: item.quantity,
-      };
 
-    });
+      // For regular products, extract and validate the ID.
+      const productId = item.id ? String(item.id).split('-')[0] : null;
+      if (productId && productId !== 'undefined') {
+        acc.push({
+          productId: productId,
+          qty: item.quantity,
+        });
+      }
+      
+      // Silently ignore items with invalid IDs by not pushing them to the accumulator.
+      return acc;
+    }, [] as any[]);
+
+
     
     
     addOrder({
