@@ -206,7 +206,17 @@ const createOrderFromCart = useCallback(async () => {
       return acc;
     }, [] as any[]);
 
-
+        // START: Add this new block
+        if (itemsForBackend.length === 0) {
+          setPostPaymentStatus('error');
+          setPostPaymentMessage('Your cart contained invalid items that could not be processed. The cart has been cleared.');
+          clearCart();
+          // Use router.replace to avoid affecting browser history for this cleanup action
+          router.replace(window.location.pathname, { scroll: false }); 
+          return;
+        }
+        // END: Add this new block
+    
       
     
 
@@ -281,7 +291,16 @@ useEffect(() => {
       return acc;
     }, [] as any[]);
 
-
+            // START: Add this new block
+            if (itemsForBackend.length === 0) {
+              setIsProcessingFreeOrder(false); // Stop the 'processing' state
+              setPostPaymentStatus('error');
+              setPostPaymentMessage('Your cart contained invalid items that could not be processed. The cart has been cleared.');
+              clearCart();
+              return; // Exit the effect
+            }
+            // END: Add this new block
+    
     
     
     addOrder({
