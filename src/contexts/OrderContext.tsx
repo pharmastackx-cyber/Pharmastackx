@@ -36,7 +36,7 @@ export interface Order {
 interface OrderContextType {
   orders: Order[];
   loading: boolean;
-  addOrder: (orderData: any) => Promise<string>; // Keeping this flexible for now
+  addOrder: (orderData: any) => Promise<{ success: boolean; order?: Order; message: string; }>;
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
   getOrderById: (orderId: string) => Order | undefined;
 }
@@ -80,9 +80,9 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     fetchOrders();
   }, []);
 
-  // This function is for creating a NEW order (from PaystackButton)
-  const addOrder = async (orderData: any) => {
+  const addOrder = async (orderData: any): Promise<{ success: boolean; order?: Order; message: string; }> => {
     try {
+      // The orderData object now contains everything, including optional requestId and quoteId
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,16 +91,24 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
 
       if (!response.ok) {
         const errorBody = await response.json();
-        throw new Error(errorBody.message || 'Failed to save order to the database');
+        // Provide a more specific error message if available
+        throw new Error(errorBody.message || 'Failed to save order to the database. The server returned an error.');
       }
 
       const newOrder = await response.json();
-      setOrders(prev => [newOrder, ...prev]); // Add new order to the top of the list
-      return newOrder._id; // Return the database ID
+      
+      // Add the newly created order to the local state
+      setOrders(prev => [newOrder, ...prev]); 
+      
+      // Return the full new order object on success
+      return { success: true, order: newOrder, message: 'Order created successfully.' };
 
     } catch (error) {
-      console.error('Error saving order:', error);
-      throw error; // Re-throw to be caught by the calling function if needed
+      console.error('Error in addOrder:', error);
+
+      // Ensure a consistent error object is returned
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred while creating the order.';
+      return { success: false, message: errorMessage };
     }
   };
 

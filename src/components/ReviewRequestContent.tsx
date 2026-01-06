@@ -167,7 +167,7 @@ const QuoteCard: React.FC<{ quote: Quote; onRequestDecision: (quoteId: string, i
 // --- MAIN COMPONENT --- 
 
 const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string) => void; }> = ({ requestId, setView }) => {
-  const { addToCart, updateQuantity } = useCart();
+  const { addToCart, updateQuantity, setRequestInfo } = useCart();
 
   const [request, setRequest] = useState<Request | null>(null);
   const [distances, setDistances] = useState<{ [pharmacyId: string]: string }>({});
@@ -261,9 +261,12 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
           });
           if (!response.ok) throw new Error((await response.json()).message || 'Failed to accept the quote.');
 
+          setRequestInfo(requestId, quoteId);
+
           itemsToAdd.forEach(item => {
+              const uniqueId = `${item.productId}-${quoteId}`;
               addToCart({
-                  id: item.productId,
+                  id: uniqueId,
                   name: item.name,
                   price: item.price,
                   image: request?.items.find(i => i.name === item.name)?.image || '',
@@ -271,7 +274,7 @@ const ReviewRequestContent: React.FC<{ requestId: string; setView: (view: string
                   pharmacy: sortedQuotes.find(q => q._id === quoteId)?.pharmacy.name || 'Pharmacy',
                   drugClass: 'From Quote',
               });
-              updateQuantity(item.productId, item.pharmacyQuantity);
+              updateQuantity(uniqueId, item.pharmacyQuantity);
           });
           
           setView('cart');

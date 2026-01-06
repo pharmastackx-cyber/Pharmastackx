@@ -13,7 +13,6 @@ import { event } from '../lib/gtag';
 interface PaystackButtonProps {
   total: number;
   deliveryOption: 'standard' | 'express' | 'pickup';
-
   orderType: 'S' | 'MN' | 'MP';
   uniquePharmacies: string[];
   subtotal: number;
@@ -36,8 +35,7 @@ interface PaystackButtonProps {
 
 const PaystackButton: React.FC<PaystackButtonProps> = (props) => {
   const { user } = useSession();
-  const { items, clearCart } = useCart();
-  const { addOrder } = useOrders();
+  const { items } = useCart(); // Removed clearCart as it's no longer called here
   const router = useRouter();
 
   const config = {
@@ -70,46 +68,17 @@ const PaystackButton: React.FC<PaystackButtonProps> = (props) => {
 
   const initializePayment = usePaystackPayment(config);
 
-  const onSuccess = async (reference: any) => {
-    if (!user) {
-      console.error("User not found. Cannot create order.");
-      return;
-    }
-
-    try {
-      const itemsForBackend = items.map(item => ({
-        productId: item.id,
-        qty: item.quantity,
-      }));
-
-
-      const orderData = {
-      
-        patientName: props.patientName,
-        
-        deliveryEmail: props.deliveryEmail,
-        deliveryPhone: props.deliveryPhone,
-        
-        items: itemsForBackend,
-        
-        businesses: props.uniquePharmacies,
-        orderType: props.orderType,
-        deliveryOption: props.deliveryOption,
-        
-        coupon: props.promoCode,
-      };
-
-      // addOrder now handles everything: API call and state update
-      await addOrder(orderData);
-
-      // Simple and clean: Clear the cart and navigate
-      clearCart();
-      router.push('/orders');
-
-    } catch (error) {
-      console.error("Failed to create order after payment:", error);
-      // Optionally, show an error message to the user
-    }
+  const onSuccess = (reference: any) => {
+    // We don't create the order here anymore.
+    // Instead, we redirect to the same page with a success flag.
+    console.log('Payment successful. Reference:', reference.reference);
+    
+    // Construct the new URL. This assumes we are already on the page that shows the cart.
+    const currentPath = window.location.pathname;
+    const newUrl = `${currentPath}?redirect_status=success`;
+    
+    // We don't clear the cart here. The cart page will do it after creating the order.
+    router.push(newUrl);
   };
 
   const onClose = () => {
@@ -126,8 +95,6 @@ const PaystackButton: React.FC<PaystackButtonProps> = (props) => {
     initializePayment({ onSuccess, onClose });
   };
 
-  
-
   const getButtonText = () => {
     if (!user) return 'Please log in to check out';
     if (!props.isFormValid) return 'Please fill in delivery info';
@@ -140,7 +107,6 @@ const PaystackButton: React.FC<PaystackButtonProps> = (props) => {
       variant="contained"
       size="large"
       onClick={handleCheckout}
-
       disabled={!user || !props.isFormValid}
       sx={{
         background: 'linear-gradient(135deg, #006D5B 0%, #004D40 100%)',

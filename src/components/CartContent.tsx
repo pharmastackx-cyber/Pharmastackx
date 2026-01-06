@@ -15,27 +15,28 @@ import {
   FormControlLabel,
   RadioGroup,
   Radio,
+  CircularProgress,
 } from '@mui/material';
 import {
   Add,
   Remove,
   Delete,
   LocalShipping,
-  
-
   Security,
   ShoppingCart,
   ArrowBack,
   CheckCircle,
   PersonPinCircle,
+  Error as ErrorIcon,
 } from '@mui/icons-material';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react'; // Add useCallback
+import { useRouter, useSearchParams } from 'next/navigation'; // Add useSearchParams
 import Link from 'next/link';
 import { useCart } from '../contexts/CartContext';
 import { usePromo } from '../contexts/PromoContext';
 import { useOrders } from '../contexts/OrderContext';
 import { useSession } from '../context/SessionProvider';
-import { useRouter } from 'next/navigation';
+
 import dynamicImport from "next/dynamic";
 import { event } from '../lib/gtag';
 import { Business } from '@/types';
@@ -50,13 +51,19 @@ export const dynamic = "force-dynamic";
 const STANDARD_DELIVERY_FEE = 900;
 const EXPRESS_DELIVERY_FEE = 2000;
 
-export default function CartContent() {
+export default function CartContent({ setView }: { setView: (view: string) => void }) {
+
   const { user } = useSession();
-  const { items, updateQuantity, removeFromCart, clearCart } = useCart();
+  const { items, updateQuantity, removeFromCart, clearCart, requestId, quoteId } = useCart();
+
   
   const { activePromo, applyPromo, removePromo, validatePromo, calculateDiscount } = usePromo();
   const { addOrder } = useOrders();
   const router = useRouter();
+  const searchParams = useSearchParams(); 
+
+  const [postPaymentStatus, setPostPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
+  const [postPaymentMessage, setPostPaymentMessage] = useState('');
 
   const [promoCode, setPromoCode] = useState('');
   const [promoMessage, setPromoMessage] = useState('');
@@ -141,64 +148,129 @@ const deliveryFee = getDeliveryFee();
 const sfcPercentage = deliveryOption === 'pickup' ? 25 : 20;
 const sfcAmount = subtotal * (sfcPercentage / 100);
 const { discountAmount, deliveryDiscount, sfcDiscount, finalTotal } = calculateDiscount(subtotal, deliveryFee, sfcAmount);
+
+
 const total = finalTotal;
+
+// START: Add this entire block
+const createOrderFromCart = useCallback(async () => {
+    setPostPaymentStatus('processing');
+    setPostPaymentMessage('Payment successful. Creating your order, please wait...');
+
+    if (!user) {
+      setPostPaymentStatus('error');
+      setPostPaymentMessage('Error: User session expired. Please log in again.');
+      return;
+    }
+
+    const itemsForBackend = items.map(item => ({
+      // Use the full item.id since it's already unique
+      productId: item.id,
+      qty: item.quantity,
+    }));
+
+    const orderData = {
+      patientName, patientAge, patientCondition,
+      deliveryEmail, deliveryPhone, deliveryAddress, deliveryCity, deliveryState,
+      items: itemsForBackend,
+      coupon: activePromo?.code,
+      deliveryOption,
+      orderType: actualOrderType,
+      businesses: uniquePharmacies,
+      // Add requestId and quoteId here
+      requestId,
+      quoteId,
+    };
+    
+    const result = await addOrder(orderData);
+
+    if (result.success) {
+      setPostPaymentStatus('success');
+      setPostPaymentMessage('Order successfully created!');
+      clearCart(); // Clear the cart on success
+      removePromo(); // Clear any active promo
+    } else {
+      setPostPaymentStatus('error');
+      setPostPaymentMessage(`Order creation failed: ${result.message}`);
+    }
+    // Clean the "?redirect_status=success" from the URL without reloading the page
+    router.replace(window.location.pathname, { scroll: false });
+}, [user, items, patientName, patientAge, patientCondition, deliveryEmail, deliveryPhone, deliveryAddress, deliveryCity, deliveryState, activePromo, deliveryOption, actualOrderType, uniquePharmacies, requestId, quoteId, addOrder, clearCart, removePromo, router]);
+
+useEffect(() => {
+  const status = searchParams?.get('redirect_status');
+
+    // Only trigger if payment was successful and we haven't started processing yet
+    if (status === 'success' && postPaymentStatus === 'idle' && items.length > 0) {
+      createOrderFromCart();
+    }
+}, [searchParams, postPaymentStatus, items.length, createOrderFromCart]);
+// END: Add this entire block
 
   
 
-  useEffect(() => {
-    if (total === 0 && items.length > 0 && activePromo && !isProcessingFreeOrder && isFormValid && user) {
-      
-      // --- Start of new code ---
-      // Fire the 'begin_checkout' event for free orders
-      event({
-        action: 'begin_checkout',
-        category: 'ecommerce',
-        label: 'Free Checkout', // Differentiate from paid checkouts
-        value: 0 // The value is zero
-      });
-      // --- End of new code ---
+useEffect(() => {
+  if (total === 0 && items.length > 0 && activePromo && !isProcessingFreeOrder && isFormValid && user) {
+    setIsProcessingFreeOrder(true);
+    event({ action: 'begin_checkout', category: 'ecommerce', label: 'Free Checkout', value: 0 });
+    
+    const itemsForBackend = items.map(item => ({ productId: item.id, qty: item.quantity }));
 
-      setIsProcessingFreeOrder(true);
-      
-      const itemsForBackend = items.map(item => ({
-        productId: item.id,
-        qty: item.quantity,
-      }));
-
-      addOrder({
-        patientName,
-        patientAge,
-        patientCondition,
-        deliveryEmail,
-        deliveryPhone,
-        deliveryAddress,
-        deliveryCity,
-        deliveryState,
-        items: itemsForBackend,
-        coupon: activePromo.code,
-        deliveryOption,
-        orderType: actualOrderType as any,
-        businesses: uniquePharmacies,
-      }).then(() => {
+    addOrder({
+      patientName, patientAge, patientCondition, deliveryEmail, deliveryPhone, deliveryAddress,
+      deliveryCity, deliveryState, items: itemsForBackend, coupon: activePromo.code,
+      deliveryOption, orderType: actualOrderType as any, businesses: uniquePharmacies,
+      requestId, quoteId // Also pass request/quote ID for free orders
+    }).then((res) => {
+      if(res.success){
+        // Keep existing success behavior for the "Order Confirmed!" popup
         setTimeout(() => {
             clearCart();
             removePromo();
-            router.push('/orders');
+            setView('orders'); // Use setView to navigate
         }, 1500);
-      });
-    }
-  }, [total, items.length, activePromo, isProcessingFreeOrder, isFormValid, user, addOrder, actualOrderType, clearCart, deliveryOption, patientAge, patientCondition, patientName, deliveryAddress, deliveryCity, deliveryEmail, deliveryPhone, deliveryState, removePromo, router, uniquePharmacies]);
+      } else {
+          // If it fails, show the main error overlay
+          setIsProcessingFreeOrder(false); // Hide the "Confirmed" popup
+          setPostPaymentStatus('error');
+          setPostPaymentMessage(`Free order creation failed: ${res.message}`);
+      }
+    });
+  }
+}, [total, items.length, activePromo, isProcessingFreeOrder, isFormValid, user, addOrder, actualOrderType, clearCart, deliveryOption, patientAge, patientCondition, patientName, deliveryAddress, deliveryCity, deliveryEmail, deliveryPhone, deliveryState, removePromo, router, uniquePharmacies, setView, requestId, quoteId]);
 
 
   return (
-    <Box sx={{ flex: 1 }}>
+    <Box sx={{ flex: 1, position: 'relative' }}>
+    {/* START: Add this entire Box */}
+    {postPaymentStatus !== 'idle' && (
+        <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, bgcolor: 'rgba(255, 255, 255, 0.98)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, p: 2, minHeight: '60vh' }}>
+            <Paper elevation={3} sx={{ p: {xs: 2, sm: 4}, textAlign: 'center', borderRadius: '16px', maxWidth: 450, width: '100%' }}>
+                {postPaymentStatus === 'processing' && <CircularProgress sx={{ mb: 2 }} />}
+                {postPaymentStatus === 'success' && <CheckCircle sx={{ fontSize: 56, color: 'success.main', mb: 2 }} />}
+                {postPaymentStatus === 'error' && <ErrorIcon sx={{ fontSize: 56, color: 'error.main', mb: 2 }} />}
+                
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                    {postPaymentStatus === 'processing' ? 'Processing...' : postPaymentStatus === 'success' ? 'Success!' : 'An Error Occurred'}
+                </Typography>
+
+                <Typography sx={{ mb: 3, minHeight: '40px' }}>{postPaymentMessage}</Typography>
+
+                <Button variant="contained" onClick={() => setView('orders')} disabled={postPaymentStatus !== 'success'}>
+                    View Orders
+                </Button>
+            </Paper>
+        </Box>
+    )}
+    {/* END: Add this entire Box */}
         {items.length === 0 ? (
           <Paper elevation={1} sx={{ p: 6, textAlign: 'center', borderRadius: '16px' }}>
             <ShoppingCart sx={{ fontSize: 64, color: '#ccc', mb: 2 }} />
             <Typography variant="h5" sx={{ mb: 2, color: '#666' }}>Your cart is empty</Typography>
-            <Button component={Link} href="/find-medicines" variant="contained" sx={{ background: 'linear-gradient(135deg, #006D5B 0%, #004D40 100%)' }}>
-              Browse Medicines
-            </Button>
+            <Button onClick={() => setView('findMedicines')} variant="contained" sx={{ background: 'linear-gradient(135deg, #006D5B 0%, #004D40 100%)' }}>
+  Browse Medicines
+</Button>
+
           </Paper>
         ) : (
           <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>

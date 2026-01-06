@@ -585,8 +585,9 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
         return renderPageView('Conversations', 'consult-header', <ConversationsContent onUserSelect={handleUserSelect} />);
       case 'account':
         return renderPageView('Account', 'account-header', <AccountContent setView={setView} />);
-      case 'cart':
-        return renderPageView('Cart', 'cart-header', <CartContent />, true);
+        case 'cart':
+          return renderPageView('Cart', 'cart-header', <CartContent setView={setView} />, true);
+      
       case 'orders':
         return renderPageView('Orders', 'orders-header', <OrdersContent />, true);
       case 'reviewRequest':
