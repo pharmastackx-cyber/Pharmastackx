@@ -79,50 +79,36 @@ export default function HomePage() {
 
   useEffect(() => {
     if (notificationSyncStatus === 'success') {
-        const timer = setTimeout(() => setNotificationSyncStatus('idle'), 3000); // Revert to idle after 3 seconds
+        // Close the modal immediately on success
+        setShowNotificationPrompt(false); 
+        
+        // Revert to idle after a short delay
+        const timer = setTimeout(() => setNotificationSyncStatus('idle'), 3000); 
         return () => clearTimeout(timer);
     }
 }, [notificationSyncStatus]);
+
 
 const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 const [showContinueOnAppMessage, setShowContinueOnAppMessage] = useState(false);
 const [notificationError, setNotificationError] = useState<string | null>(null);
 
 useEffect(() => {
-  console.log('--- Install Prompt Check Running ---');
-
-  // Condition 1: Must be on the home screen to show the prompt.
-  if (view !== 'home') {
-    console.log(`[Prompt Debug] Stop: View is currently '${view}', not 'home'.`);
-    return;
-  }
-
-  // Condition 2: Must have a logged-in user object available.
+  // Don't do anything until the user's session is loaded.
   if (!user) {
-    console.log('[Prompt Debug] Stop: User data is not loaded yet.');
     return;
   }
 
-  // If we get here, we have a user and are on the home screen. Let's log the details.
-  console.log(`[Prompt Debug] State: view='${view}', user.role='${user.role}'`);
-
+  // Check if the app is running as an installed PWA.
   const isPWA = typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches;
-  const hasSeenInstallPrompt = localStorage.getItem('hasSeenInstallPrompt');
 
-  // Condition 3: Check all conditions required to show the prompt.
-  if (!isPWA && ['pharmacist', 'pharmacy'].includes(user.role) && !hasSeenInstallPrompt) {
-    console.log('[Prompt Debug] SUCCESS: All conditions met. Showing install prompt.');
-    setShowInstallPrompt(true);
-    localStorage.setItem('hasSeenInstallPrompt', 'true');
-  } else {
-    // If we don't show it, log exactly why.
-    console.log('[Prompt Debug] Stop: Conditions not met.', {
-        isPWA,
-        isCorrectRole: ['pharmacist', 'pharmacy'].includes(user.role),
-        hasSeenPrompt: !!hasSeenInstallPrompt
-    });
-  }
-}, [view, user]); // Rerun this logic when the view or user changes.
+  // Determine if the user has a role that should be prompted.
+  const isTargetRole = ['pharmacist', 'pharmacy'].includes(user.role);
+
+  // Show the prompt if the user has the target role AND the app is not installed.
+  setShowInstallPrompt(isTargetRole && !isPWA);
+  
+}, [view, user]); // Re-run this logic every time the view or user data changes.
 
 
 
