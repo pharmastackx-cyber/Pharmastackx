@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { dbConnect } from '@/lib/mongoConnect';
 import User from '@/models/User';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { cookies } from 'next/headers';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 const admin = getFirebaseAdmin();
@@ -23,8 +24,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'FCM token is required.' }, { status: 400 });
     }
 
-    const sessionCookie = request.headers.get('cookie');
-    const sessionToken = sessionCookie?.split('; ').find(c => c.startsWith('session_token='))?.split('=')[1];
+    const cookieStore = await cookies();
+    const sessionTokenCookie = cookieStore.get('session_token');
+    const sessionToken = sessionTokenCookie?.value;
 
     if (!sessionToken) {
       console.log("Session token not found in cookies.");
