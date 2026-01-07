@@ -153,10 +153,12 @@ const requestPermission = async () => {
           const response = await fetch('/api/save-fcm-token', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify({ token: fcmToken }),
-          });
+            credentials: 'include', // Send cookies with the request
+        });
+        
 
           if (response.ok) {
             console.log('FCM token saved successfully.');
