@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { dbConnect } from '@/lib/mongoConnect';
 import User from '@/models/User';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
+const admin = getFirebaseAdmin();
 
 export async function POST(request: Request) {
   console.log("--- New request to /api/save-fcm-token ---");
@@ -59,9 +61,26 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'User disappeared during update operation.' }, { status: 500 });
     }
 
-    // CORRECTED LOGIC: Check if the token was actually added
     if (updatedUser.fcmTokens && updatedUser.fcmTokens.includes(fcmToken)) {
       console.log("FCM token successfully added to user's token list.");
+
+      // Send a confirmation notification
+      try {
+        const message = {
+          notification: {
+            title: 'Notification Configured',
+            body: 'You can now receive notifications.',
+          },
+          token: fcmToken,
+        };
+
+        await admin.messaging().send(message);
+        console.log('Successfully sent confirmation message.');
+      } catch (error) {
+        console.error('Error sending confirmation message:', error);
+        // We don't want to fail the whole request if the notification fails
+      }
+
       return NextResponse.json({ message: 'FCM token saved successfully.' });
     } else {
       console.error("CRITICAL: Token was not added after the database update operation.");

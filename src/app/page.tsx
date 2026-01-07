@@ -86,6 +86,7 @@ export default function HomePage() {
 
 const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 const [showContinueOnAppMessage, setShowContinueOnAppMessage] = useState(false);
+const [notificationError, setNotificationError] = useState<string | null>(null);
 
 useEffect(() => {
   console.log('--- Install Prompt Check Running ---');
@@ -149,6 +150,8 @@ useEffect(() => {
 
 const requestPermission = async () => {
   setNotificationSyncStatus('syncing');
+  setNotificationError(null); // Clear previous errors
+
   try {
     const permissionResult = await Notification.requestPermission();
     setPermission(permissionResult);
@@ -173,26 +176,33 @@ const requestPermission = async () => {
             console.log('FCM token saved successfully.');
             setNotificationSyncStatus('success');
           } else {
-            console.error('Failed to save FCM token.');
+            const errorData = await response.json();
+            console.error('Failed to save FCM token:', errorData.message);
+            setNotificationError(errorData.message || 'Failed to save token.');
             setNotificationSyncStatus('error');
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error saving FCM token:', error);
+          setNotificationError(error.message || 'An unknown error occurred.');
           setNotificationSyncStatus('error');
         }
       } else {
         console.log('Can not get token, need to ask user to enable it in browser settings.');
+        setNotificationError('Could not get notification token. Please check your browser settings.');
         setNotificationSyncStatus('error');
       }
     } else {
       console.log('Notification permission denied.');
+      // If permission is denied, we don't treat it as an error, but we stop the process.
       setNotificationSyncStatus('idle'); 
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('An error occurred while requesting permission ', error);
+    setNotificationError(error.message || 'An unknown error occurred while requesting permission.');
     setNotificationSyncStatus('error');
   }
 };
+
 
 const normalizedUser: UnifiedUser | null = user ? { ...user, _id: (user as any)._id } : null;
 
@@ -276,29 +286,30 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    // This effect runs on mount and whenever the user session changes.
+    // This effect runs when the loading state changes.
     const isPWA = typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches;
     const hasNotificationSupport = 'Notification' in window;
   
-    // Only proceed if running as a PWA and notifications are supported.
-    if (isPWA && hasNotificationSupport) { // <-- The '&& user' check is removed here
+    // Only proceed if running as a PWA, notifications are supported, and the session has been checked.
+    if (isPWA && hasNotificationSupport && !isLoading) {
       const currentPermission = Notification.permission;
       setPermission(currentPermission); // Keep our state in sync
   
       if (currentPermission === 'default') {
-        // If permission has not been decided, show our custom prompt.
-        // This now works on initial launch (user is null) AND after login.
-        setShowNotificationPrompt(true);
+        // If the user is logged in and permission is undecided, show our prompt.
+        if (user) {
+          setShowNotificationPrompt(true);
+        }
       } else if (currentPermission === 'granted' && user) {
-        // If permission is already granted AND a user is logged in,
-        // silently sync their token to ensure it's up-to-date.
+        // If permission is granted and a user is logged in, sync their token.
         console.log('Permission granted. Syncing token for logged-in user...');
         requestPermission();
       }
-      // If permission is 'denied', we respect that and do nothing.
+      // If permission is 'denied', or if there's no user, we do nothing.
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]); // Re-running when user changes is still correct for the login case.
+  }, [isLoading, user]); // Re-run when loading status or user changes.
+
   
 
 
@@ -783,7 +794,11 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
 
 <Modal
         open={showNotificationPrompt}
-        onClose={() => setShowNotificationPrompt(false)}
+        onClose={() => {
+          if (notificationSyncStatus !== 'syncing') {
+            setShowNotificationPrompt(false);
+          }
+        }}
         closeAfterTransition
         slots={{ backdrop: Backdrop }}
         slotProps={{
@@ -810,24 +825,46 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
             textAlign: 'center'
           }}>
             <Typography variant="h6" component="h2" sx={{ mb: 2, fontWeight: 'bold' }}>
-              Enable Notifications
+              {notificationSyncStatus === 'success' ? 'Notifications Enabled' : 
+               notificationSyncStatus === 'error' ? 'Something Went Wrong' : 
+               'Enable Notifications'}
             </Typography>
+
+            {notificationSyncStatus === 'syncing' && <CircularProgress sx={{ mb: 2 }} />}
+
+            {notificationSyncStatus === 'success' && (
+              <Typography sx={{ mb: 2 }}>
+                You will now receive notifications for drug searches.
+              </Typography>
+            )}
+
+            {notificationSyncStatus === 'error' && (
+              <Box>
+                <Typography color="error" sx={{ mb: 2 }}>
+                  {notificationError}
+                </Typography>
+                <Button onClick={requestPermission} variant="contained">
+                  Retry
+                </Button>
+              </Box>
+            )}
             
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', width: '100%' }}>
-              
-              <Button
-                onClick={() => {
-                  setShowNotificationPrompt(false);
-                  requestPermission();
-                }}
-                variant="contained"
-              >
-                Enable
-              </Button>
-            </Box>
+            {notificationSyncStatus === 'idle' && (
+              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', width: '100%' }}>
+                <Button
+                  onClick={() => {
+                    requestPermission();
+                  }}
+                  variant="contained"
+                >
+                  Enable
+                </Button>
+              </Box>
+            )}
           </Box>
         </Fade>
       </Modal>
+
 
       <Box
         sx={{
