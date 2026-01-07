@@ -79,14 +79,11 @@ export default function HomePage() {
 
   useEffect(() => {
     if (notificationSyncStatus === 'success') {
-        // Close the modal immediately on success
-        setShowNotificationPrompt(false); 
-        
-        // Revert to idle after a short delay
-        const timer = setTimeout(() => setNotificationSyncStatus('idle'), 3000); 
+        const timer = setTimeout(() => setNotificationSyncStatus('idle'), 3000); // Revert to idle after 3 seconds
         return () => clearTimeout(timer);
     }
 }, [notificationSyncStatus]);
+
 
 
 const [showInstallPrompt, setShowInstallPrompt] = useState(false);
