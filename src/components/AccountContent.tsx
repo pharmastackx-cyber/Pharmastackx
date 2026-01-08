@@ -3,14 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from "@/context/SessionProvider";
-import { Box, Typography, Avatar, Button, Paper, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Chip, Grid, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from "@mui/material";
-import { Person, VpnKey, Logout, Info, ContactMail, Business, LocationOn, MarkEmailRead, Pending, VerifiedUser, ArrowBack, Phone, LocalHospital, Assignment } from "@mui/icons-material";
+import { Box, Typography, Avatar, Button, Paper, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Chip, Grid, Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton, Select, MenuItem, FormControl, InputLabel } from "@mui/material";
+import { Person, VpnKey, Logout, Info, ContactMail, Business, LocationOn, MarkEmailRead, Pending, VerifiedUser, ArrowBack, Phone, LocalHospital, Assignment, Edit } from "@mui/icons-material";
 import FileUpload from './FileUpload';
 import SubscriptionContent from './SubscriptionContent';
-
-interface AccountContentProps {
-    setView: (view: string) => void;
-}
 
 // Define a more detailed user interface
 interface DetailedUser {
@@ -30,8 +26,96 @@ interface DetailedUser {
     mobile?: string;
     stateOfPractice?: string;
     licenseNumber?: string;
-    pharmacy?: string; // Should be the pharmacy name
+    pharmacy?: string; // This should be the pharmacy name
 }
+
+interface AccountContentProps {
+    setView: (view: string) => void;
+}
+
+// Prop types for the new components
+interface EditDialogProps {
+    open: boolean;
+    onClose: () => void;
+    onSave: (fieldName: string, value: any) => void;
+    fieldName: string;
+    value: any;
+}
+
+interface EditableListItemProps {
+    fieldName: string;
+    label: string;
+    value?: string | null;
+    icon: React.ReactElement;
+}
+
+const nigerianStates = [
+    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+    "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe",
+    "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos",
+    "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto",
+    "Taraba", "Yobe", "Zamfara"
+];
+
+const EditDialog = ({ open, onClose, onSave, fieldName, value }: EditDialogProps) => {
+    const [currentValue, setCurrentValue] = useState(value);
+
+    useEffect(() => {
+        setCurrentValue(value);
+    }, [value]);
+
+    const handleSave = () => {
+        onSave(fieldName, currentValue);
+    };
+    
+    const formattedFieldName = fieldName.replace(/([A-Z])/g, ' $1').trim();
+
+    const renderInput = () => {
+        if (fieldName === 'stateOfPractice' || fieldName === 'state') {
+            return (
+                <FormControl fullWidth margin="dense">
+                    <InputLabel>{formattedFieldName}</InputLabel>
+                    <Select
+                        autoFocus
+                        value={currentValue || ''}
+                        label={formattedFieldName}
+                        onChange={(e) => setCurrentValue(e.target.value)}
+                    >
+                        {nigerianStates.map(state => (
+                            <MenuItem key={state} value={state}>{state}</MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+            );
+        }
+
+        return (
+            <TextField
+                autoFocus
+                margin="dense"
+                label={formattedFieldName}
+                type="text"
+                fullWidth
+                value={currentValue || ''}
+                onChange={(e) => setCurrentValue(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSave()}
+            />
+        );
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+            <DialogTitle>Edit {formattedFieldName}</DialogTitle>
+            <DialogContent>
+                {renderInput()}
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Cancel</Button>
+                <Button onClick={handleSave}>Save</Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
 
 
 const AccountContent = ({ setView }: AccountContentProps) => {
@@ -39,12 +123,12 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     const [detailedUser, setDetailedUser] = useState<DetailedUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isEditMode, setIsEditMode] = useState(false);
-    const [editData, setEditData] = useState<Partial<DetailedUser>>({});
     const [resendStatus, setResendStatus] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploadStatus, setUploadStatus] = useState('');
     const [showSubscription, setShowSubscription] = useState(false);
+    const [editingField, setEditingField] = useState<string | null>(null);
+    const [fieldValue, setFieldValue] = useState<any>(null);
     const router = useRouter();
 
     useEffect(() => {
@@ -58,7 +142,6 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                     }
                     const data = await response.json();
                     setDetailedUser(data);
-                    setEditData(data);
                 } catch (err: any) {
                     setError(err.message);
                 } finally {
@@ -85,76 +168,60 @@ const AccountContent = ({ setView }: AccountContentProps) => {
         }
     };
 
-    const handleEdit = () => {
-        setIsEditMode(true);
+    const handleEdit = (fieldName: string, value: any) => {
+        setEditingField(fieldName);
+        setFieldValue(value);
     };
 
-    const handleClose = () => {
-        setIsEditMode(false);
+    const handleCloseDialog = () => {
+        setEditingField(null);
+        setFieldValue(null);
     };
 
-    const handleSave = async () => {
+    const handleSave = async (fieldName: string, newValue: any) => {
         try {
             const response = await fetch('/api/account', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(editData),
+                body: JSON.stringify({ [fieldName]: newValue }),
             });
 
             if (!response.ok) {
-                throw new Error('Failed to update account details.');
+                const errorData = await response.json();
+                throw new Error(errorData.message || `Failed to update ${fieldName}.`);
             }
 
             const updatedUser = await response.json();
             setDetailedUser(updatedUser);
-            setIsEditMode(false);
+            handleCloseDialog();
         } catch (err: any) {
             setError(err.message);
         }
-    };
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setEditData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleResendVerification = async () => {
         setResendStatus('sending');
         try {
             const response = await fetch('/api/auth/resend-verification', { method: 'POST' });
-            if (!response.ok) {
-                throw new Error('Failed to send verification email.');
-            }
+            if (!response.ok) throw new Error('Failed to send verification email.');
             setResendStatus('sent');
         } catch (err) {
             setResendStatus('error');
         }
     };
 
-    const handleFileSelect = (file: File) => {
-        setSelectedFile(file);
-    };
+    const handleFileSelect = (file: File) => setSelectedFile(file);
 
     const handleUpload = async () => {
         if (!selectedFile) return;
         setUploadStatus('uploading');
-
         const formData = new FormData();
         formData.append('file', selectedFile);
-
         try {
-            const response = await fetch('/api/account/upload-verification', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                throw new Error('File upload failed.');
-            }
-
-            const data = await response.json();
+            const response = await fetch('/api/account/upload-verification', { method: 'POST', body: formData });
+            if (!response.ok) throw new Error('File upload failed.');
             setDetailedUser(prev => prev ? { ...prev, professionalVerificationStatus: 'pending_review' } : null);
             setUploadStatus('success');
         } catch (err) {
@@ -163,114 +230,86 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     };
 
     const handleSubscriptionSuccess = () => {
-        refreshSession(); // Refresh session to get updated user details
+        refreshSession();
         setShowSubscription(false);
     };
 
-    if (isSessionLoading || isLoading) {
-        return <CircularProgress sx={{ display: 'block', margin: 'auto', mt: 4 }} />;
-    }
+    if (isSessionLoading || isLoading) return <CircularProgress sx={{ display: 'block', margin: 'auto', mt: 4 }} />;
 
     if (error || !detailedUser) {
         return (
             <Box sx={{ textAlign: 'center', mt: 4 }}>
-                <Typography sx={{color: 'grey.800'}}>Error: {error || 'Could not load user data.'}</Typography>
-                <Button variant="contained" onClick={() => window.location.href = '/auth'} sx={{ mt: 2 }}>
-                    Login
-                </Button>
+                <Typography color="grey.800">Error: {error || 'Could not load user data.'}</Typography>
+                <Button variant="contained" onClick={() => window.location.href = '/auth'} sx={{ mt: 2 }}>Login</Button>
             </Box>
         );
     }
+    
+    const EditableListItem = ({ fieldName, label, value, icon }: EditableListItemProps) => (
+        <ListItem secondaryAction={<IconButton edge="end" aria-label="edit" onClick={() => handleEdit(fieldName, value)}><Edit /></IconButton>}>
+            <ListItemIcon sx={{ color: 'grey.800' }}>{icon}</ListItemIcon>
+            <ListItemText primary={label} secondary={value || 'N/A'} secondaryTypographyProps={{ color: 'grey.600' }} />
+        </ListItem>
+    );
 
     const renderRoleSpecificDetails = () => {
+        if (!detailedUser) return null;
         if (detailedUser.role === 'pharmacist') {
             return (
-                <Box sx={{ width: '100%', mt: 2 }}>
-                    <ListItem>
-                        <ListItemIcon sx={{ color: 'grey.800' }}><Phone /></ListItemIcon>
-                        <ListItemText primary="Mobile" secondary={detailedUser.mobile || 'N/A'} secondaryTypographyProps={{ color: 'grey.600' }} />
-                    </ListItem>
-                    <ListItem>
-                        <ListItemIcon sx={{ color: 'grey.800' }}><LocationOn /></ListItemIcon>
-                        <ListItemText primary="State of Practice" secondary={detailedUser.stateOfPractice || 'N/A'} secondaryTypographyProps={{ color: 'grey.600' }} />
-                    </ListItem>
-                    <ListItem>
-                        <ListItemIcon sx={{ color: 'grey.800' }}><Assignment /></ListItemIcon>
-                        <ListItemText primary="License Number" secondary={detailedUser.licenseNumber || 'N/A'} secondaryTypographyProps={{ color: 'grey.600' }} />
-                    </ListItem>
+                <>
+                    <EditableListItem fieldName="mobile" label="Mobile" value={detailedUser.mobile} icon={<Phone />} />
+                    <EditableListItem fieldName="stateOfPractice" label="State of Practice" value={detailedUser.stateOfPractice} icon={<LocationOn />} />
+                    <EditableListItem fieldName="licenseNumber" label="License Number" value={detailedUser.licenseNumber} icon={<Assignment />} />
                     <ListItem>
                         <ListItemIcon sx={{ color: 'grey.800' }}><LocalHospital /></ListItemIcon>
                         <ListItemText primary="Pharmacy" secondary={detailedUser.pharmacy || 'N/A'} secondaryTypographyProps={{ color: 'grey.600' }} />
                     </ListItem>
-                </Box>
-            )
+                </>
+            );
         } else if (detailedUser.role === 'pharmacy') {
             return (
-                 <Box sx={{ width: '100%', mt: 2 }}>
-                    {detailedUser.businessName && (
-                        <ListItem>
-                            <ListItemIcon sx={{ color: 'grey.800' }}><Business /></ListItemIcon>
-                            <ListItemText primary="Business Name" secondary={detailedUser.businessName} secondaryTypographyProps={{ color: 'grey.600' }} />
-                        </ListItem>
-                    )}
-                    {(detailedUser.city || detailedUser.state) && (
-                         <ListItem>
-                            <ListItemIcon sx={{ color: 'grey.800' }}><LocationOn /></ListItemIcon>
-                            <ListItemText primary="Location" secondary={`${detailedUser.city || ''}, ${detailedUser.state || ''}`} secondaryTypographyProps={{ color: 'grey.600' }} />
-                        </ListItem>
-                    )}
-                </Box>
+                <>
+                    <EditableListItem fieldName="businessName" label="Business Name" value={detailedUser.businessName} icon={<Business />} />
+                    <EditableListItem fieldName="businessAddress" label="Business Address" value={detailedUser.businessAddress} icon={<LocationOn />} />
+                    <EditableListItem fieldName="city" label="City" value={detailedUser.city} icon={<LocationOn />} />
+                    <EditableListItem fieldName="state" label="State" value={detailedUser.state} icon={<LocationOn />} />
+                </>
             );
         }
-        
         return null;
     };
 
-    const renderProfessionalVerification = (detailedUser: DetailedUser | null) => {
-        if (!detailedUser || (detailedUser.role !== 'pharmacy' && detailedUser.role !== 'pharmacist')) {
-            return null;
-        }
-
+    const renderProfessionalVerification = (user: DetailedUser | null) => {
+        if (!user || (user.role !== 'pharmacy' && user.role !== 'pharmacist')) return null;
         let statusChip;
-        switch (detailedUser.professionalVerificationStatus) {
-            case 'approved':
-                statusChip = <Chip icon={<VerifiedUser />} label="Approved" color="success" size="small" />;
-                break;
-            case 'pending_review':
-                statusChip = <Chip icon={<Pending />} label="Pending Review" color="warning" size="small" />;
-                break;
-            case 'rejected':
-                statusChip = <Chip label="Rejected" color="error" size="small" />;
-                break;
-            default:
-                statusChip = <Chip label="Not Started" color="default" size="small" />;
+        switch (user.professionalVerificationStatus) {
+            case 'approved': statusChip = <Chip icon={<VerifiedUser />} label="Approved" color="success" size="small" />; break;
+            case 'pending_review': statusChip = <Chip icon={<Pending />} label="Pending Review" color="warning" size="small" />; break;
+            case 'rejected': statusChip = <Chip label="Rejected" color="error" size="small" />; break;
+            default: statusChip = <Chip label="Not Started" color="default" size="small" />;
         }
-
-        return (
-            <ListItem>
-                <ListItemText primary="Professional Verification" />
-                {statusChip}
-            </ListItem>
-        );
-    }
-
+        return <ListItem><ListItemText primary="Professional Verification" />{statusChip}</ListItem>;
+    };
 
     return (
         <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, bgcolor: 'white', color: 'black', borderRadius: '16px', width: '100%', maxWidth: '600px', margin: 'auto' }}>
             {showSubscription ? (
                 <Box>
-                    <Button startIcon={<ArrowBack />} onClick={() => setShowSubscription(false)} sx={{ mb: 2 }}>
-                        Back to Account
-                    </Button>
+                    <Button startIcon={<ArrowBack />} onClick={() => setShowSubscription(false)} sx={{ mb: 2 }}>Back to Account</Button>
                     <SubscriptionContent onSubscriptionSuccess={handleSubscriptionSuccess} />
                 </Box>
             ) : (
                 <>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3, position: 'relative' }}>
                         <Avatar src={detailedUser.profilePicture} sx={{ width: 80, height: 80, mb: 2, bgcolor: 'primary.main', color: 'white', fontSize: '2.5rem' }}>
                             {detailedUser.username?.charAt(0).toUpperCase()}
                         </Avatar>
-                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{detailedUser.username}</Typography>
+                        <IconButton size="small" onClick={() => handleEdit('profilePicture', detailedUser.profilePicture)} sx={{ position: 'absolute', top: 55, left: '55%', backgroundColor: 'rgba(255,255,255,0.7)' }}><Edit fontSize="small" /></IconButton>
+                        
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                           <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{detailedUser.username}</Typography>
+                           <IconButton size="small" onClick={() => handleEdit('username', detailedUser.username)}><Edit fontSize="small" /></IconButton>
+                        </Box>
                         <Typography variant="body1" sx={{ color: 'grey.600' }}>{detailedUser.email}</Typography>
                     </Box>
 
@@ -278,51 +317,29 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                         {renderRoleSpecificDetails()}
                         <ListItem>
                             <ListItemText primary="Email Verification" />
-                            <Chip 
-                                icon={detailedUser.emailVerified ? <MarkEmailRead /> : undefined}
-                                label={detailedUser.emailVerified ? "Verified" : "Unverified"} 
-                                color={detailedUser.emailVerified ? "success" : "warning"} 
-                                size="small" 
-                            />
-                            {!detailedUser.emailVerified && (
-                                <Button size="small" onClick={handleResendVerification} disabled={resendStatus === 'sending' || resendStatus === 'sent'} sx={{ ml: 1 }}>
-                                    {resendStatus === 'sending' ? 'Sending...' : resendStatus === 'sent' ? 'Sent!' : 'Resend'}
-                                </Button>
-                            )}
+                            <Chip icon={detailedUser.emailVerified ? <MarkEmailRead /> : undefined} label={detailedUser.emailVerified ? "Verified" : "Unverified"} color={detailedUser.emailVerified ? "success" : "warning"} size="small" />
+                            {!detailedUser.emailVerified && <Button size="small" onClick={handleResendVerification} disabled={resendStatus === 'sending' || resendStatus === 'sent'} sx={{ ml: 1 }}>{resendStatus === 'sending' ? 'Sending...' : resendStatus === 'sent' ? 'Sent!' : 'Resend'}</Button>}
                         </ListItem>
                         {renderProfessionalVerification(detailedUser)}
                         <ListItem button onClick={() => setShowSubscription(true)}>
                             <ListItemText primary="Subscription Status" />
-                            <Chip 
-                                label={detailedUser.subscriptionStatus === 'subscribed' ? "Subscribed" : "Unsubscribed"} 
-                                color={detailedUser.subscriptionStatus === 'subscribed' ? "success" : "default"} 
-                                size="small" 
-                            />
+                            <Chip label={detailedUser.subscriptionStatus === 'subscribed' ? "Subscribed" : "Unsubscribed"} color={detailedUser.subscriptionStatus === 'subscribed' ? "success" : "default"} size="small" />
                         </ListItem>
                     </List>
 
                     {(detailedUser.role === 'pharmacy' || detailedUser.role === 'pharmacist') && detailedUser.professionalVerificationStatus !== 'approved' && (
-                         <Box sx={{ my: 2 }}>
+                        <Box sx={{ my: 2 }}>
                             <Typography variant="h6" sx={{ mb: 1 }}>Submit Verification Documents</Typography>
                             <FileUpload onFileSelect={handleFileSelect} />
-                            <Button 
-                                variant="contained" 
-                                onClick={handleUpload} 
-                                disabled={!selectedFile || uploadStatus === 'uploading' || uploadStatus === 'success'}
-                                sx={{ mt: 1 }}
-                            >
+                            <Button variant="contained" onClick={handleUpload} disabled={!selectedFile || uploadStatus === 'uploading' || uploadStatus === 'success'} sx={{ mt: 1 }}>
                                 {uploadStatus === 'uploading' ? 'Uploading...' : uploadStatus === 'success' ? 'Uploaded!' : 'Upload'}
                             </Button>
-                         </Box>
+                        </Box>
                     )}
 
                     <Divider sx={{ my: 2, borderColor: 'rgba(0,0,0,0.12)' }} />
-
+                    
                     <List dense>
-                         <ListItem button onClick={handleEdit}>
-                            <ListItemIcon sx={{ color: 'grey.800', minWidth: '40px' }}><Person /></ListItemIcon>
-                            <ListItemText primary="Edit Profile" />
-                        </ListItem>
                         <ListItem button onClick={() => { /* TODO: Implement change password */ }}>
                             <ListItemIcon sx={{ color: 'grey.800', minWidth: '40px' }}><VpnKey /></ListItemIcon>
                             <ListItemText primary="Change Password" />
@@ -332,127 +349,14 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                     <Divider sx={{ my: 2, borderColor: 'rgba(0,0,0,0.12)' }} />
 
                     <Grid container spacing={2} sx={{ mb: 2 }}>
-                        <Grid item xs={6}>
-                            <Button fullWidth variant="outlined" startIcon={<Info />} onClick={() => setView('about')} sx={{ color: 'grey.800', borderColor: 'rgba(0,0,0,0.23)' }}>About Us</Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button fullWidth variant="outlined" startIcon={<ContactMail />} onClick={() => setView('contact')} sx={{ color: 'grey.800', borderColor: 'rgba(0,0,0,0.23)' }}>Contact</Button>
-                        </Grid>
+                        <Grid item xs={6}><Button fullWidth variant="outlined" startIcon={<Info />} onClick={() => setView('about')} sx={{ color: 'grey.800', borderColor: 'rgba(0,0,0,0.23)' }}>About Us</Button></Grid>
+                        <Grid item xs={6}><Button fullWidth variant="outlined" startIcon={<ContactMail />} onClick={() => setView('contact')} sx={{ color: 'grey.800', borderColor: 'rgba(0,0,0,0.23)' }}>Contact</Button></Grid>
                     </Grid>
 
-                    <Button
-                        variant="contained"
-                        color="error"
-                        startIcon={<Logout />}
-                        onClick={handleLogout}
-                        fullWidth
-                    >
-                        Logout
-                    </Button>
+                    <Button variant="contained" color="error" startIcon={<Logout />} onClick={handleLogout} fullWidth>Logout</Button>
                 </>
             )}
-            <Dialog open={isEditMode} onClose={handleClose} fullWidth maxWidth="sm">
-                <DialogTitle>Edit Profile</DialogTitle>
-                <DialogContent>
-                    <TextField
-                        margin="dense"
-                        label="Username"
-                        type="text"
-                        fullWidth
-                        name="username"
-                        value={editData.username || ''}
-                        onChange={handleChange}
-                    />
-                    <TextField
-                        margin="dense"
-                        label="Profile Picture URL"
-                        type="text"
-                        fullWidth
-                        name="profilePicture"
-                        value={editData.profilePicture || ''}
-                        onChange={handleChange}
-                    />
-                    {detailedUser.role === 'pharmacy' && (
-                        <>
-                            <TextField
-                                margin="dense"
-                                label="Business Name"
-                                type="text"
-                                fullWidth
-                                name="businessName"
-                                value={editData.businessName || ''}
-                                onChange={handleChange}
-                            />
-                            <TextField
-                                margin="dense"
-                                label="Business Address"
-                                type="text"
-                                fullWidth
-                                name="businessAddress"
-                                value={editData.businessAddress || ''}
-                                onChange={handleChange}
-                            />
-                        </>
-                    )}
-                    {(detailedUser.role === 'pharmacist') && (
-                        <>
-                            <TextField
-                                margin="dense"
-                                label="Mobile"
-                                type="text"
-                                fullWidth
-                                name="mobile"
-                                value={editData.mobile || ''}
-                                onChange={handleChange}
-                            />
-                            <TextField
-                                margin="dense"
-                                label="State of Practice"
-                                type="text"
-                                fullWidth
-                                name="stateOfPractice"
-                                value={editData.stateOfPractice || ''}
-                                onChange={handleChange}
-                            />
-                            <TextField
-                                margin="dense"
-                                label="License Number"
-                                type="text"
-                                fullWidth
-                                name="licenseNumber"
-                                value={editData.licenseNumber || ''}
-                                onChange={handleChange}
-                            />
-                        </>
-                    )}
-                    {(detailedUser.role === 'pharmacy' || detailedUser.role === 'pharmacist') && (
-                        <>
-                            <TextField
-                                margin="dense"
-                                label="City"
-                                type="text"
-                                fullWidth
-                                name="city"
-                                value={editData.city || ''}
-                                onChange={handleChange}
-                            />
-                            <TextField
-                                margin="dense"
-                                label="State"
-                                type="text"
-                                fullWidth
-                                name="state"
-                                value={editData.state || ''}
-                                onChange={handleChange}
-                            />
-                        </>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleClose}>Cancel</Button>
-                    <Button onClick={handleSave}>Save</Button>
-                </DialogActions>
-            </Dialog>
+            {editingField && <EditDialog open={!!editingField} onClose={handleCloseDialog} onSave={handleSave} fieldName={editingField} value={fieldValue} />}
         </Paper>
     );
 };
