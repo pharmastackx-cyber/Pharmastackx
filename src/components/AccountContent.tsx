@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from "@/context/SessionProvider";
 import { Box, Typography, Avatar, Button, Paper, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Chip, Grid, Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton, Select, MenuItem, FormControl, InputLabel, Switch, FormControlLabel } from "@mui/material";
-
-import { Person, VpnKey, Logout, Info, ContactMail, Business, LocationOn, MarkEmailRead, Pending, VerifiedUser, ArrowBack, Phone, LocalHospital, Assignment, Edit, Store } from "@mui/icons-material";
+import { Person, VpnKey, Logout, Info, ContactMail, Business, LocationOn, MarkEmailRead, Pending, VerifiedUser, ArrowBack, Phone, LocalHospital, Assignment, Edit, CheckCircleOutline, ErrorOutline } from "@mui/icons-material";
 import FileUpload from './FileUpload';
 import SubscriptionContent from './SubscriptionContent';
 
@@ -44,7 +43,6 @@ interface AccountContentProps {
     setView: (view: string) => void;
 }
 
-// Prop types for the new components
 interface EditDialogProps {
     open: boolean;
     onClose: () => void;
@@ -231,6 +229,9 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     const [fieldValue, setFieldValue] = useState<any>(null);
     const [isSwitchingPharmacy, setIsSwitchingPharmacy] = useState(false);
     const [pharmacists, setPharmacists] = useState<Pharmacist[]>([]);
+    const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+    const [isUpdatingAccess, setIsUpdatingAccess] = useState(false);
+    const [accessUpdateResult, setAccessUpdateResult] = useState<{ status: 'success' | 'error'; message: string } | null>(null);
     const router = useRouter();
 
     useEffect(() => {
@@ -268,7 +269,15 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     }, [sessionUser, isSessionLoading, router]);
 
     const handleAccessChange = async (pharmacistId: string, canManageStore: boolean) => {
+        setIsAccessModalOpen(true);
+        setIsUpdatingAccess(true);
+        setAccessUpdateResult(null);
+
+        // Optimistically update the UI
+        setPharmacists(prev => prev.map(p => p._id === pharmacistId ? { ...p, canManageStore } : p));
+
         try {
+            console.log(`Attempting to update access for pharmacist ${pharmacistId} to ${canManageStore}`);
             const response = await fetch('/api/account/pharmacists/manage-access', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -276,17 +285,33 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                 body: JSON.stringify({ pharmacistId, canManageStore }),
             });
 
+            const responseBody = await response.json();
+
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to update access.');
+                console.error("API Error:", responseBody);
+                throw new Error(responseBody.message || 'An unknown error occurred on the server.');
             }
 
-            const data = await response.json();
-            setPharmacists(data.pharmacists);
+            console.log("Access update successful, API returned:", responseBody);
+            setAccessUpdateResult({ status: 'success', message: 'Access updated successfully!' });
+            setPharmacists(responseBody.pharmacists); // Sync with the server's response
 
         } catch (err: any) {
-            setError(err.message);
+            console.error("Failed to update access:", err);
+            setAccessUpdateResult({ status: 'error', message: `Update failed: ${err.message}` });
+            // Revert the optimistic update on failure
+            setPharmacists(prev => prev.map(p => p._id === pharmacistId ? { ...p, canManageStore: !canManageStore } : p));
+        } finally {
+            setIsUpdatingAccess(false);
         }
+    };
+    
+    const handleCloseAccessModal = () => {
+        setIsAccessModalOpen(false);
+        // Delay resetting the result to avoid flash of content
+        setTimeout(() => {
+            setAccessUpdateResult(null);
+        }, 300);
     };
 
     const handleLogout = async () => {
@@ -439,6 +464,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                                                 checked={pharmacist.canManageStore}
                                                 onChange={(e) => handleAccessChange(pharmacist._id, e.target.checked)}
                                                 edge="end"
+                                                disabled={isUpdatingAccess}
                                             />
                                         }
                                         label="Store Access"
@@ -550,6 +576,27 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                 onClose={() => setIsSwitchingPharmacy(false)} 
                 onSwitch={handleSwitchPharmacy} 
             />
+
+            <Dialog open={isAccessModalOpen} onClose={handleCloseAccessModal} fullWidth maxWidth="xs">
+                <DialogTitle sx={{ textAlign: 'center', pb: 0 }}>
+                    {isUpdatingAccess ? 'Updating Access' : accessUpdateResult?.status === 'success' ? 'Update Successful' : 'Update Failed'}
+                </DialogTitle>
+                <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 3 }}>
+                    {isUpdatingAccess ? (
+                        <CircularProgress sx={{ mb: 2 }} />
+                    ) : accessUpdateResult?.status === 'success' ? (
+                        <CheckCircleOutline color="success" sx={{ fontSize: 60, mb: 2 }} />
+                    ) : (
+                        <ErrorOutline color="error" sx={{ fontSize: 60, mb: 2 }} />
+                    )}
+                    <Typography variant="body1" sx={{ textAlign: 'center' }}>
+                        {isUpdatingAccess ? 'Please wait...' : accessUpdateResult?.message}
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
+                    {!isUpdatingAccess && <Button onClick={handleCloseAccessModal}>Close</Button>}
+                </DialogActions>
+            </Dialog>
         </Paper>
     );
 };
