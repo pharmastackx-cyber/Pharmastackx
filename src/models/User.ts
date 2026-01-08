@@ -33,6 +33,7 @@ export interface IUser extends Document {
   subscriptionStatus: 'subscribed' | 'unsubscribed';
   subscriptionExpiry?: Date;
   orderCount: number;
+  canManageStore?: boolean; // New field for store management access
 }
 
 // The schema defines the blueprint for the database
@@ -79,6 +80,7 @@ const userSchema: Schema<IUser> = new mongoose.Schema({
   subscriptionStatus: { type: String, enum: ['subscribed', 'unsubscribed'], default: 'unsubscribed' },
   subscriptionExpiry: { type: Date },
   orderCount: { type: Number, default: 0 },
+  canManageStore: { type: Boolean, default: false }, // New field added to schema
 });
 
 // This line creates the model

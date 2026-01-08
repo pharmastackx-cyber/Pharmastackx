@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from "@/context/SessionProvider";
-import { Box, Typography, Avatar, Button, Paper, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Chip, Grid, Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton, Select, MenuItem, FormControl, InputLabel } from "@mui/material";
-import { Person, VpnKey, Logout, Info, ContactMail, Business, LocationOn, MarkEmailRead, Pending, VerifiedUser, ArrowBack, Phone, LocalHospital, Assignment, Edit } from "@mui/icons-material";
+import { Box, Typography, Avatar, Button, Paper, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Chip, Grid, Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton, Select, MenuItem, FormControl, InputLabel, Switch, FormControlLabel } from "@mui/material";
+
+import { Person, VpnKey, Logout, Info, ContactMail, Business, LocationOn, MarkEmailRead, Pending, VerifiedUser, ArrowBack, Phone, LocalHospital, Assignment, Edit, Store } from "@mui/icons-material";
 import FileUpload from './FileUpload';
 import SubscriptionContent from './SubscriptionContent';
 
@@ -26,7 +27,17 @@ interface DetailedUser {
     mobile?: string;
     stateOfPractice?: string;
     licenseNumber?: string;
-    pharmacy?: { _id: string; businessName: string }; // Nested object for pharmacy
+    pharmacy?: { _id: string; businessName: string };
+    canManageStore?: boolean;
+}
+
+// Specific interface for connected pharmacists
+interface Pharmacist {
+    _id: string;
+    username: string;
+    email: string;
+    profilePicture?: string;
+    canManageStore: boolean;
 }
 
 interface AccountContentProps {
@@ -123,7 +134,6 @@ const EditDialog = ({ open, onClose, onSave, fieldName, value }: EditDialogProps
     );
 };
 
-// Dialog for switching pharmacies
 const SwitchPharmacyDialog = ({ open, onClose, onSwitch }: SwitchPharmacyDialogProps) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [pharmacies, setPharmacies] = useState<DetailedUser[]>([]);
@@ -131,7 +141,6 @@ const SwitchPharmacyDialog = ({ open, onClose, onSwitch }: SwitchPharmacyDialogP
     const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Debounced search effect
     useEffect(() => {
         const search = async () => {
             if (!searchQuery.trim()) {
@@ -146,7 +155,6 @@ const SwitchPharmacyDialog = ({ open, onClose, onSwitch }: SwitchPharmacyDialogP
                     throw new Error('Failed to search for pharmacies.');
                 }
                 const data = await response.json();
-                // Safely access the pharmacies array, whether it's the root response or in a .pharmacies property
                 const pharmaciesData = Array.isArray(data) ? data : data.pharmacies || [];
                 setPharmacies(pharmaciesData);
             } catch (err: any) {
@@ -222,37 +230,30 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     const [editingField, setEditingField] = useState<string | null>(null);
     const [fieldValue, setFieldValue] = useState<any>(null);
     const [isSwitchingPharmacy, setIsSwitchingPharmacy] = useState(false);
-    const [pharmacists, setPharmacists] = useState<any[]>([]);
+    const [pharmacists, setPharmacists] = useState<Pharmacist[]>([]);
     const router = useRouter();
 
     useEffect(() => {
         const fetchUserData = async () => {
             if (sessionUser) {
-                console.log('--- [AccountContent] Fetching user data ---');
                 try {
                     setIsLoading(true);
                     const response = await fetch('/api/account', { credentials: 'include' });
                     if (!response.ok) throw new Error('Failed to fetch account details.');
                     const data = await response.json();
-                    console.log('Account details fetched:', data);
                     setDetailedUser(data);
 
                     if (data.role === 'pharmacy') {
-                        console.log('User is a pharmacy. Fetching connected pharmacists.');
                         const pharmacistsResponse = await fetch('/api/account/pharmacists', { credentials: 'include' });
                         if (pharmacistsResponse.ok) {
                             const pharmacistsData = await pharmacistsResponse.json();
-                            console.log('--- [AccountContent] Received pharmacists data ---');
-                            console.log(JSON.stringify(pharmacistsData, null, 2));
                             setPharmacists(pharmacistsData.pharmacists);
                         } else {
-                            console.error('--- [AccountContent] Failed to fetch pharmacists ---');
                             const errorData = await pharmacistsResponse.json();
-                            console.error('Error response:', errorData);
+                            console.error('Failed to fetch pharmacists:', errorData.message);
                         }
                     }
                 } catch (err: any) {
-                    console.error('--- [AccountContent] Error fetching data ---', err);
                     setError(err.message);
                 } finally {
                     setIsLoading(false);
@@ -265,6 +266,28 @@ const AccountContent = ({ setView }: AccountContentProps) => {
             else router.push('/auth');
         }
     }, [sessionUser, isSessionLoading, router]);
+
+    const handleAccessChange = async (pharmacistId: string, canManageStore: boolean) => {
+        try {
+            const response = await fetch('/api/account/pharmacists/manage-access', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ pharmacistId, canManageStore }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to update access.');
+            }
+
+            const data = await response.json();
+            setPharmacists(data.pharmacists);
+
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
 
     const handleLogout = async () => {
         try {
@@ -314,7 +337,6 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Failed to switch pharmacy.');
             }
-            // The API returns the updated pharmacist, so we update the state
             const updatedPharmacist = await response.json();
             setDetailedUser(updatedPharmacist);
             setIsSwitchingPharmacy(false);
@@ -410,7 +432,19 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                     <List dense>
                         {pharmacists.length > 0 ? (
                             pharmacists.map(pharmacist => (
-                                <ListItem key={pharmacist._id}>
+                                <ListItem key={pharmacist._id} secondaryAction={
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={pharmacist.canManageStore}
+                                                onChange={(e) => handleAccessChange(pharmacist._id, e.target.checked)}
+                                                edge="end"
+                                            />
+                                        }
+                                        label="Store Access"
+                                        labelPlacement="start"
+                                    />
+                                }>
                                     <ListItemIcon>
                                         <Avatar src={pharmacist.profilePicture} sx={{ width: 32, height: 32 }}>
                                             {pharmacist.username?.charAt(0).toUpperCase()}

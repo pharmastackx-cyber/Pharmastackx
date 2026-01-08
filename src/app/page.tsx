@@ -50,7 +50,9 @@ interface UnifiedUser {
   email?: string;
   role: string;
   profilePicture?: string;
+  canManageStore?: boolean; // Add this line
 }
+
 
 const MapBackground = dynamic(() => import('@/components/MapBackground'), {
   ssr: false,
@@ -88,6 +90,7 @@ export default function HomePage() {
 
 const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 const [showContinueOnAppMessage, setShowContinueOnAppMessage] = useState(false);
+
 const [notificationError, setNotificationError] = useState<string | null>(null);
 
 useEffect(() => {
@@ -188,6 +191,30 @@ const requestPermission = async () => {
   }
 };
 
+const [detailedUser, setDetailedUser] = useState<UnifiedUser | null>(null);
+useEffect(() => {
+  const fetchDetailedUser = async () => {
+      // Fetch only if we have a session user and haven't fetched full details yet
+      if (user && !detailedUser) { 
+          try {
+              const response = await fetch('/api/account', { credentials: 'include' });
+              if (response.ok) {
+                  const data = await response.json();
+                  setDetailedUser(data); // Store the full user object
+              } else {
+                  console.error("Failed to fetch detailed user data for access control.");
+              }
+          } catch (error) {
+              console.error("Error fetching detailed user data:", error);
+          }
+      } else if (!user) {
+          // If user logs out, clear the detailed user state
+          setDetailedUser(null);
+      }
+  };
+
+  fetchDetailedUser();
+}, [user, detailedUser]);
 
 const normalizedUser: UnifiedUser | null = user ? { ...user, _id: (user as any)._id } : null;
 
@@ -361,17 +388,18 @@ useEffect(() => {
       {!isLoading && (
             <Grid container spacing={2} sx={{ flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'left', justifyContent: 'center' }}>
                 
-                {/* Store Management Button: Pharmacy/Pharmacist only */}
-                {normalizedUser && ['pharmacy', 'pharmacist'].includes(normalizedUser.role) && (
-                    <Grid item xs="auto">
-                        <motion.div layoutId="store-management-header">
-                            <Button variant="contained" onClick={() => setView('storeManagement')}
-                                sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' }, px: { xs: 2, sm: 4 }, py: { xs: 0.75, sm: 1 }, whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
-                                Store Management
-                            </Button>
-                        </motion.div>
-                    </Grid>
-                )}
+                {/* Store Management Button: Pharmacy or authorized Pharmacist only */}
+{detailedUser && (detailedUser.role === 'pharmacy' || (detailedUser.role === 'pharmacist' && detailedUser.canManageStore)) && (
+    <Grid item xs="auto">
+        <motion.div layoutId="store-management-header">
+            <Button variant="contained" onClick={() => setView('storeManagement')}
+                sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' }, px: { xs: 2, sm: 4 }, py: { xs: 0.75, sm: 1 }, whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
+                Store Management
+            </Button>
+        </motion.div>
+    </Grid>
+)}
+
         
                 {/* Order Requests Button: Pharmacy/Pharmacist only */}
                 {normalizedUser && ['pharmacy', 'pharmacist'].includes(normalizedUser.role) && (
