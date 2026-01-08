@@ -228,23 +228,31 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     useEffect(() => {
         const fetchUserData = async () => {
             if (sessionUser) {
+                console.log('--- [AccountContent] Fetching user data ---');
                 try {
                     setIsLoading(true);
-                    const response = await fetch('/api/account');
+                    const response = await fetch('/api/account', { credentials: 'include' });
                     if (!response.ok) throw new Error('Failed to fetch account details.');
                     const data = await response.json();
+                    console.log('Account details fetched:', data);
                     setDetailedUser(data);
 
                     if (data.role === 'pharmacy') {
-                        const pharmacistsResponse = await fetch('/api/account/pharmacists');
+                        console.log('User is a pharmacy. Fetching connected pharmacists.');
+                        const pharmacistsResponse = await fetch('/api/account/pharmacists', { credentials: 'include' });
                         if (pharmacistsResponse.ok) {
                             const pharmacistsData = await pharmacistsResponse.json();
+                            console.log('--- [AccountContent] Received pharmacists data ---');
+                            console.log(JSON.stringify(pharmacistsData, null, 2));
                             setPharmacists(pharmacistsData.pharmacists);
                         } else {
-                            console.error('Failed to fetch pharmacists');
+                            console.error('--- [AccountContent] Failed to fetch pharmacists ---');
+                            const errorData = await pharmacistsResponse.json();
+                            console.error('Error response:', errorData);
                         }
                     }
                 } catch (err: any) {
+                    console.error('--- [AccountContent] Error fetching data ---', err);
                     setError(err.message);
                 } finally {
                     setIsLoading(false);
