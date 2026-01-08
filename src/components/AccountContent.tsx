@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from "@/context/SessionProvider";
 import { Box, Typography, Avatar, Button, Paper, List, ListItem, ListItemIcon, ListItemText, Divider, CircularProgress, Chip, Grid, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from "@mui/material";
-import { Person, VpnKey, Logout, Info, ContactMail, Business, LocationOn, MarkEmailRead, Pending, VerifiedUser, ArrowBack } from "@mui/icons-material";
+import { Person, VpnKey, Logout, Info, ContactMail, Business, LocationOn, MarkEmailRead, Pending, VerifiedUser, ArrowBack, Phone, LocalHospital, Assignment } from "@mui/icons-material";
 import FileUpload from './FileUpload';
 import SubscriptionContent from './SubscriptionContent';
 
@@ -18,7 +18,7 @@ interface DetailedUser {
     username: string;
     email: string;
     profilePicture?: string;
-    role: 'user' | 'pharmacist' | 'pharmacy';
+    role: 'admin' | 'customer' | 'pharmacy' | 'clinic' | 'vendor' | 'agent' | 'pharmacist' | 'user';
     businessName?: string;
     businessAddress?: string;
     slug?: string;
@@ -27,7 +27,12 @@ interface DetailedUser {
     emailVerified: boolean;
     professionalVerificationStatus: 'not_started' | 'pending_review' | 'approved' | 'rejected';
     subscriptionStatus: 'subscribed' | 'unsubscribed';
+    mobile?: string;
+    stateOfPractice?: string;
+    licenseNumber?: string;
+    pharmacy?: string; // Should be the pharmacy name
 }
+
 
 const AccountContent = ({ setView }: AccountContentProps) => {
     const { user: sessionUser, isLoading: isSessionLoading, refreshSession } = useSession();
@@ -178,26 +183,51 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     }
 
     const renderRoleSpecificDetails = () => {
-        return (
-            <Box sx={{ width: '100%', mt: 2 }}>
-                {(detailedUser.role === 'pharmacy') && detailedUser.businessName && (
+        if (detailedUser.role === 'pharmacist') {
+            return (
+                <Box sx={{ width: '100%', mt: 2 }}>
                     <ListItem>
-                        <ListItemIcon sx={{ color: 'grey.800' }}><Business /></ListItemIcon>
-                        <ListItemText primary="Business Name" secondary={detailedUser.businessName} secondaryTypographyProps={{ color: 'grey.600' }} />
+                        <ListItemIcon sx={{ color: 'grey.800' }}><Phone /></ListItemIcon>
+                        <ListItemText primary="Mobile" secondary={detailedUser.mobile || 'N/A'} secondaryTypographyProps={{ color: 'grey.600' }} />
                     </ListItem>
-                )}
-                {(detailedUser.role === 'pharmacy' || detailedUser.role === 'pharmacist') && (detailedUser.city || detailedUser.state) && (
-                     <ListItem>
+                    <ListItem>
                         <ListItemIcon sx={{ color: 'grey.800' }}><LocationOn /></ListItemIcon>
-                        <ListItemText primary="Location" secondary={`${detailedUser.city || ''}, ${detailedUser.state || ''}`} secondaryTypographyProps={{ color: 'grey.600' }} />
+                        <ListItemText primary="State of Practice" secondary={detailedUser.stateOfPractice || 'N/A'} secondaryTypographyProps={{ color: 'grey.600' }} />
                     </ListItem>
-                )}
-            </Box>
-        );
+                    <ListItem>
+                        <ListItemIcon sx={{ color: 'grey.800' }}><Assignment /></ListItemIcon>
+                        <ListItemText primary="License Number" secondary={detailedUser.licenseNumber || 'N/A'} secondaryTypographyProps={{ color: 'grey.600' }} />
+                    </ListItem>
+                    <ListItem>
+                        <ListItemIcon sx={{ color: 'grey.800' }}><LocalHospital /></ListItemIcon>
+                        <ListItemText primary="Pharmacy" secondary={detailedUser.pharmacy || 'N/A'} secondaryTypographyProps={{ color: 'grey.600' }} />
+                    </ListItem>
+                </Box>
+            )
+        } else if (detailedUser.role === 'pharmacy') {
+            return (
+                 <Box sx={{ width: '100%', mt: 2 }}>
+                    {detailedUser.businessName && (
+                        <ListItem>
+                            <ListItemIcon sx={{ color: 'grey.800' }}><Business /></ListItemIcon>
+                            <ListItemText primary="Business Name" secondary={detailedUser.businessName} secondaryTypographyProps={{ color: 'grey.600' }} />
+                        </ListItem>
+                    )}
+                    {(detailedUser.city || detailedUser.state) && (
+                         <ListItem>
+                            <ListItemIcon sx={{ color: 'grey.800' }}><LocationOn /></ListItemIcon>
+                            <ListItemText primary="Location" secondary={`${detailedUser.city || ''}, ${detailedUser.state || ''}`} secondaryTypographyProps={{ color: 'grey.600' }} />
+                        </ListItem>
+                    )}
+                </Box>
+            );
+        }
+        
+        return null;
     };
 
-    const renderProfessionalVerification = () => {
-        if (detailedUser.role !== 'pharmacy' && detailedUser.role !== 'pharmacist') {
+    const renderProfessionalVerification = (detailedUser: DetailedUser | null) => {
+        if (!detailedUser || (detailedUser.role !== 'pharmacy' && detailedUser.role !== 'pharmacist')) {
             return null;
         }
 
@@ -223,6 +253,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
             </ListItem>
         );
     }
+
 
     return (
         <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, bgcolor: 'white', color: 'black', borderRadius: '16px', width: '100%', maxWidth: '600px', margin: 'auto' }}>
@@ -259,7 +290,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                                 </Button>
                             )}
                         </ListItem>
-                        {renderProfessionalVerification()}
+                        {renderProfessionalVerification(detailedUser)}
                         <ListItem button onClick={() => setShowSubscription(true)}>
                             <ListItemText primary="Subscription Status" />
                             <Chip 
@@ -359,6 +390,37 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                                 fullWidth
                                 name="businessAddress"
                                 value={editData.businessAddress || ''}
+                                onChange={handleChange}
+                            />
+                        </>
+                    )}
+                    {(detailedUser.role === 'pharmacist') && (
+                        <>
+                            <TextField
+                                margin="dense"
+                                label="Mobile"
+                                type="text"
+                                fullWidth
+                                name="mobile"
+                                value={editData.mobile || ''}
+                                onChange={handleChange}
+                            />
+                            <TextField
+                                margin="dense"
+                                label="State of Practice"
+                                type="text"
+                                fullWidth
+                                name="stateOfPractice"
+                                value={editData.stateOfPractice || ''}
+                                onChange={handleChange}
+                            />
+                            <TextField
+                                margin="dense"
+                                label="License Number"
+                                type="text"
+                                fullWidth
+                                name="licenseNumber"
+                                value={editData.licenseNumber || ''}
                                 onChange={handleChange}
                             />
                         </>

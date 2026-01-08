@@ -24,10 +24,21 @@ export async function GET() {
       throw new Error('Invalid token payload');
     }
 
-    const user = await User.findById(userId).select('-password').lean();
+    const user = await User.findById(userId)
+      .select('-password')
+      .populate({
+        path: 'pharmacy',
+        select: 'businessName' 
+      })
+      .lean();
 
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    // If user is a pharmacist and has a pharmacy, replace pharmacy object with its name
+    if (user.role === 'pharmacist' && user.pharmacy && typeof user.pharmacy === 'object') {
+      (user as any).pharmacy = (user.pharmacy as any).businessName;
     }
 
     return NextResponse.json(user, { status: 200 });
@@ -59,19 +70,43 @@ export async function PUT(req: Request) {
         }
 
         const body = await req.json();
-        const { username, profilePicture, businessName, businessAddress, city, state } = body;
+        const { 
+            username, 
+            profilePicture, 
+            businessName, 
+            businessAddress, 
+            city, 
+            state,
+            mobile,
+            stateOfPractice,
+            licenseNumber
+        } = body;
 
-        const updatedUser = await User.findByIdAndUpdate(userId, {
+        const updatedUserDoc = await User.findByIdAndUpdate(userId, {
             username,
             profilePicture,
             businessName,
             businessAddress,
             city,
-            state
-        }, { new: true }).select('-password');
+            state,
+            mobile,
+            stateOfPractice,
+            licenseNumber
+        }, { new: true })
+        .select('-password')
+        .populate({
+            path: 'pharmacy',
+            select: 'businessName'
+        });
 
-        if (!updatedUser) {
+        if (!updatedUserDoc) {
             return NextResponse.json({ message: 'User not found' }, { status: 404 });
+        }
+        
+        const updatedUser = updatedUserDoc.toObject();
+
+        if (updatedUser.role === 'pharmacist' && updatedUser.pharmacy && typeof updatedUser.pharmacy === 'object') {
+          (updatedUser as any).pharmacy = (updatedUser.pharmacy as any).businessName;
         }
 
         return NextResponse.json(updatedUser, { status: 200 });
