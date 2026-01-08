@@ -26,7 +26,7 @@ interface DetailedUser {
     mobile?: string;
     stateOfPractice?: string;
     licenseNumber?: string;
-    pharmacy?: string; // This should be the pharmacy name
+    pharmacy?: { _id: string; businessName: string }; // Nested object for pharmacy
 }
 
 interface AccountContentProps {
@@ -40,6 +40,12 @@ interface EditDialogProps {
     onSave: (fieldName: string, value: any) => void;
     fieldName: string;
     value: any;
+}
+
+interface SwitchPharmacyDialogProps {
+    open: boolean;
+    onClose: () => void;
+    onSwitch: (pharmacyId: string) => void;
 }
 
 interface EditableListItemProps {
@@ -117,6 +123,92 @@ const EditDialog = ({ open, onClose, onSave, fieldName, value }: EditDialogProps
     );
 };
 
+// Dialog for switching pharmacies
+const SwitchPharmacyDialog = ({ open, onClose, onSwitch }: SwitchPharmacyDialogProps) => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [pharmacies, setPharmacies] = useState<DetailedUser[]>([]);
+    const [selectedPharmacy, setSelectedPharmacy] = useState<DetailedUser | null>(null);
+    const [isSearching, setIsSearching] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Debounced search effect
+    useEffect(() => {
+        const search = async () => {
+            if (!searchQuery.trim()) {
+                setPharmacies([]);
+                return;
+            }
+            setIsSearching(true);
+            setError(null);
+            try {
+                const response = await fetch(`/api/pharmacies?search=${searchQuery}`);
+                if (!response.ok) {
+                    throw new Error('Failed to search for pharmacies.');
+                }
+                const data = await response.json();
+                // Safely access the pharmacies array, whether it's the root response or in a .pharmacies property
+                const pharmaciesData = Array.isArray(data) ? data : data.pharmacies || [];
+                setPharmacies(pharmaciesData);
+            } catch (err: any) {
+                setError(err.message);
+                setPharmacies([]);
+            } finally {
+                setIsSearching(false);
+            }
+        };
+
+        const timerId = setTimeout(() => {
+            search();
+        }, 500);
+
+        return () => clearTimeout(timerId);
+    }, [searchQuery]);
+
+    const handleSwitch = () => {
+        if (selectedPharmacy) {
+            onSwitch(selectedPharmacy._id);
+        }
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+            <DialogTitle>Switch Pharmacy</DialogTitle>
+            <DialogContent>
+                <TextField
+                    autoFocus
+                    margin="dense"
+                    label="Search for a pharmacy by name or address"
+                    type="text"
+                    fullWidth
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {isSearching && <CircularProgress size={24} sx={{ display: 'block', margin: 'auto', mt: 2 }} />}
+                {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
+                <List sx={{ mt: 2 }}>
+                    {pharmacies.map((pharmacy) => (
+                        <ListItem
+                            button
+                            key={pharmacy._id}
+                            selected={selectedPharmacy?._id === pharmacy._id}
+                            onClick={() => setSelectedPharmacy(pharmacy)}
+                        >
+                            <ListItemText primary={pharmacy.businessName} secondary={pharmacy.businessAddress} />
+                        </ListItem>
+                    ))}
+                    {pharmacies.length === 0 && searchQuery.length > 0 && !isSearching && (
+                        <Typography sx={{ textAlign: 'center', mt: 2 }}>No pharmacies found.</Typography>
+                    )}
+                </List>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Cancel</Button>
+                <Button onClick={handleSwitch} disabled={!selectedPharmacy}>Confirm Switch</Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
+
 
 const AccountContent = ({ setView }: AccountContentProps) => {
     const { user: sessionUser, isLoading: isSessionLoading, refreshSession } = useSession();
@@ -129,6 +221,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     const [showSubscription, setShowSubscription] = useState(false);
     const [editingField, setEditingField] = useState<string | null>(null);
     const [fieldValue, setFieldValue] = useState<any>(null);
+    const [isSwitchingPharmacy, setIsSwitchingPharmacy] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -137,9 +230,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                 try {
                     setIsLoading(true);
                     const response = await fetch('/api/account');
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch account details.');
-                    }
+                    if (!response.ok) throw new Error('Failed to fetch account details.');
                     const data = await response.json();
                     setDetailedUser(data);
                 } catch (err: any) {
@@ -151,11 +242,8 @@ const AccountContent = ({ setView }: AccountContentProps) => {
         };
 
         if (!isSessionLoading) {
-            if (sessionUser) {
-                fetchUserData();
-            } else {
-                router.push('/auth');
-            }
+            if (sessionUser) fetchUserData();
+            else router.push('/auth');
         }
     }, [sessionUser, isSessionLoading, router]);
 
@@ -182,20 +270,35 @@ const AccountContent = ({ setView }: AccountContentProps) => {
         try {
             const response = await fetch('/api/account', {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ [fieldName]: newValue }),
             });
-
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.message || `Failed to update ${fieldName}.`);
             }
-
-            const updatedUser = await response.json();
-            setDetailedUser(updatedUser);
+            setDetailedUser(await response.json());
             handleCloseDialog();
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+
+    const handleSwitchPharmacy = async (pharmacyId: string) => {
+        try {
+            const response = await fetch('/api/account/switch-pharmacy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pharmacyId }),
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to switch pharmacy.');
+            }
+            // The API returns the updated pharmacist, so we update the state
+            const updatedPharmacist = await response.json();
+            setDetailedUser(updatedPharmacist);
+            setIsSwitchingPharmacy(false);
         } catch (err: any) {
             setError(err.message);
         }
@@ -260,9 +363,19 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                     <EditableListItem fieldName="mobile" label="Mobile" value={detailedUser.mobile} icon={<Phone />} />
                     <EditableListItem fieldName="stateOfPractice" label="State of Practice" value={detailedUser.stateOfPractice} icon={<LocationOn />} />
                     <EditableListItem fieldName="licenseNumber" label="License Number" value={detailedUser.licenseNumber} icon={<Assignment />} />
-                    <ListItem>
+                    <ListItem
+                        secondaryAction={
+                            <Button variant="outlined" size="small" onClick={() => setIsSwitchingPharmacy(true)}>
+                                Switch
+                            </Button>
+                        }
+                    >
                         <ListItemIcon sx={{ color: 'grey.800' }}><LocalHospital /></ListItemIcon>
-                        <ListItemText primary="Pharmacy" secondary={detailedUser.pharmacy || 'N/A'} secondaryTypographyProps={{ color: 'grey.600' }} />
+                        <ListItemText 
+                            primary="Pharmacy" 
+                            secondary={detailedUser.pharmacy?.businessName || 'N/A'} 
+                            secondaryTypographyProps={{ color: 'grey.600' }} 
+                        />
                     </ListItem>
                 </>
             );
@@ -356,7 +469,14 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                     <Button variant="contained" color="error" startIcon={<Logout />} onClick={handleLogout} fullWidth>Logout</Button>
                 </>
             )}
+            
             {editingField && <EditDialog open={!!editingField} onClose={handleCloseDialog} onSave={handleSave} fieldName={editingField} value={fieldValue} />}
+            
+            <SwitchPharmacyDialog 
+                open={isSwitchingPharmacy} 
+                onClose={() => setIsSwitchingPharmacy(false)} 
+                onSwitch={handleSwitchPharmacy} 
+            />
         </Paper>
     );
 };

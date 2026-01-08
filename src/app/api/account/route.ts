@@ -24,6 +24,7 @@ export async function GET() {
       throw new Error('Invalid token payload');
     }
 
+    // Correctly populate the pharmacy details without overwriting the object
     const user = await User.findById(userId)
       .select('-password')
       .populate({
@@ -34,11 +35,6 @@ export async function GET() {
 
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
-    }
-
-    // If user is a pharmacist and has a pharmacy, replace pharmacy object with its name
-    if (user.role === 'pharmacist' && user.pharmacy && typeof user.pharmacy === 'object') {
-      (user as any).pharmacy = (user.pharmacy as any).businessName;
     }
 
     return NextResponse.json(user, { status: 200 });
@@ -70,6 +66,7 @@ export async function PUT(req: Request) {
         }
 
         const body = await req.json();
+        // Destructure only the fields that are meant to be updated from this endpoint
         const { 
             username, 
             profilePicture, 
@@ -82,31 +79,32 @@ export async function PUT(req: Request) {
             licenseNumber
         } = body;
 
-        const updatedUserDoc = await User.findByIdAndUpdate(userId, {
-            username,
-            profilePicture,
-            businessName,
-            businessAddress,
-            city,
+        // Ensure only truthy values are being set to avoid overwriting with null/undefined
+        const updateData: { [key: string]: any } = { 
+            username, 
+            profilePicture, 
+            businessName, 
+            businessAddress, 
+            city, 
             state,
             mobile,
             stateOfPractice,
             licenseNumber
-        }, { new: true })
+        };
+
+        // Remove undefined keys so they don't overwrite existing values in the database
+        Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+
+        const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true })
         .select('-password')
         .populate({
             path: 'pharmacy',
             select: 'businessName'
-        });
+        })
+        .lean();
 
-        if (!updatedUserDoc) {
+        if (!updatedUser) {
             return NextResponse.json({ message: 'User not found' }, { status: 404 });
-        }
-        
-        const updatedUser = updatedUserDoc.toObject();
-
-        if (updatedUser.role === 'pharmacist' && updatedUser.pharmacy && typeof updatedUser.pharmacy === 'object') {
-          (updatedUser as any).pharmacy = (updatedUser.pharmacy as any).businessName;
         }
 
         return NextResponse.json(updatedUser, { status: 200 });

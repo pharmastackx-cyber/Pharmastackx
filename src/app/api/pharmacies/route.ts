@@ -16,7 +16,10 @@ export async function GET(req: NextRequest) {
 
     const query: any = { role: 'pharmacy' };
     if (searchQuery) {
-      query.businessName = { $regex: searchQuery, $options: 'i' };
+      query.$or = [
+        { businessName: { $regex: searchQuery, $options: 'i' } },
+        { businessAddress: { $regex: searchQuery, $options: 'i' } }
+      ];
     }
 
     let pharmaciesQuery = User.find(query)
@@ -31,6 +34,7 @@ export async function GET(req: NextRequest) {
 
     const pharmacies = await pharmaciesQuery.lean();
 
+    // The frontend expects an object containing the array, like { pharmacies: [...] }
     return NextResponse.json({ pharmacies }, { status: 200 });
 
   } catch (error) {
