@@ -24,13 +24,10 @@ export async function GET() {
       throw new Error('Invalid token payload');
     }
 
-    // Correctly populate the pharmacy details without overwriting the object
+    // Correctly populate the pharmacy details. Changed to populate the full document for robustness.
     const user = await User.findById(userId)
       .select('-password')
-      .populate({
-        path: 'pharmacy',
-        select: 'businessName' 
-      })
+      .populate('pharmacy') // Populate the full pharmacy document
       .lean();
 
     if (!user) {
@@ -66,7 +63,6 @@ export async function PUT(req: Request) {
         }
 
         const body = await req.json();
-        // Destructure only the fields that are meant to be updated from this endpoint
         const { 
             username, 
             profilePicture, 
@@ -79,7 +75,6 @@ export async function PUT(req: Request) {
             licenseNumber
         } = body;
 
-        // Ensure only truthy values are being set to avoid overwriting with null/undefined
         const updateData: { [key: string]: any } = { 
             username, 
             profilePicture, 
@@ -92,15 +87,11 @@ export async function PUT(req: Request) {
             licenseNumber
         };
 
-        // Remove undefined keys so they don't overwrite existing values in the database
         Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
         const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true })
         .select('-password')
-        .populate({
-            path: 'pharmacy',
-            select: 'businessName'
-        })
+        .populate('pharmacy') // Also changed here for consistency
         .lean();
 
         if (!updatedUser) {
