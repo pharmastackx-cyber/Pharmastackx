@@ -222,6 +222,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     const [editingField, setEditingField] = useState<string | null>(null);
     const [fieldValue, setFieldValue] = useState<any>(null);
     const [isSwitchingPharmacy, setIsSwitchingPharmacy] = useState(false);
+    const [pharmacists, setPharmacists] = useState<any[]>([]);
     const router = useRouter();
 
     useEffect(() => {
@@ -233,6 +234,16 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                     if (!response.ok) throw new Error('Failed to fetch account details.');
                     const data = await response.json();
                     setDetailedUser(data);
+
+                    if (data.role === 'pharmacy') {
+                        const pharmacistsResponse = await fetch('/api/account/pharmacists');
+                        if (pharmacistsResponse.ok) {
+                            const pharmacistsData = await pharmacistsResponse.json();
+                            setPharmacists(pharmacistsData.pharmacists);
+                        } else {
+                            console.error('Failed to fetch pharmacists');
+                        }
+                    }
                 } catch (err: any) {
                     setError(err.message);
                 } finally {
@@ -386,6 +397,26 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                     <EditableListItem fieldName="businessAddress" label="Business Address" value={detailedUser.businessAddress} icon={<LocationOn />} />
                     <EditableListItem fieldName="city" label="City" value={detailedUser.city} icon={<LocationOn />} />
                     <EditableListItem fieldName="state" label="State" value={detailedUser.state} icon={<LocationOn />} />
+                    <Divider sx={{ my: 2 }} />
+                    <Typography variant="h6" sx={{ mt: 2, mb: 1, pl: 2 }}>Connected Pharmacists</Typography>
+                    <List dense>
+                        {pharmacists.length > 0 ? (
+                            pharmacists.map(pharmacist => (
+                                <ListItem key={pharmacist._id}>
+                                    <ListItemIcon>
+                                        <Avatar src={pharmacist.profilePicture} sx={{ width: 32, height: 32 }}>
+                                            {pharmacist.username?.charAt(0).toUpperCase()}
+                                        </Avatar>
+                                    </ListItemIcon>
+                                    <ListItemText primary={pharmacist.username} secondary={pharmacist.email} />
+                                </ListItem>
+                            ))
+                        ) : (
+                            <ListItem>
+                                <ListItemText secondary="No pharmacists are connected to this pharmacy." />
+                            </ListItem>
+                        )}
+                    </List>
                 </>
             );
         }

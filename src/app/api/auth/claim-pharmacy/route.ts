@@ -1,10 +1,10 @@
 
-import { NextResponse, NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 import { dbConnect } from '@/lib/mongoConnect';
 import User from '@/models/User';
-import bcrypt from 'bcryptjs';
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     await dbConnect();
     const { businessName, email, password } = await req.json();
@@ -12,29 +12,37 @@ export async function POST(req: NextRequest) {
     if (!businessName || !email || !password) {
       return NextResponse.json({ error: 'Business name, email, and password are required.' }, { status: 400 });
     }
-
-    const existingPharmacy = await User.findOne({ businessName, role: 'pharmacy' });
-
-    if (!existingPharmacy) {
-      return NextResponse.json({ error: 'Pharmacy not found.' }, { status: 404 });
+    
+    const emailExists = await User.findOne({ email });
+    if (emailExists) {
+        return NextResponse.json({ error: 'This email is already in use. Please choose another one.' }, { status: 409 });
     }
 
-    if (existingPharmacy.email !== '1767503591446@pharmacy.placeholder') {
-        return NextResponse.json({ error: 'This pharmacy has already been claimed.' }, { status: 409 });
+    const claimablePharmacy = await User.findOne({
+      businessName,
+      role: 'pharmacy',
+      email: { $regex: /@pharmacy\.placeholder$/, $options: 'i' }
+    });
+
+    if (!claimablePharmacy) {
+      return NextResponse.json({ error: 'This pharmacy is not available to be claimed. It may have already been registered by another user.' }, { status: 404 });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    existingPharmacy.email = email;
-    existingPharmacy.password = hashedPassword;
-    existingPharmacy.emailVerified = false; 
+    claimablePharmacy.email = email;
+    claimablePharmacy.password = hashedPassword;
+    claimablePharmacy.emailVerified = false; 
     
-    await existingPharmacy.save();
+    await claimablePharmacy.save();
+    
+    return NextResponse.json({ message: 'Pharmacy claimed successfully. You can now log in.' }, { status: 200 });
 
-    return NextResponse.json({ message: 'Pharmacy claimed successfully. Please verify your email to activate your account.' }, { status: 200 });
-
-  } catch (error) {
+  } catch (error: any) {
     console.error("Claim Pharmacy API Error:", error);
+    if (error.code === 11000 && error.keyPattern && error.keyPattern.email) {
+        return NextResponse.json({ error: 'This email has just been taken. Please choose another one.' }, { status: 409 });
+    }
     return NextResponse.json({ error: 'An internal server error occurred.' }, { status: 500 });
   }
 }
