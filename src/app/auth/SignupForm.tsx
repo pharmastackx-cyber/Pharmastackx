@@ -4,6 +4,7 @@ import { TextField, Button, MenuItem, Box, Typography, InputAdornment, IconButto
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from "axios";
 import CreatePharmacyModal from "../components/CreatePharmacyModal";
+import ClaimPharmacyModal from "../components/ClaimPharmacyModal"; // Import the new modal
 import { useSession } from "@/context/SessionProvider";
 
 const nigerianStates = [
@@ -17,6 +18,9 @@ const nigerianStates = [
 interface Pharmacy {
   _id: string;
   businessName: string;
+  businessAddress?: string;
+  city?: string;
+  state?: string;
 }
 
 export default function SignupForm({ redirectUrl }: { redirectUrl: string | null; }) {
@@ -49,6 +53,11 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
   const [isCreatePharmacyModalOpen, setCreatePharmacyModalOpen] = useState(false);
   const [newlyCreatedPharmacy, setNewlyCreatedPharmacy] = useState<Pharmacy | null>(null);
 
+  const [unclaimedPharmacies, setUnclaimedPharmacies] = useState<Pharmacy[]>([]);
+  const [isClaimModalOpen, setClaimModalOpen] = useState(false);
+  const [isPharmacyClaimed, setIsPharmacyClaimed] = useState(false);
+  const [hasDeclinedClaim, setHasDeclinedClaim] = useState(false);
+
   const fetchPharmacies = useCallback(async () => {
     try {
       const { data } = await axios.get('/api/pharmacies?all=true');
@@ -70,32 +79,33 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
   }, [providerType, fetchPharmacies]);
 
   useEffect(() => {
-    if (newlyCreatedPharmacy && pharmacies.some(p => p._id === newlyCreatedPharmacy._id)) {
-      setPharmacies(prevPharmacies => {
-        const otherPharmacies = prevPharmacies.filter(p => p._id !== newlyCreatedPharmacy._id);
-        const newPharmacyFromList = prevPharmacies.find(p => p._id === newlyCreatedPharmacy._id);
-        if (newPharmacyFromList) {
-          const reorderedList = [newPharmacyFromList, ...otherPharmacies];
-          // Only reset if the operation was successful
-          setNewlyCreatedPharmacy(null);
-          return reorderedList;
+    const searchUnclaimed = async () => {
+      if (providerType === 'pharmacy' && form.businessName.length > 2 && !isPharmacyClaimed && !hasDeclinedClaim) {
+        try {
+          setProviderLoading(true);
+          const { data } = await axios.get(`/api/pharmacies?businessName=${form.businessName}`);
+          const unclaimed = data.pharmacies.filter((p: any) => p.email.includes('@pharmacy.placeholder'));
+          if (unclaimed.length > 0) {
+            setUnclaimedPharmacies(unclaimed);
+            setClaimModalOpen(true);
+          }
+        } catch (error) {
+          console.error("Error searching for unclaimed pharmacies", error);
+          setError('Could not verify business name. Please try again.');
+        } finally {
+          setProviderLoading(false);
         }
-        return prevPharmacies;
-      });
-    }
-  }, [pharmacies, newlyCreatedPharmacy]);
+      }
+    };
+    const handler = setTimeout(() => {
+      searchUnclaimed();
+    }, 1000);
 
-
-  useEffect(() => {
-    if (newlyCreatedPharmacy && pharmacies.some(p => p._id === newlyCreatedPharmacy._id)) {
-      const reorderedList = [
-        newlyCreatedPharmacy,
-        ...pharmacies.filter(p => p._id !== newlyCreatedPharmacy._id),
-      ];
-      setPharmacies(reorderedList);
-      setNewlyCreatedPharmacy(null);
-    }
-  }, [pharmacies, newlyCreatedPharmacy]);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [form.businessName, providerType, isPharmacyClaimed, hasDeclinedClaim]);
+  
 
   const handlePharmacySearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setPharmacySearch(event.target.value);
@@ -112,6 +122,10 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
       return;
     }
     setForm((prevForm) => ({ ...prevForm, [name as string]: value }));
+    if (name === 'businessName') {
+      setHasDeclinedClaim(false);
+      setError("");
+    }
   };
 
   const handleClickShowPassword = () => setShowPassword((show) => !show);
@@ -153,17 +167,34 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
     setError("");
     setSuccess("");
     setProviderLoading(true);
-
+  
+    if (isPharmacyClaimed) {
+      try {
+        await axios.post("/api/auth/claim-pharmacy", {
+          businessName: form.businessName,
+          email: form.email,
+          password: form.password,
+        });
+        const loginResponse = await axios.post("/api/auth/login", { email: form.email, password: form.password });
+        setSuccess("Pharmacy claimed successfully! Redirecting...");
+        await refreshSession();
+        redirectToApp(loginResponse.data.user?.role);
+      } catch (err: any) {
+        setError(err.response?.data?.error || "Failed to claim pharmacy.");
+        setProviderLoading(false);
+      }
+      return;
+    }
+  
     const { username, email, password, mobile, licenseNumber, stateOfPractice, pharmacy, businessName, state, city, businessAddress, phoneNumber, license } = form;
-
     let payload: any = { username, email, password, role: providerType };
-
+  
     if (providerType === 'pharmacist') {
       payload = { ...payload, mobile, licenseNumber, stateOfPractice, pharmacy };
     } else {
       payload = { ...payload, businessName, state, city, businessAddress, phoneNumber, license };
     }
-
+  
     try {
       await axios.post("/api/auth/signup", payload);
       const res = await axios.post("/api/auth/login", { email: form.email, password: form.password });
@@ -171,7 +202,12 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
       await refreshSession();
       redirectToApp(res.data.user?.role);
     } catch (err: any) {
-      setError(err.response?.data?.error || "Provider signup failed. Please check your information.");
+      if (err.response?.data?.claimable) {
+        setError("This pharmacy already exists. Please claim it to continue.");
+        setClaimModalOpen(true);
+      } else {
+        setError(err.response?.data?.error || "Provider signup failed. Please check your information.");
+      }
       setProviderLoading(false);
     }
   };
@@ -182,6 +218,24 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
     setPharmacySearch("");
     setNewlyCreatedPharmacy(newPharmacy);
     await fetchPharmacies();
+  };
+
+  const handleSelectPharmacyToClaim = (pharmacy: Pharmacy) => {
+    setForm(prev => ({
+      ...prev,
+      businessName: pharmacy.businessName,
+      businessAddress: pharmacy.businessAddress || "",
+      city: pharmacy.city || "",
+      state: pharmacy.state || "",
+    }));
+    setIsPharmacyClaimed(true);
+    setClaimModalOpen(false);
+    setSuccess(`You are claiming "${pharmacy.businessName}". Please enter your email and password to finalize.`);
+  };
+
+  const handleDeclineClaim = () => {
+    setClaimModalOpen(false);
+    setHasDeclinedClaim(true);
   };
 
   
@@ -196,7 +250,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
   return (
     <>
      {(error || success) && (
-        <Alert severity={error ? "error" : "success"} sx={{ mb: 2, mt: 1 }}>
+        <Alert severity={error ? "error" : "success"} sx={{ mb: 2, mt: 1, whiteSpace: 'pre-wrap' }}>
           {error || success}
         </Alert>
       )}
@@ -258,7 +312,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
             Service Provider Registration
           </Typography>
           <form onSubmit={handleProviderSignup}>
-            <TextField label="Username" name="username" value={form.username} onChange={handleChange} fullWidth margin="normal" required disabled={providerLoading} />
+            {!isPharmacyClaimed && <TextField label="Username" name="username" value={form.username} onChange={handleChange} fullWidth margin="normal" required disabled={providerLoading} />}
             <TextField label="Email" name="email" type="email" value={form.email} onChange={handleChange} fullWidth margin="normal" required disabled={providerLoading} />
             <TextField
               label="Password"
@@ -280,7 +334,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
                 ),
               }}
             />
-            <TextField select label="Provider Type" name="providerType" value={providerType} onChange={(e) => setProviderType(e.target.value)} fullWidth margin="normal" required disabled={providerLoading} >
+            <TextField select label="Provider Type" name="providerType" value={providerType} onChange={(e) => setProviderType(e.target.value)} fullWidth margin="normal" required disabled={providerLoading || isPharmacyClaimed} >
               {providerTypes.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
             </TextField>
             
@@ -303,14 +357,14 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
 
             {providerType && providerType !== 'pharmacist' && (
               <>
-                <TextField label="Business Name" name="businessName" value={form.businessName || ""} onChange={handleChange} fullWidth margin="normal" required />
-                <TextField select label="State" name="state" value={form.state || ""} onChange={handleChange} fullWidth margin="normal" required >
+                <TextField label="Business Name" name="businessName" value={form.businessName || ""} onChange={handleChange} fullWidth margin="normal" required disabled={isPharmacyClaimed || providerLoading} />
+                <TextField select label="State" name="state" value={form.state || ""} onChange={handleChange} fullWidth margin="normal" required disabled={isPharmacyClaimed || providerLoading}>
                   {nigerianStates.map((state) => <MenuItem key={state} value={state}>{state}</MenuItem>)}
                 </TextField>
-                <TextField label="City" name="city" value={form.city || ""} onChange={handleChange} fullWidth margin="normal" required />
-                <TextField label="Business Address" name="businessAddress" value={form.businessAddress || ""} onChange={handleChange} fullWidth margin="normal" required />
-                <TextField label="Phone Number" name="phoneNumber" value={form.phoneNumber || ""} onChange={handleChange} fullWidth margin="normal" required />
-                <TextField label="License (optional)" name="license" value={form.license || ""} onChange={handleChange} fullWidth margin="normal" />
+                <TextField label="City" name="city" value={form.city || ""} onChange={handleChange} fullWidth margin="normal" required disabled={isPharmacyClaimed || providerLoading}/>
+                <TextField label="Business Address" name="businessAddress" value={form.businessAddress || ""} onChange={handleChange} fullWidth margin="normal" required disabled={isPharmacyClaimed || providerLoading}/>
+                {!isPharmacyClaimed && <TextField label="Phone Number" name="phoneNumber" value={form.phoneNumber || ""} onChange={handleChange} fullWidth margin="normal" required />}
+                {!isPharmacyClaimed && <TextField label="License (optional)" name="license" value={form.license || ""} onChange={handleChange} fullWidth margin="normal" />}
               </>
             )}
 
@@ -328,7 +382,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
                     '&:hover': { bgcolor: 'darkcyan' }
                 }}
             >
-              {providerLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : `Sign Up as ${providerType.charAt(0).toUpperCase() + providerType.slice(1)}`}
+              {providerLoading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : isPharmacyClaimed ? 'Claim Pharmacy & Sign Up' : `Sign Up as ${providerType.charAt(0).toUpperCase() + providerType.slice(1)}`}
             </Button>
             <Button variant="text" sx={{ mt: 1 }} fullWidth onClick={() => setShowProviderStep(false)}>
               Back
@@ -339,6 +393,12 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
             onClose={() => setCreatePharmacyModalOpen(false)}
             onPharmacyCreated={handlePharmacyCreated}
             setError={setError}
+          />
+          <ClaimPharmacyModal 
+            open={isClaimModalOpen}
+            onClose={handleDeclineClaim}
+            pharmacies={unclaimedPharmacies}
+            onSelectPharmacy={handleSelectPharmacyToClaim}
           />
         </Box>
       )}
