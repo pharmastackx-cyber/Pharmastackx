@@ -73,16 +73,16 @@ const CreatePharmacyModal: React.FC<CreatePharmacyModalProps> = ({ open, onClose
         <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
           Add your Pharmacy
         </Typography>
-        <TextField label="Business Name" name="businessName" value={form.businessName} onChange={handleChange} fullWidth margin="normal" required />
+        <TextField label="Whats your Pharmacy Name" name="businessName" value={form.businessName} onChange={handleChange} fullWidth margin="normal" required />
         <TextField select label="State" name="state" value={form.state} onChange={handleChange} fullWidth margin="normal" required>
           {nigerianStates.map((state) => (
             <MenuItem key={state} value={state}>{state}</MenuItem>
           ))}
         </TextField>
         <TextField label="City" name="city" value={form.city} onChange={handleChange} fullWidth margin="normal" required />
-        <TextField label="Business Address" name="businessAddress" value={form.businessAddress} onChange={handleChange} fullWidth margin="normal" required />
-        <TextField label="Phone Number" name="phoneNumber" value={form.phoneNumber} onChange={handleChange} fullWidth margin="normal" required />
-        <TextField label="License (optional)" name="license" value={form.license} onChange={handleChange} fullWidth margin="normal" />
+        <TextField label="Whats the Address of your Pharmacy" name="businessAddress" value={form.businessAddress} onChange={handleChange} fullWidth margin="normal" required />
+        <TextField label="Phone Number of the MD/Superintendent" name="phoneNumber" value={form.phoneNumber} onChange={handleChange} fullWidth margin="normal" required />
+        <TextField label="License of the Pharmacy (optional)" name="license" value={form.license} onChange={handleChange} fullWidth margin="normal" />
         <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
           <Button onClick={onClose} color="secondary">Cancel</Button>
           <Button onClick={handleCreate} variant="contained" disabled={creating}>

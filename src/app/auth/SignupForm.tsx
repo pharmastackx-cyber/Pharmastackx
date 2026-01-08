@@ -295,7 +295,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
                   <ListSubheader>
                     <TextField size="small" autoFocus placeholder="Type to search..." fullWidth value={pharmacySearch} onChange={handlePharmacySearchChange} onKeyDown={(e) => e.stopPropagation()} variant="standard" />
                   </ListSubheader>
-                  <MenuItem value="create-new">+ Create New Pharmacy</MenuItem>
+                  <MenuItem value="create-new" sx={{ fontWeight: 'bold', color: 'darkmagenta' }}>+ Add your pharmacy info if not on the list</MenuItem>
                   {filteredPharmacies.map((p) => <MenuItem key={p._id} value={p._id}>{p.businessName}</MenuItem>)}
                 </TextField>
               </>
