@@ -80,6 +80,22 @@ export async function POST(req) {
 
     await newUser.save();
     
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+    const protocol = req.headers.get('x-forwarded-proto') || 'https';
+    const baseUrl = `${protocol}://${host}`;
+
+    // Notify admin
+    fetch(`${baseUrl}/api/notify-admin`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            userName: newUser.username,
+            userRole: newUser.role,
+        }),
+    });
+
     // Use the reliable verification method from the "resend" flow.
     const emailVerificationToken = crypto.randomBytes(32).toString('hex');
     const emailVerificationTokenExpires = new Date(Date.now() + 3600000); // 1 hour
@@ -88,10 +104,6 @@ export async function POST(req) {
     newUser.emailVerificationTokenExpires = emailVerificationTokenExpires;
     await newUser.save();
 
-
-    const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
-    const protocol = req.headers.get('x-forwarded-proto') || 'https';
-    const baseUrl = `${protocol}://${host}`;
     const verificationUrl = `${baseUrl}/api/auth/verify-and-redirect?token=${emailVerificationToken}`;
 
     await transporter.sendMail({

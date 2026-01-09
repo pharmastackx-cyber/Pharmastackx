@@ -5,10 +5,10 @@ import { dbConnect } from '@/lib/mongoConnect';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import UserModel from '@/models/User';
 
-async function getPharmacistTokens(): Promise<string[]> {
+async function getRecipientTokens(): Promise<string[]> {
     await dbConnect();
     const users = await UserModel.find(
-        { role: 'pharmacist', fcmTokens: { $nin: [null, []] } },
+        { role: { $in: ['pharmacist', 'admin'] }, fcmTokens: { $nin: [null, []] } },
         { fcmTokens: 1, _id: 0 }
     ).lean();
     return users.flatMap(user => user.fcmTokens).filter(Boolean) as string[];
@@ -45,10 +45,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: 'Request ID is required' }, { status: 400 });
         }
 
-        const tokens = await getPharmacistTokens();
+        const tokens = await getRecipientTokens();
 
         if (tokens.length === 0) {
-            return NextResponse.json({ message: 'No pharmacists to notify' }, { status: 200 });
+            return NextResponse.json({ message: 'No recipients to notify' }, { status: 200 });
         }
 
         const admin = getFirebaseAdmin();
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         const response = await admin.messaging().sendEachForMulticast(message as any);
         console.log('Successfully sent message:', response);
 
-        return NextResponse.json({ success: true, message: `Notified ${response.successCount} pharmacists.` });
+        return NextResponse.json({ success: true, message: `Notified ${response.successCount} recipients.` });
 
     } catch (error) {
         console.error('Error sending notification:', error);

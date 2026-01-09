@@ -389,7 +389,8 @@ useEffect(() => {
             <Grid container spacing={2} sx={{ flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'left', justifyContent: 'center' }}>
                 
                 {/* Store Management Button: Pharmacy or authorized Pharmacist only */}
-{detailedUser && (detailedUser.role === 'pharmacy' || (detailedUser.role === 'pharmacist' && detailedUser.canManageStore)) && (
+                {detailedUser && (detailedUser.role === 'pharmacy' || (detailedUser.role === 'pharmacist' && detailedUser.canManageStore) || detailedUser.role === 'admin') && (
+
     <Grid item xs="auto">
         <motion.div layoutId="store-management-header">
             <Button variant="contained" onClick={() => setView('storeManagement')}
@@ -402,7 +403,8 @@ useEffect(() => {
 
         
                 {/* Order Requests Button: Pharmacy/Pharmacist only */}
-                {normalizedUser && ['pharmacy', 'pharmacist'].includes(normalizedUser.role) && (
+                {normalizedUser && ['pharmacy', 'pharmacist', 'admin'].includes(normalizedUser.role) && (
+
                     <Grid item xs="auto">
                         <motion.div layoutId="order-requests-header">
                             <Button variant="contained" size="small" onClick={() => setView('orderRequests')}
@@ -414,7 +416,8 @@ useEffect(() => {
                 )}
         
                 {/* Medicine Restock Button: Pharmacy/Pharmacist/Clinic only */}
-                {normalizedUser && ['pharmacy', 'pharmacist', 'clinic'].includes(normalizedUser.role) && (
+                {normalizedUser && ['pharmacy', 'pharmacist', 'clinic', 'admin'].includes(normalizedUser.role) && (
+
                     <Grid item xs="auto">
                         <motion.div>
                             <Button variant="contained" size="small" onClick={() => setView('medicineRestock')}
