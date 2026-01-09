@@ -50,9 +50,9 @@ interface UnifiedUser {
   email?: string;
   role: string;
   profilePicture?: string;
-  canManageStore?: boolean; // Add this line
+  canManageStore?: boolean;
+  fcmTokens?: string[];
 }
-
 
 const MapBackground = dynamic(() => import('@/components/MapBackground'), {
   ssr: false,
@@ -298,37 +298,30 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    // This effect runs when the loading state changes.
     const isPWA = typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches;
     const hasNotificationSupport = 'Notification' in window;
   
-    // Only proceed if running as a PWA, notifications are supported, and the session has been checked.
-    if (isPWA && hasNotificationSupport && !isLoading) {
+    // We need detailedUser to check for fcmTokens, so we wait for it.
+    if (isPWA && hasNotificationSupport && !isLoading && detailedUser) {
       const currentPermission = Notification.permission;
-      setPermission(currentPermission); // Keep our state in sync
+      setPermission(currentPermission);
   
-      if (currentPermission === 'default') {
-        // If the user is logged in and permission is undecided, show our prompt.
-        if (user) {
-          setShowNotificationPrompt(true);
-        }
-      } else if (currentPermission === 'granted' && user) {
-        // If permission is granted and a user is logged in, sync their token.
-        console.log('Permission granted. Syncing token for logged-in user...');
+      const hasFcmTokens = detailedUser.fcmTokens && detailedUser.fcmTokens.length > 0;
+      const isTargetRole = ['pharmacist', 'pharmacy'].includes(detailedUser.role);
+  
+      // Show the prompt if the user is a target role and either:
+      // 1. They haven't set a notification permission yet ('default').
+      // 2. They have granted permission, but we don't have a token for them on the backend.
+      if (isTargetRole && currentPermission !== 'denied' && (currentPermission === 'default' || !hasFcmTokens)) {
+        setShowNotificationPrompt(true);
+      } else if (currentPermission === 'granted' && isTargetRole && !hasFcmTokens) {
+        // If permission is granted but the token is missing, try to sync it.
+        console.log('Permission granted, but token missing. Syncing token...');
         requestPermission();
       }
-      // If permission is 'denied', or if there's no user, we do nothing.
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, user]); // Re-run when loading status or user changes.
-
+  }, [isLoading, detailedUser]); // Depend on detailedUser now
   
-
-
-  
-  
-  
-
 
   const renderWelcomeView = () => (
     <Box
@@ -860,7 +853,7 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
                   {notificationError}
                 </Typography>
                 <Button onClick={requestPermission} variant="contained">
-                  Retry
+                  Close the app, come back and Retry
                 </Button>
               </Box>
             )}
