@@ -1,7 +1,7 @@
 
 "use client";
+import { useState, useEffect, useCallback } from "react";
 
-import { useState, useEffect } from "react";
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
@@ -160,10 +160,12 @@ const requestPermission = async () => {
         });
         
 
-          if (response.ok) {
-            console.log('FCM token saved successfully.');
-            setNotificationSyncStatus('success');
-          } else {
+        if (response.ok) {
+          console.log('FCM token saved successfully.');
+          setNotificationSyncStatus('success');
+          fetchDetailedUser(); // Re-fetch user data here
+        } else {
+
             const errorData = await response.json();
             console.error('Failed to save FCM token:', errorData.message);
             setNotificationError(errorData.message || 'Failed to save token.');
@@ -192,29 +194,31 @@ const requestPermission = async () => {
 };
 
 const [detailedUser, setDetailedUser] = useState<UnifiedUser | null>(null);
-useEffect(() => {
-  const fetchDetailedUser = async () => {
-      // Fetch only if we have a session user and haven't fetched full details yet
-      if (user && !detailedUser) { 
-          try {
-              const response = await fetch('/api/account', { credentials: 'include' });
-              if (response.ok) {
-                  const data = await response.json();
-                  setDetailedUser(data); // Store the full user object
-              } else {
-                  console.error("Failed to fetch detailed user data for access control.");
-              }
-          } catch (error) {
-              console.error("Error fetching detailed user data:", error);
-          }
-      } else if (!user) {
-          // If user logs out, clear the detailed user state
-          setDetailedUser(null);
-      }
-  };
+  // This defines the function to fetch user data
+  const fetchDetailedUser = useCallback(async () => {
+    if (user) {
+        try {
+            const response = await fetch('/api/account', { credentials: 'include' });
+            if (response.ok) {
+                const data = await response.json();
+                setDetailedUser(data);
+            } else {
+                console.error("Failed to fetch detailed user data for access control.");
+            }
+        } catch (error) {
+            console.error("Error fetching detailed user data:", error);
+        }
+    } else {
+        setDetailedUser(null);
+    }
+  }, [user]);
 
-  fetchDetailedUser();
-}, [user, detailedUser]);
+  // This hook calls the function when the component loads or the function changes
+  useEffect(() => {
+    fetchDetailedUser();
+  }, [fetchDetailedUser]);
+
+
 
 const normalizedUser: UnifiedUser | null = user ? { ...user, _id: (user as any)._id } : null;
 
@@ -842,10 +846,16 @@ const renderPageView = (title: string, layoutId: string, children?: React.ReactN
             {notificationSyncStatus === 'syncing' && <CircularProgress sx={{ mb: 2 }} />}
 
             {notificationSyncStatus === 'success' && (
-              <Typography sx={{ mb: 2 }}>
-                You will now receive notifications for drug searches.
-              </Typography>
+              <Box>
+                <Typography sx={{ mb: 2 }}>
+                  You will now receive notifications for drug searches.
+                </Typography>
+                <Button onClick={() => setShowNotificationPrompt(false)} variant="contained">
+                  Close
+                </Button>
+              </Box>
             )}
+
 
             {notificationSyncStatus === 'error' && (
               <Box>
