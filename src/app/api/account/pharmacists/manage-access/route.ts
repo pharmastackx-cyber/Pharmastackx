@@ -1,71 +1,79 @@
 
-import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongoConnect';
 import User from '@/models/User';
-import { cookies } from 'next/headers';
+import mongoose from 'mongoose'; // Import mongoose to use ObjectId
 
-const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
+export async function PUT(request: Request) {
+    await dbConnect();
 
-export async function PUT(req: NextRequest) {
-    console.log('--- [PUT /api/account/pharmacists/manage-access] Received request ---');
+    // Correctly fetch the session on the server-side
+    const host = request.headers.get('host');
+    const protocol = request.headers.get('x-forwarded-proto') || 'http';
+    const sessionResponse = await fetch(`${protocol}://${host}/api/auth/session`, {
+        headers: {
+            cookie: request.headers.get('cookie') || '',
+        },
+    });
+
+    if (!sessionResponse.ok) {
+        return NextResponse.json({ message: 'Failed to fetch session' }, { status: sessionResponse.status });
+    }
+
+    const session = await sessionResponse.json();
+
+    if (!session?.user?._id) {
+        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
-        await dbConnect();
-        console.log('Database connected.');
-
-        const cookieStore = await cookies();
-        const sessionToken = cookieStore.get('session_token');
-
-        if (!sessionToken) {
-            console.log('Authentication failed: No session_token found.');
-            return NextResponse.json({ message: 'Authentication failed' }, { status: 401 });
-        }
-        console.log('session_token found.');
-
-        const payload = jwt.verify(sessionToken.value, JWT_SECRET) as { userId: string };
-        const pharmacyUser = await User.findById(payload.userId).lean();
-
-        if (!pharmacyUser || pharmacyUser.role !== 'pharmacy') {
-            console.log(`Unauthorized access attempt. User ID: ${payload.userId}, Role: ${pharmacyUser?.role}`);
-            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-        }
-        console.log(`Authenticated as pharmacy: ${pharmacyUser.username} (ID: ${pharmacyUser._id})`);
-
-        const { pharmacistId, canManageStore } = await req.json();
+        // The pharmacy owner's ID from the session is a STRING
+        const pharmacyOwnerId = session.user._id;
+        const { pharmacistId, canManageStore } = await request.json();
 
         if (!pharmacistId || typeof canManageStore !== 'boolean') {
-            return NextResponse.json({ message: 'Invalid request body' }, { status: 400 });
+            return NextResponse.json({ message: 'Invalid input: pharmacistId and canManageStore are required.' }, { status: 400 });
         }
 
-        const pharmacist = await User.findById(pharmacistId);
+        // The pharmacistId from the request body needs to be converted to an ObjectId
+        if (!mongoose.Types.ObjectId.isValid(pharmacistId)) {
+            return NextResponse.json({ message: 'Invalid Pharmacist ID format' }, { status: 400 });
+        }
+        const pharmacistObjectId = new mongoose.Types.ObjectId(pharmacistId);
 
-        if (!pharmacist || pharmacist.role !== 'pharmacist' || pharmacist.pharmacy?.toString() !== pharmacyUser._id.toString()) {
-            return NextResponse.json({ message: 'Pharmacist not found or not associated with this pharmacy' }, { status: 404 });
+        // Atomically find and update the document.
+        const updatedPharmacist = await User.findOneAndUpdate(
+            // The query now matches the schema exactly:
+            // - _id is an ObjectId
+            // - pharmacy is a String
+            { 
+                _id: pharmacistObjectId, 
+                pharmacy: pharmacyOwnerId, // This must be a string as per the schema
+                role: 'pharmacist' 
+            },
+            // Update
+            { $set: { canManageStore: canManageStore } },
+            // Options
+            { new: true }
+        );
+
+        if (!updatedPharmacist) {
+            // This will now correctly trigger if the pharmacist doesn't exist or isn't linked to this pharmacy
+            return NextResponse.json({ message: 'Update failed: The specified pharmacist is not linked to your pharmacy.' }, { status: 404 });
         }
 
-        pharmacist.canManageStore = canManageStore;
-        await pharmacist.save();
+        console.log(`DATABASE WRITE CONFIRMED: Updated canManageStore for pharmacist ${updatedPharmacist.username} to ${canManageStore}`);
 
-        console.log(`Successfully updated canManageStore for pharmacist ${pharmacistId} to ${canManageStore}`);
-
-        // Return the updated list of pharmacists
+        // Re-fetch the complete list to send to the frontend.
         const pharmacists = await User.find({
             role: 'pharmacist',
-            pharmacy: pharmacyUser._id.toString(),
-        }).select('username email profilePicture canManageStore').lean();
+            pharmacy: pharmacyOwnerId, // Query by the string ID
+        }).select('_id username email profilePicture canManageStore').lean();
 
         return NextResponse.json({ pharmacists }, { status: 200 });
 
     } catch (error: any) {
-        console.error('--- [ERROR in /api/account/pharmacists/manage-access] ---');
-        console.error(`Error occurred: ${error.message}`);
-        console.error(error.stack);
-        if (error instanceof jwt.JsonWebTokenError) {
-            return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
-        }
-        return NextResponse.json({ 
-            message: 'An internal server error occurred.',
-            error: error.message
-        }, { status: 500 });
+        console.error('Error in manage-access endpoint:', error);
+        return NextResponse.json({ message: `Server error: ${error.message || 'An unknown error occurred'}` }, { status: 500 });
     }
 }

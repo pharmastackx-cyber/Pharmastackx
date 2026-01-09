@@ -239,13 +239,19 @@ const AccountContent = ({ setView }: AccountContentProps) => {
             if (sessionUser) {
                 try {
                     setIsLoading(true);
-                    const response = await fetch('/api/account', { credentials: 'include' });
+                    const response = await fetch('/api/account', { 
+                        credentials: 'include',
+                        cache: 'no-store' // Ensure fresh data on every fetch
+                    });
                     if (!response.ok) throw new Error('Failed to fetch account details.');
                     const data = await response.json();
                     setDetailedUser(data);
 
                     if (data.role === 'pharmacy') {
-                        const pharmacistsResponse = await fetch('/api/account/pharmacists', { credentials: 'include' });
+                        const pharmacistsResponse = await fetch('/api/account/pharmacists', { 
+                            credentials: 'include',
+                            cache: 'no-store' // Ensure fresh data on every fetch
+                        });
                         if (pharmacistsResponse.ok) {
                             const pharmacistsData = await pharmacistsResponse.json();
                             setPharmacists(pharmacistsData.pharmacists);
@@ -273,11 +279,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
         setIsUpdatingAccess(true);
         setAccessUpdateResult(null);
 
-        // Optimistically update the UI
-        setPharmacists(prev => prev.map(p => p._id === pharmacistId ? { ...p, canManageStore } : p));
-
         try {
-            console.log(`Attempting to update access for pharmacist ${pharmacistId} to ${canManageStore}`);
             const response = await fetch('/api/account/pharmacists/manage-access', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -288,19 +290,14 @@ const AccountContent = ({ setView }: AccountContentProps) => {
             const responseBody = await response.json();
 
             if (!response.ok) {
-                console.error("API Error:", responseBody);
                 throw new Error(responseBody.message || 'An unknown error occurred on the server.');
             }
-
-            console.log("Access update successful, API returned:", responseBody);
+            
             setAccessUpdateResult({ status: 'success', message: 'Access updated successfully!' });
-            setPharmacists(responseBody.pharmacists); // Sync with the server's response
+            router.refresh(); // This is the key fix: invalidate the cache and re-fetch data.
 
         } catch (err: any) {
-            console.error("Failed to update access:", err);
             setAccessUpdateResult({ status: 'error', message: `Update failed: ${err.message}` });
-            // Revert the optimistic update on failure
-            setPharmacists(prev => prev.map(p => p._id === pharmacistId ? { ...p, canManageStore: !canManageStore } : p));
         } finally {
             setIsUpdatingAccess(false);
         }
@@ -308,7 +305,6 @@ const AccountContent = ({ setView }: AccountContentProps) => {
     
     const handleCloseAccessModal = () => {
         setIsAccessModalOpen(false);
-        // Delay resetting the result to avoid flash of content
         setTimeout(() => {
             setAccessUpdateResult(null);
         }, 300);
@@ -344,7 +340,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                 const errorData = await response.json();
                 throw new Error(errorData.message || `Failed to update ${fieldName}.`);
             }
-            setDetailedUser(await response.json());
+            router.refresh(); // Refresh data after saving
             handleCloseDialog();
         } catch (err: any) {
             setError(err.message);
@@ -362,8 +358,7 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Failed to switch pharmacy.');
             }
-            const updatedPharmacist = await response.json();
-            setDetailedUser(updatedPharmacist);
+            router.refresh(); // Refresh data after switching
             setIsSwitchingPharmacy(false);
         } catch (err: any) {
             setError(err.message);
@@ -391,8 +386,8 @@ const AccountContent = ({ setView }: AccountContentProps) => {
         try {
             const response = await fetch('/api/account/upload-verification', { method: 'POST', body: formData });
             if (!response.ok) throw new Error('File upload failed.');
-            setDetailedUser(prev => prev ? { ...prev, professionalVerificationStatus: 'pending_review' } : null);
             setUploadStatus('success');
+            router.refresh(); // Refresh to show new status
         } catch (err) {
             setUploadStatus('error');
         }
@@ -464,7 +459,6 @@ const AccountContent = ({ setView }: AccountContentProps) => {
                                                 checked={pharmacist.canManageStore}
                                                 onChange={(e) => handleAccessChange(pharmacist._id, e.target.checked)}
                                                 edge="end"
-                                                disabled={isUpdatingAccess}
                                             />
                                         }
                                         label="Store Access"
