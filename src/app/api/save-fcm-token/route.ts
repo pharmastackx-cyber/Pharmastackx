@@ -68,6 +68,9 @@ export async function POST(request: Request) {
 
       // Send a confirmation notification
       try {
+        // Wait for 2 seconds to give the client time to be ready for the push notification
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
         const message = {
           notification: {
             title: 'Notification Configured',
@@ -77,7 +80,7 @@ export async function POST(request: Request) {
         };
 
         await admin.messaging().send(message);
-        console.log('Successfully sent confirmation message.');
+        console.log('Successfully sent confirmation message after delay.');
       } catch (error) {
         console.error('Error sending confirmation message:', error);
         // We don't want to fail the whole request if the notification fails

@@ -156,16 +156,17 @@ const requestPermission = async () => {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ token: fcmToken }),
-            credentials: 'include', // Send cookies with the request
+            credentials: 'include',
         });
         
-
         if (response.ok) {
-          console.log('FCM token saved successfully.');
-          setNotificationSyncStatus('success');
-          fetchDetailedUser(); // Re-fetch user data here
+          console.log('FCM token saved to server. Now re-fetching user data...');
+          // This is the crucial change:
+          // We WAIT for the user data to be fetched BEFORE setting success.
+          await fetchDetailedUser(); 
+          console.log('User data re-fetched. Sync complete.');
+          setNotificationSyncStatus('success'); // NOW we show the success message.
         } else {
-
             const errorData = await response.json();
             console.error('Failed to save FCM token:', errorData.message);
             setNotificationError(errorData.message || 'Failed to save token.');
@@ -177,21 +178,22 @@ const requestPermission = async () => {
           setNotificationSyncStatus('error');
         }
       } else {
-        console.log('Can not get token, need to ask user to enable it in browser settings.');
+        console.log('Could not get FCM token.');
         setNotificationError('Could not get notification token. Please check your browser settings.');
         setNotificationSyncStatus('error');
       }
     } else {
       console.log('Notification permission denied.');
-      // If permission is denied, we don't treat it as an error, but we stop the process.
+      // If permission is denied, we don't treat it as an error.
       setNotificationSyncStatus('idle'); 
     }
   } catch (error: any) {
-    console.error('An error occurred while requesting permission ', error);
-    setNotificationError(error.message || 'An unknown error occurred while requesting permission.');
+    console.error('An error occurred during the permission request process: ', error);
+    setNotificationError(error.message || 'An unknown error occurred.');
     setNotificationSyncStatus('error');
   }
 };
+
 
 const [detailedUser, setDetailedUser] = useState<UnifiedUser | null>(null);
   // This defines the function to fetch user data
