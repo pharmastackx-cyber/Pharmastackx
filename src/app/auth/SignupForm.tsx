@@ -232,8 +232,9 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
 
   
   const providerTypes = [
-    { label: "Pharmacy", value: "pharmacy" },
     { label: "Pharmacist", value: "pharmacist" },
+    { label: "Pharmacy Owner", value: "pharmacy" },
+    
     { label: "Clinic", value: "clinic" },
     { label: "Vendor", value: "vendor" },
     { label: "Delivery Agent", value: "agent" },
@@ -270,33 +271,35 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
               ),
             }}
           />
-          <Button
-            type="submit"
-            variant="contained"
-            fullWidth
-            disabled={loading || !form.username || !form.email || !form.password}
-            sx={{
-                mt: 2,
-                py: 1.5,
-                fontWeight: 'bold',
-                bgcolor: 'teal',
-                color: 'white',
-                '&:hover': { bgcolor: 'darkcyan' }
-            }}
-            >
-            {loading ? <CircularProgress size={24} sx={{ color: 'white' }}/> : "Sign Up as a Customer"}
-            </Button>
-            <Typography variant="body2" sx={{ textAlign: 'center', my: 2, color: 'text.secondary' }}>
-                Are you a pharmacy, clinic, or other service provider?
+                    <Button
+        type="submit"
+        variant="contained"
+        fullWidth
+        disabled={loading || !form.username || !form.email || !form.password}
+        sx={{
+            mt: 0.3,
+            py: 1,
+            fontWeight: 100,
+            bgcolor: 'teal',
+            color: 'white',
+            '&:hover': { bgcolor: 'darkcyan' }
+        }}
+        >
+        {loading ? <CircularProgress size={24} sx={{ color: 'white' }}/> : "Sign Up as a Customer"}
+        </Button>
+
+            <Typography variant="body2" sx={{ textAlign: 'center', my: 0.2, color: 'text.secondary' }}>
+                Pharmacist, Pharmacy owners and clinics should sign up as service providers?
             </Typography>
             <Button 
-                variant="outlined" 
-                color="secondary"
-                fullWidth sx={{ mt: 1, py: 1.5 }} 
-                onClick={() => setShowProviderStep(true)}
-            >
-                Join as a Service Provider
-            </Button>
+            variant="outlined" 
+            color="secondary"
+            fullWidth sx={{ mt: 0.2, py: 1 }} 
+            onClick={() => setShowProviderStep(true)}
+        >
+            Join as a Service Provider
+        </Button>
+
         </form>
       ) : (
         <Box sx={{ px: { xs: 0, sm: 1 } }}>
