@@ -420,7 +420,8 @@ useEffect(() => {
                     <Grid item xs="auto">
                         <motion.div>
                             <Button variant="contained" size="small" onClick={() => setView('medicineRestock')}
-                                sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' }, px: { xs: 2, sm: 4 }, py: { xs: 0.75, sm: 1 }, whiteSpace: 'nowrap', bgcolor: '#004D40', color: 'white', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.05)', bgcolor: '#00382e' } }}>
+                                
+                                  sx={{ borderRadius: '20px', fontSize: { xs: '0.75rem', sm: '0.9rem' }, px: { xs: 2, sm: 4 }, py: { xs: 0.75, sm: 1 }, whiteSpace: 'nowrap', transition: 'transform 0.2s', fontWeight: 500, bgcolor: 'secondary.main', color: 'white', '&:hover': { transform: 'scale(1.05)', bgcolor: 'secondary.dark' } }}>
                                 Medicine Restock
                             </Button>
                         </motion.div>

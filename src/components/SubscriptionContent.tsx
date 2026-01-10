@@ -74,7 +74,7 @@ const SubscriptionContent = ({ onSubscriptionSuccess }: SubscriptionContentProps
                 value={promoCode}
                 onChange={(e) => setPromoCode(e.target.value)}
                 sx={{ mb: 2 }}
-                helperText="Use code ALLFREE to test the feature."
+                helperText=""
             />
             <Button
                 variant="contained"
