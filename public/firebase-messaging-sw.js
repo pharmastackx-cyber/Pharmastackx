@@ -88,3 +88,44 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(promiseChain);
 });
+
+// ** THE NEW, PROACTIVE FIX IS HERE **
+// This event fires when the push subscription token changes.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  console.log('Push subscription has changed. Attempting to re-sync with server.');
+
+  event.waitUntil(
+    handleTokenRefresh()
+  );
+});
+
+async function handleTokenRefresh() {
+    try {
+        const vapidKey = "BJRiF8tiN4l1QHCuKQ3ePrLsSMBlyDIJcKdnU5TWQK2bhjpmEckbqgUjsm3cYgYr4xMqRDAF1QOHyw7xJ8L3Gqc";
+        const newToken = await messaging.getToken({ vapidKey });
+        
+        if (newToken) {
+            console.log('New FCM token obtained:', newToken);
+            // We send the token to the server. The user's session cookie will be
+            // included automatically if it exists, allowing the server to identify the user.
+            const response = await fetch('/api/save-fcm-token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token: newToken }),
+                credentials: 'include', // This is crucial! It includes the session cookie.
+            });
+
+            if (response.ok) {
+                console.log('New FCM token saved to server successfully.');
+            } else {
+                console.error('Failed to save new FCM token to server. Status:', response.status);
+            }
+        } else {
+            console.error('Could not get new FCM token after subscription change.');
+        }
+    } catch (error) {
+        console.error('Error handling token refresh:', error);
+    }
+}
