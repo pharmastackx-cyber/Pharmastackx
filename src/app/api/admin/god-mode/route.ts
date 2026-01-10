@@ -71,9 +71,24 @@ export async function GET(req: NextRequest) {
         const page = parseInt(searchParams.get('page') || '1', 10);
         const limit = 100;
         const skip = (page - 1) * limit;
+        const sort = searchParams.get('sort') === 'asc' ? 'asc' : 'desc'; // default to desc
+        const search = searchParams.get('search') || '';
 
-        const data = await Model.find({}).skip(skip).limit(limit).lean();
-        const total = await Model.countDocuments({});
+        let query: any = {};
+        if (search) {
+            const stringFields = Object.keys(Model.schema.paths).filter(
+                field => Model.schema.paths[field].instance === 'String'
+            );
+
+            if (stringFields.length > 0) {
+                query.$or = stringFields.map(field => ({
+                    [field]: { $regex: search, $options: 'i' }
+                }));
+            }
+        }
+
+        const data = await Model.find(query).sort({ createdAt: sort }).skip(skip).limit(limit).lean();
+        const total = await Model.countDocuments(query);
 
         return NextResponse.json({ data, total, page, limit }, { status: 200 });
 

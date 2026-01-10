@@ -25,16 +25,34 @@ const modalStyle = {
   overflowY: 'auto',
 };
 
+// Custom hook for debouncing
+function useDebounce(value: string, delay: number) {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
+}
+
 const GodModePage = () => {
     const { user, isLoading: sessionLoading } = useSession();
 
     const [collections, setCollections] = useState<string[]>([]);
     const [selectedCollection, setSelectedCollection] = useState<string>('');
     const [collectionData, setCollectionData] = useState<any[]>([]);
-    const [filteredData, setFilteredData] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState<string>('');
+    const debouncedSearchTerm = useDebounce(searchTerm, 500); // 500ms delay
+
     const [modalOpen, setModalOpen] = useState(false);
     const [modalData, setModalData] = useState<string>('');
     
@@ -65,22 +83,19 @@ const GodModePage = () => {
         }
     }, [user]);
 
-    const fetchCollectionData = async (collection: string, newPage: number = 1, sort: 'desc' | 'asc' = 'desc') => {
+    const fetchCollectionData = async (collection: string, newPage: number = 1, sort: 'desc' | 'asc' = 'desc', search: string = '') => {
         if (!collection) return;
-        setSelectedCollection(collection);
         setLoading(true);
         setError(null);
-        setPage(newPage);
-        setSortOrder(sort);
         
         try {
-            const res = await fetch(`/api/admin/god-mode?collection=${collection}&page=${newPage}&sort=${sort}`);
+            const res = await fetch(`/api/admin/god-mode?collection=${collection}&page=${newPage}&sort=${sort}&search=${search}`);
             if (res.ok) {
                 const { data, total, limit } = await res.json();
                 setCollectionData(data);
-                setFilteredData(data);
                 setTotal(total);
                 setLimit(limit);
+                setPage(newPage);
             } else {
                 setError(`Failed to fetch data for ${collection}.`);
             }
@@ -91,18 +106,10 @@ const GodModePage = () => {
     };
 
     useEffect(() => {
-        if (searchTerm) {
-            const lowercasedSearchTerm = searchTerm.toLowerCase();
-            const filtered = collectionData.filter(item => {
-                return Object.values(item).some(value => 
-                    String(value).toLowerCase().includes(lowercasedSearchTerm)
-                );
-            });
-            setFilteredData(filtered);
-        } else {
-            setFilteredData(collectionData);
+        if (selectedCollection) {
+            fetchCollectionData(selectedCollection, 1, sortOrder, debouncedSearchTerm);
         }
-    }, [searchTerm, collectionData]);
+    }, [debouncedSearchTerm]);
 
     const handleOpenModal = (data: any) => {
         setModalData(JSON.stringify(data, null, 2));
@@ -112,8 +119,16 @@ const GodModePage = () => {
     const handleCloseModal = () => setModalOpen(false);
 
     const handleCollectionChange = (collection: string) => {
-        setSearchTerm('');
-        fetchCollectionData(collection, 1, sortOrder);
+        setSelectedCollection(collection);
+        setSearchTerm(''); 
+        fetchCollectionData(collection, 1, sortOrder, '');
+    }
+    
+    const handleSortChange = (newSortOrder: 'desc' | 'asc') => {
+        setSortOrder(newSortOrder);
+        if(selectedCollection) {
+            fetchCollectionData(selectedCollection, 1, newSortOrder, debouncedSearchTerm);
+        }
     }
 
     if (sessionLoading) {
@@ -169,13 +184,12 @@ const GodModePage = () => {
                             </Select>
                         </FormControl>
                         <TextField 
-                            label="Search Current Page"
+                            label="Search Collection"
                             variant="outlined"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             sx={{ flexGrow: 2, minWidth: 300 }}
                             disabled={!selectedCollection}
-                            helperText={searchTerm ? "Search is active on the current page only." : ""}
                         />
                         <FormControl sx={{ minWidth: 150 }} disabled={!selectedCollection}>
                             <InputLabel id="sort-order-label">Sort By</InputLabel>
@@ -183,10 +197,7 @@ const GodModePage = () => {
                                 labelId="sort-order-label"
                                 value={sortOrder}
                                 label="Sort By"
-                                onChange={(e) => {
-                                    const newSortOrder = e.target.value as 'desc' | 'asc';
-                                    fetchCollectionData(selectedCollection, 1, newSortOrder);
-                                }}
+                                onChange={(e) => handleSortChange(e.target.value as 'desc' | 'asc')}
                             >
                                 <MenuItem value="desc">Latest</MenuItem>
                                 <MenuItem value="asc">Oldest</MenuItem>
@@ -203,15 +214,15 @@ const GodModePage = () => {
                                     <TableHead>
                                         <TableRow>
                                             <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>S/N</TableCell>
-                                            {filteredData.length > 0 && Object.keys(filteredData[0]).map(key => (
+                                            {collectionData.length > 0 && Object.keys(collectionData[0]).map(key => (
                                                 <TableCell key={key} sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>{key}</TableCell>
                                             ))}
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {filteredData.length > 0 ? (
-                                            filteredData.map((item, index) => (
-                                                <TableRow key={index} hover>
+                                        {collectionData.length > 0 ? (
+                                            collectionData.map((item, index) => (
+                                                <TableRow key={item._id || index} hover>
                                                    <TableCell>{((page - 1) * limit) + index + 1}</TableCell>
                                                     {Object.values(item).map((value: any, i) => (
                                                         <TableCell key={i} sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -227,14 +238,14 @@ const GodModePage = () => {
                                         ) : (
                                             <TableRow>
                                                 <TableCell colSpan={collectionData.length > 0 ? Object.keys(collectionData[0]).length + 1 : 1} sx={{ textAlign: 'center', py: 4}}>
-                                                    <Typography>No results found</Typography>
+                                                    <Typography>No results found for your query.</Typography>
                                                 </TableCell>
                                             </TableRow>
                                         )}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
-                            {total > 0 && !searchTerm && (
+                            {total > limit && (
                                 <Grid container justifyContent="space-between" alignItems="center" sx={{ p: 2 }}>
                                     <Grid item>
                                         <Typography variant="body2">
@@ -242,13 +253,13 @@ const GodModePage = () => {
                                         </Typography>
                                     </Grid>
                                     <Grid item>
-                                        <IconButton onClick={() => fetchCollectionData(selectedCollection, page - 1, sortOrder)} disabled={page <= 1}>
+                                        <IconButton onClick={() => fetchCollectionData(selectedCollection, page - 1, sortOrder, debouncedSearchTerm)} disabled={page <= 1}>
                                             <NavigateBefore />
                                         </IconButton>
                                         <Typography display="inline" sx={{ mx: 2 }}>
                                             Page {page} of {totalPages}
                                         </Typography>
-                                        <IconButton onClick={() => fetchCollectionData(selectedCollection, page + 1, sortOrder)} disabled={page >= totalPages}>
+                                        <IconButton onClick={() => fetchCollectionData(selectedCollection, page + 1, sortOrder, debouncedSearchTerm)} disabled={page >= totalPages}>
                                             <NavigateNext />
                                         </IconButton>
                                     </Grid>
