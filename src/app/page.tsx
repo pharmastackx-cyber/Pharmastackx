@@ -426,6 +426,35 @@ useEffect(() => {
                         </motion.div>
                     </Grid>
                 )}
+
+                {/* God Mode Button: Admin only */}
+{detailedUser && detailedUser.role === 'admin' && (
+    <Grid item xs="auto">
+        <motion.div>
+            <Button 
+                variant="contained" 
+                onClick={() => router.push('/admin/god-mode')}
+                sx={{ 
+                    borderRadius: '20px', 
+                    fontSize: { xs: '0.75rem', sm: '0.9rem' }, 
+                    px: { xs: 2, sm: 4 }, 
+                    py: { xs: 0.75, sm: 1 }, 
+                    whiteSpace: 'nowrap', 
+                    bgcolor: '#e74c3c', // A distinct red color for admin-only
+                    color: 'white', 
+                    transition: 'transform 0.2s', 
+                    '&:hover': { 
+                        transform: 'scale(1.05)', 
+                        bgcolor: '#c0392b' 
+                    } 
+                }}
+            >
+                God Mode
+            </Button>
+        </motion.div>
+    </Grid>
+)}
+
         
                 {/* Order Medicines Button: Not Pharmacy/Pharmacist */}
                 {(!normalizedUser || !['pharmacy', 'pharmacist'].includes(normalizedUser.role)) && (
