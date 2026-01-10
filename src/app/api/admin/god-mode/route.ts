@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
@@ -87,7 +88,13 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        let data = await Model.find(query).sort({ _id: sortOrder }).skip(skip).limit(limit).lean();
+        let dataQuery = Model.find(query).sort({ _id: sortOrder }).skip(skip).limit(limit);
+
+        if (collectionName === 'requests') {
+            dataQuery = dataQuery.populate('user', 'username email').populate('quotes.pharmacy', 'username email');
+        }
+
+        let data = await dataQuery.lean({ virtuals: true });
         const total = await Model.countDocuments(query);
 
         if (collectionName === 'users') {

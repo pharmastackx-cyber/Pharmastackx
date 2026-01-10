@@ -55,6 +55,18 @@ const UserRow = ({ user, index, page, limit, onEdit, onDelete }: { user: any, in
     const [open, setOpen] = useState(false);
     const phoneNumber = user.role === 'pharmacist' ? user.mobile : user.phoneNumber;
 
+    const formatWhatsAppNumber = (phone: string) => {
+        if (!phone) return '';
+        // Remove all non-numeric characters
+        const cleaned = String(phone).replace(/[^0-9]/g, '');
+        // If the number starts with 0, replace it with the country code 234
+        if (cleaned.startsWith('0')) {
+            return `234${cleaned.substring(1)}`;
+        }
+        // Otherwise, return the cleaned number as is
+        return cleaned;
+    };
+
     // Fields that are either sensitive or already displayed in the main row
     const mainFields = ['_id', 'username', 'email', 'phoneNumber', 'mobile', 'role', 'isPWA', 'fcmTokens', '__v', 'salt', 'hash', 'verificationToken', 'verificationTokenExpires'];
     const extraDetails = Object.entries(user).filter(([key]) => !mainFields.includes(key));
@@ -68,7 +80,8 @@ const UserRow = ({ user, index, page, limit, onEdit, onDelete }: { user: any, in
                 <TableCell>
                     {phoneNumber ? (
                         <Link 
-                            href={`https://wa.me/${String(phoneNumber).replace(/[^0-9]/g, '')}`} 
+                        href={`https://wa.me/${formatWhatsAppNumber(phoneNumber)}`}
+
                             target="_blank" 
                             rel="noopener noreferrer" 
                             sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit', '&:hover': { textDecoration: 'underline'} }}
