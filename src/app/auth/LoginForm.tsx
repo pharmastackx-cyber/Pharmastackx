@@ -53,7 +53,7 @@ export default function LoginForm({
       await refreshSession();
 
       // Hard redirect to ensure a full page reload and session update
-      window.location.href = redirectUrl || '/';
+      window.location.href = '/';
 
     } catch (err: any) {
       setError(err.response?.data?.error || "Login failed. Please check your credentials.");

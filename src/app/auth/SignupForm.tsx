@@ -134,15 +134,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
   };
 
   const redirectToApp = (role: string) => {
-    if (redirectUrl) {
-      window.location.href = redirectUrl;
-      return;
-    }
-    if (role === 'pharmacy' || role === 'vendor' || role === 'admin') {
-      window.location.href = '/store-management';
-    } else {
-      window.location.href = '/';
-    }
+    window.location.href = '/';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -256,7 +248,7 @@ export default function SignupForm({ redirectUrl }: { redirectUrl: string | null
       )}
       {!showProviderStep ? (
         <form onSubmit={handleSubmit}>
-          <TextField label="Username" name="username" value={form.username} onChange={handleChange} fullWidth margin="normal" required disabled={loading} />
+          <TextField label="Full name" name="username" value={form.username} onChange={handleChange} fullWidth margin="normal" required disabled={loading} />
           <TextField label="Email" name="email" type="email" value={form.email} onChange={handleChange} fullWidth margin="normal" required disabled={loading} />
           <TextField
             label="Password"
