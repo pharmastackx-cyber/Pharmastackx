@@ -263,7 +263,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: stri
       }
   };
 
- const handleConfirmDispatch = async (phoneNumber: string) => {
+  const handleConfirmDispatch = async (phoneNumber: string, state: string) => {
     setIsModalOpen(false);
     setGlobalError(null);
     if (requestedDrugs.length === 0) {
@@ -277,6 +277,7 @@ const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: stri
     const payload = {
       requestType: 'drug-list',
       phoneNumber,
+      state,
       items: requestedDrugs.map(({ name, form, strength, quantity, notes, image }) => ({ name, form, strength, quantity, notes, image }))
     };
 
@@ -305,7 +306,8 @@ const DispatchForm: React.FC<{ initialSearchValue?: string, setView: (view: stri
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             requestId: newRequest._id,
-            drugNames: drugNames
+            drugNames: drugNames,
+            userId: newRequest.user
           }),
         });
       } catch (notifyError) {

@@ -43,6 +43,9 @@ const RequestSchema = new mongoose.Schema({
   phoneNumber: {
     type: String,
   },
+  state: {
+    type: String,
+  },
   // The user's original requested items.
   items: [{
     _id: false,

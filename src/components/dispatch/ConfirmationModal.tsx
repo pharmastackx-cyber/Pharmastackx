@@ -15,7 +15,12 @@ import {
     Box,
     Chip,
     CircularProgress,
-    TextField
+    TextField,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    FormHelperText
 } from '@mui/material';
 import { useState } from 'react';
 
@@ -32,21 +37,43 @@ interface DrugRequest {
 interface ConfirmationModalProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: (phoneNumber: string) => void;
+  onConfirm: (phoneNumber: string, state: string) => void;
   requests: DrugRequest[];
   isSubmitting: boolean;
 }
 
+const nigerianStates = [
+  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+  "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe",
+  "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos",
+  "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto",
+  "Taraba", "Yobe", "Zamfara"
+];
+
 export default function ConfirmationModal({ open, onClose, onConfirm, requests, isSubmitting }: ConfirmationModalProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [phoneError, setPhoneError] = useState(false);
+  const [state, setState] = useState('');
+  const [stateError, setStateError] = useState(false);
 
   const handleConfirm = () => {
+    let hasError = false;
     if (phoneNumber.trim() === '') {
       setPhoneError(true);
+      hasError = true;
     } else {
       setPhoneError(false);
-      onConfirm(phoneNumber);
+    }
+
+    if (state.trim() === '') {
+      setStateError(true);
+      hasError = true;
+    } else {
+      setStateError(false);
+    }
+
+    if (!hasError) {
+      onConfirm(phoneNumber, state);
     }
   };
 
@@ -104,10 +131,31 @@ export default function ConfirmationModal({ open, onClose, onConfirm, requests, 
           sx={{mt: 2}}
         />
 
+        <FormControl fullWidth margin="dense" sx={{ mt: 2 }} required error={stateError}>
+          <InputLabel id="state-select-label">Your State</InputLabel>
+          <Select
+            labelId="state-select-label"
+            id="state"
+            value={state}
+            label="Your State"
+            onChange={(e) => {
+              setState(e.target.value);
+              if(stateError) setStateError(false);
+            }}
+          >
+            {nigerianStates.map((stateName) => (
+              <MenuItem key={stateName} value={stateName}>
+                {stateName}
+              </MenuItem>
+            ))}
+          </Select>
+          <FormHelperText>{stateError ? "Your state is required." : "The search will start state-wide before nationwide."}</FormHelperText>
+        </FormControl>
+
       </DialogContent>
       <DialogActions sx={{ p: '16px 24px', borderTop: '1px solid #ddd' }}>
         <Button onClick={onClose} color="inherit" disabled={isSubmitting}>Go Back</Button>
-        <Button onClick={handleConfirm} variant="contained" autoFocus sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' }, minWidth: 130 }} disabled={isSubmitting || !phoneNumber}>
+        <Button onClick={handleConfirm} variant="contained" autoFocus sx={{ bgcolor: '#006D5B', '&:hover': { bgcolor: '#004D3F' }, minWidth: 130 }} disabled={isSubmitting || !phoneNumber || !state}>
           {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Begin Search'}
         </Button>
       </DialogActions>

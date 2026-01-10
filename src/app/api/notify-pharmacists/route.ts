@@ -1,18 +1,34 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Db } from 'mongodb';
 import { dbConnect } from '@/lib/mongoConnect';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import UserModel from '@/models/User';
+import RequestModel from '@/models/Request'; // Import RequestModel
 
-async function getRecipientTokens(): Promise<string[]> {
+async function getRecipientTokens(requestState?: string): Promise<string[]> {
     await dbConnect();
-    const users = await UserModel.find(
-        { role: { $in: ['pharmacist', 'admin'] }, fcmTokens: { $nin: [null, []] } },
-        { fcmTokens: 1, _id: 0 }
-    ).lean();
+
+    const query: any = {
+        fcmTokens: { $nin: [null, []] },
+        $or: [
+            { role: 'admin' } 
+        ]
+    };
+
+    if (requestState) {
+        query.$or.push(
+            { role: { $in: ['pharmacist', 'pharmacy'] }, state: requestState }
+        );
+    } else {
+        query.$or.push(
+            { role: { $in: ['pharmacist', 'pharmacy'] } }
+        );
+    }
+
+    const users = await UserModel.find(query, { fcmTokens: 1, _id: 0 }).lean();
     return users.flatMap(user => user.fcmTokens).filter(Boolean) as string[];
 }
+
 
 // Helper function to generate a dynamic notification title
 function createDynamicTitle(drugNames: string[]): string {
@@ -38,14 +54,19 @@ function createDynamicTitle(drugNames: string[]): string {
 
 export async function POST(req: NextRequest) {
     try {
-        // Now expecting requestId and drugNames from the frontend
         const { requestId, drugNames } = await req.json();
 
         if (!requestId) {
             return NextResponse.json({ message: 'Request ID is required' }, { status: 400 });
         }
 
-        const tokens = await getRecipientTokens();
+        const request = await RequestModel.findById(requestId).lean() as { state?: string };
+
+        if (!request) {
+            return NextResponse.json({ message: 'Request not found' }, { status: 404 });
+        }
+
+        const tokens = await getRecipientTokens(request.state);
 
         if (tokens.length === 0) {
             return NextResponse.json({ message: 'No recipients to notify' }, { status: 200 });
