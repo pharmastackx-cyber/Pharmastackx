@@ -87,8 +87,15 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        const data = await Model.find(query).sort({ _id: sortOrder }).skip(skip).limit(limit).lean();
+        let data = await Model.find(query).sort({ _id: sortOrder }).skip(skip).limit(limit).lean();
         const total = await Model.countDocuments(query);
+
+        if (collectionName === 'users') {
+            data = data.map((user: any) => ({
+                ...user,
+                isPWA: user.isPWA === true,
+            }));
+        }
 
         return NextResponse.json({ data, total, page, limit }, { status: 200 });
 

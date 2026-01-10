@@ -304,6 +304,33 @@ useEffect(() => {
   };
 
   useEffect(() => {
+    // This hook sends the PWA installation status to the backend.
+    if (user && !isLoading) {
+      const isPWA = window.matchMedia('(display-mode: standalone)').matches;
+
+      fetch('/api/pwa', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isPWA }),
+        credentials: 'include',
+      })
+      .then(response => {
+        if (response.ok) {
+          console.log('PWA status successfully updated.');
+        } else {
+          console.error('Failed to update PWA status on the backend.');
+        }
+      })
+      .catch(error => {
+        console.error('Error sending PWA status:', error);
+      });
+    }
+  }, [user, isLoading]);
+
+
+  useEffect(() => {
     const isPWA = typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches;
     const hasNotificationSupport = 'Notification' in window;
   

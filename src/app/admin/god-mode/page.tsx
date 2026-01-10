@@ -6,10 +6,22 @@ import {
     Box, Typography, Container, Alert, CircularProgress, Button, Paper, 
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
     Select, MenuItem, FormControl, InputLabel, TextField, Modal, IconButton,
-    Grid, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
+    Grid, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+    Link, Collapse
 } from '@mui/material';
 import Navbar from '@/app/components/Navbar';
-import { Close as CloseIcon, NavigateBefore, NavigateNext, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { 
+    Close as CloseIcon, 
+    NavigateBefore, 
+    NavigateNext, 
+    Edit as EditIcon, 
+    Delete as DeleteIcon, 
+    CheckCircle, 
+    Cancel, 
+    WhatsApp as WhatsAppIcon, 
+    KeyboardArrowDown as KeyboardArrowDownIcon,
+    KeyboardArrowUp as KeyboardArrowUpIcon
+} from '@mui/icons-material';
 
 const modalStyle = {
   position: 'absolute' as 'absolute',
@@ -37,6 +49,153 @@ function useDebounce(value: string, delay: number) {
     }, [value, delay]);
     return debouncedValue;
 }
+
+
+const UserRow = ({ user, index, page, limit, onEdit, onDelete }: { user: any, index: number, page: number, limit: number, onEdit: (doc: any) => void, onDelete: (doc: any) => void }) => {
+    const [open, setOpen] = useState(false);
+    const phoneNumber = user.role === 'pharmacist' ? user.mobile : user.phoneNumber;
+
+    // Fields that are either sensitive or already displayed in the main row
+    const mainFields = ['_id', 'username', 'email', 'phoneNumber', 'mobile', 'role', 'isPWA', 'fcmTokens', '__v', 'salt', 'hash', 'verificationToken', 'verificationTokenExpires'];
+    const extraDetails = Object.entries(user).filter(([key]) => !mainFields.includes(key));
+
+    return (
+        <>
+            <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
+                 <TableCell>{((page - 1) * limit) + index + 1}</TableCell>
+                <TableCell>{user.username}</TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>
+                    {phoneNumber ? (
+                        <Link 
+                            href={`https://wa.me/${String(phoneNumber).replace(/[^0-9]/g, '')}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit', '&:hover': { textDecoration: 'underline'} }}
+                        >
+                            <WhatsAppIcon sx={{ color: '#25D366', mr: 1 }} />
+                            {phoneNumber}
+                        </Link>
+                    ) : '-'}
+                </TableCell>
+                <TableCell>{user.role}</TableCell>
+                <TableCell align="center">
+                    {user.isPWA ? <CheckCircle color="success" /> : <Cancel color="error" />}
+                </TableCell>
+                <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {user.fcmTokens && user.fcmTokens.length > 0 ? user.fcmTokens.join(', ') : '-'}
+                </TableCell>
+                <TableCell>
+                    <IconButton onClick={() => onEdit(user)} size="small"><EditIcon /></IconButton>
+                    <IconButton onClick={() => onDelete(user)} size="small"><DeleteIcon /></IconButton>
+                     <IconButton
+                        aria-label="expand row"
+                        size="small"
+                        onClick={() => setOpen(!open)}
+                    >
+                        {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                    </IconButton>
+                </TableCell>
+            </TableRow>
+            <TableRow>
+                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
+                    <Collapse in={open} timeout="auto" unmountOnExit>
+                        <Box sx={{ margin: 1, p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
+                            <Typography variant="h6" gutterBottom component="div">
+                                Additional Details
+                            </Typography>
+                            {extraDetails.length > 0 ? (
+                                <Grid container spacing={2}>
+                                    {extraDetails.map(([key, value]) => (
+                                        <Grid item xs={12} sm={6} md={4} key={key}>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#555' }}>{key}:</Typography>
+                                            <Typography variant="body2" sx={{ wordBreak: 'break-all', background: 'white', p: 1, borderRadius: 1 }}>
+                                                {typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value)}
+                                            </Typography>
+                                        </Grid>
+                                    ))}
+                                </Grid>
+                            ) : (
+                                <Typography>No additional details available for this user.</Typography>
+                            )}
+                        </Box>
+                    </Collapse>
+                </TableCell>
+            </TableRow>
+        </>
+    );
+};
+
+
+// Specific component for rendering the Users table
+const UsersTable = ({ data, page, limit, onEdit, onDelete }: { data: any[], page: number, limit: number, onEdit: (doc: any) => void, onDelete: (doc: any) => void }) => {
+    return (
+        <TableContainer>
+            <Table stickyHeader>
+                <TableHead>
+                    <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>S/N</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>Username</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>Email</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>Phone</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>Role</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>PWA Installed</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>FCM Tokens</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>Actions</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                     {data.map((user, index) => (
+                        <UserRow key={user._id} user={user} index={index} page={page} limit={limit} onEdit={onEdit} onDelete={onDelete} />
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
+    );
+};
+
+// Generic component for rendering other collections
+const GenericTable = ({ data, page, limit, onEdit, onDelete, onOpenModal }: { data: any[], page: number, limit: number, onEdit: (doc: any) => void, onDelete: (doc: any) => void, onOpenModal: (data: any) => void }) => {
+    if (data.length === 0) {
+        return (
+            <Typography sx={{ textAlign: 'center', py: 4}}>
+                No results found for your query.
+            </Typography>
+        );
+    }
+    return (
+        <TableContainer>
+            <Table stickyHeader>
+                <TableHead>
+                    <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>S/N</TableCell>
+                        {Object.keys(data[0]).map(key => (
+                            <TableCell key={key} sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>{key}</TableCell>
+                        ))}
+                        <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>Actions</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {data.map((item, index) => (
+                        <TableRow key={item._id || index} hover>
+                            <TableCell>{((page - 1) * limit) + index + 1}</TableCell>
+                            {Object.entries(item).map(([key, value]: [string, any]) => (
+                                <TableCell key={key} sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {typeof value === 'object' && value !== null ? <Button size="small" onClick={() => onOpenModal(value)}>View JSON</Button> : String(value)}
+                                </TableCell>
+                            ))}
+                            <TableCell>
+                                <IconButton onClick={() => onEdit(item)}><EditIcon /></IconButton>
+                                <IconButton onClick={() => onDelete(item)}><DeleteIcon /></IconButton>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
+    );
+};
+
 
 const GodModePage = () => {
     const { user, isLoading: sessionLoading } = useSession();
@@ -204,6 +363,16 @@ const GodModePage = () => {
     
     const totalPages = Math.ceil(total / limit);
 
+    const renderTable = () => {
+        if (loading) return <Box sx={{textAlign: 'center'}}><CircularProgress /></Box>;
+        if (!selectedCollection) return null;
+
+        if (selectedCollection === 'users') {
+            return <UsersTable data={collectionData} page={page} limit={limit} onEdit={handleEdit} onDelete={handleDelete} />;
+        }
+        return <GenericTable data={collectionData} page={page} limit={limit} onEdit={handleEdit} onDelete={handleDelete} onOpenModal={handleOpenModal} />;
+    }
+
     return (
         <>
             <Navbar />
@@ -253,69 +422,29 @@ const GodModePage = () => {
                         </FormControl>
                     </Paper>
 
-                    {loading && <Box sx={{textAlign: 'center'}}><CircularProgress /></Box>}
-
-                    {selectedCollection && !loading && (
-                        <Paper>
-                            <TableContainer>
-                                <Table stickyHeader>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>S/N</TableCell>
-                                            {collectionData.length > 0 && Object.keys(collectionData[0]).map(key => (
-                                                <TableCell key={key} sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>{key}</TableCell>
-                                            ))}
-                                            <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.200' }}>Actions</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {collectionData.length > 0 ? (
-                                            collectionData.map((item, index) => (
-                                                <TableRow key={item._id || index} hover>
-                                                   <TableCell>{((page - 1) * limit) + index + 1}</TableCell>
-                                                    {Object.entries(item).map(([key, value]: [string, any]) => (
-                                                        <TableCell key={key} sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                            {typeof value === 'object' && value !== null ? <Button size="small" onClick={() => handleOpenModal(value)}>View JSON</Button> : String(value)}
-                                                        </TableCell>
-                                                    ))}
-                                                <TableCell>
-                                                    <IconButton onClick={() => handleEdit(item)}><EditIcon /></IconButton>
-                                                    <IconButton onClick={() => handleDelete(item)}><DeleteIcon /></IconButton>
-                                                </TableCell>
-                                                </TableRow>
-                                            ))
-                                        ) : (
-                                            <TableRow>
-                                                <TableCell colSpan={collectionData.length > 0 ? Object.keys(collectionData[0]).length + 2 : 2} sx={{ textAlign: 'center', py: 4}}>
-                                                    <Typography>No results found for your query.</Typography>
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                            {total > limit && (
-                                <Grid container justifyContent="space-between" alignItems="center" sx={{ p: 2 }}>
-                                    <Grid item>
-                                        <Typography variant="body2">
-                                            Showing {((page - 1) * limit) + 1} - {Math.min(page * limit, total)} of {total}
-                                        </Typography>
-                                    </Grid>
-                                    <Grid item>
-                                        <IconButton onClick={() => fetchCollectionData(selectedCollection, page - 1, sortOrder, debouncedSearchTerm)} disabled={page <= 1}>
-                                            <NavigateBefore />
-                                        </IconButton>
-                                        <Typography display="inline" sx={{ mx: 2 }}>
-                                            Page {page} of {totalPages}
-                                        </Typography>
-                                        <IconButton onClick={() => fetchCollectionData(selectedCollection, page + 1, sortOrder, debouncedSearchTerm)} disabled={page >= totalPages}>
-                                            <NavigateNext />
-                                        </IconButton>
-                                    </Grid>
+                    <Paper>
+                        {renderTable()}
+                        {total > limit && !loading && (
+                            <Grid container justifyContent="space-between" alignItems="center" sx={{ p: 2 }}>
+                                <Grid item>
+                                    <Typography variant="body2">
+                                        Showing {((page - 1) * limit) + 1} - {Math.min(page * limit, total)} of {total}
+                                    </Typography>
                                 </Grid>
-                            )}
-                        </Paper>
-                    )}
+                                <Grid item>
+                                    <IconButton onClick={() => fetchCollectionData(selectedCollection, page - 1, sortOrder, debouncedSearchTerm)} disabled={page <= 1}>
+                                        <NavigateBefore />
+                                    </IconButton>
+                                    <Typography display="inline" sx={{ mx: 2 }}>
+                                        Page {page} of {totalPages}
+                                    </Typography>
+                                    <IconButton onClick={() => fetchCollectionData(selectedCollection, page + 1, sortOrder, debouncedSearchTerm)} disabled={page >= totalPages}>
+                                        <NavigateNext />
+                                    </IconButton>
+                                </Grid>
+                            </Grid>
+                        )}
+                    </Paper>
                 </Container>
             </Box>
 

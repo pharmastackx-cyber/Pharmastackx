@@ -34,6 +34,7 @@ export interface IUser extends Document {
   subscriptionExpiry?: Date;
   orderCount: number;
   canManageStore?: boolean; // New field for store management access
+  isPWA?: boolean;
 }
 
 // The schema defines the blueprint for the database
@@ -81,6 +82,7 @@ const userSchema: Schema<IUser> = new mongoose.Schema({
   subscriptionExpiry: { type: Date },
   orderCount: { type: Number, default: 0 },
   canManageStore: { type: Boolean, default: false }, // New field added to schema
+  isPWA: { type: Boolean, default: false },
 });
 
 // This line creates the model
