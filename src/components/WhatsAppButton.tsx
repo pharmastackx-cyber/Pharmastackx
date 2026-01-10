@@ -9,7 +9,7 @@ const doodlePattern = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ
 
 export default function WhatsAppButton() {
   return (
-    <Link href="https://wa.me/233596921163" passHref>
+    <Link href="https://wa.me/2349134589572" passHref>
       <Box
         component="a"
         target="_blank"

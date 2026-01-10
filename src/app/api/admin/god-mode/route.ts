@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
         const page = parseInt(searchParams.get('page') || '1', 10);
         const limit = 100;
         const skip = (page - 1) * limit;
-        const sort = searchParams.get('sort') === 'asc' ? 'asc' : 'desc'; // default to desc
+        const sortOrder = searchParams.get('sort') === 'asc' ? 1 : -1;
         const search = searchParams.get('search') || '';
 
         let query: any = {};
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        const data = await Model.find(query).sort({ createdAt: sort }).skip(skip).limit(limit).lean();
+        const data = await Model.find(query).sort({ _id: sortOrder }).skip(skip).limit(limit).lean();
         const total = await Model.countDocuments(query);
 
         return NextResponse.json({ data, total, page, limit }, { status: 200 });
