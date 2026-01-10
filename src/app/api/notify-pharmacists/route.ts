@@ -7,32 +7,52 @@ import RequestModel from '@/models/Request';
 
 async function getRecipientTokens(requestState?: string): Promise<string[]> {
     await dbConnect();
+    const recipientTokens = new Set<string>();
 
-    const query: any = {
-        fcmTokens: { $nin: [null, []] },
-        $or: [
-            { role: 'admin' } 
-        ]
-    };
+    // 1. Get all admin tokens
+    const admins = await UserModel.find({ role: 'admin', fcmTokens: { $exists: true, $ne: [] } }).lean();
+    admins.forEach(admin => {
+        if (admin.fcmTokens) {
+            admin.fcmTokens.forEach(token => recipientTokens.add(token));
+        }
+    });
+    console.log(`[getRecipientTokens] Found ${admins.length} admin users.`);
 
+    // 2. If a state is provided, get all pharmacists in that state
     if (requestState) {
-        console.log(`Searching for recipients in state: ${requestState}`);
-        query.$or.push(
-            { role: { $in: ['pharmacist', 'pharmacy'] }, state: requestState }
-        );
+        console.log(`[getRecipientTokens] Searching for pharmacists in state: ${requestState}`);
+        
+        const pharmacistsInState = await UserModel.find({
+            role: 'pharmacist',
+            state: requestState,
+            fcmTokens: { $exists: true, $ne: [] }
+        }).lean();
+
+        pharmacistsInState.forEach(pharmacist => {
+            if (pharmacist.fcmTokens) {
+                pharmacist.fcmTokens.forEach(token => recipientTokens.add(token));
+            }
+        });
+        console.log(`[getRecipientTokens] Found ${pharmacistsInState.length} pharmacists in ${requestState}.`);
     } else {
-        console.log('No state provided, searching for all pharmacists/pharmacies.');
-        query.$or.push(
-            { role: { $in: ['pharmacist', 'pharmacy'] } }
-        );
+        // Fallback for requests without a state: notify all pharmacists
+        console.log('[getRecipientTokens] No state provided, searching for all pharmacists.');
+        const allPharmacists = await UserModel.find({
+            role: 'pharmacist',
+            fcmTokens: { $exists: true, $ne: [] }
+        }).lean();
+
+        allPharmacists.forEach(user => {
+            if (user.fcmTokens) {
+                user.fcmTokens.forEach(token => recipientTokens.add(token));
+            }
+        });
     }
 
-    const users = await UserModel.find(query, { fcmTokens: 1, _id: 0 }).lean();
-    const tokens = users.flatMap(user => user.fcmTokens).filter(Boolean) as string[];
-    console.log(`Found ${tokens.length} tokens for notification.`);
+    const tokens = Array.from(recipientTokens);
+    console.log(`[getRecipientTokens] Total unique tokens found: ${tokens.length}`);
     return tokens;
 }
-
 
 // Helper function to generate a dynamic notification title
 function createDynamicTitle(drugNames: string[]): string {
