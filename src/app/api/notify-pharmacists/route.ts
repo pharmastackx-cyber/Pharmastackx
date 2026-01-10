@@ -18,13 +18,13 @@ async function getRecipientTokens(requestState?: string): Promise<string[]> {
     });
     console.log(`[getRecipientTokens] Found ${admins.length} admin users.`);
 
-    // 2. If a state is provided, get all pharmacists in that state
+    // 2. If a state is provided, get all pharmacists in that state of practice
     if (requestState) {
-        console.log(`[getRecipientTokens] Searching for pharmacists in state: ${requestState}`);
+        console.log(`[getRecipientTokens] Searching for pharmacists with stateOfPractice: ${requestState}`);
         
         const pharmacistsInState = await UserModel.find({
             role: 'pharmacist',
-            state: requestState,
+            stateOfPractice: requestState, // Corrected field
             fcmTokens: { $exists: true, $ne: [] }
         }).lean();
 
