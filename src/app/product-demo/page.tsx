@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useRef } from 'react';
 import { 
     Box, 
     Typography, 
@@ -11,13 +12,19 @@ import {
     List,
     ListItem,
     ListItemIcon,
-    ListItemText
+    ListItemText,
+    Button
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import DemoSignupForm from './DemoSignupForm'; // Import the new form
+import DemoSignupForm from './DemoSignupForm';
 import Image from 'next/image';
 
 const ProductDemoPage = () => {
+    const formRef = useRef<HTMLDivElement>(null);
+
+    const handleScrollToForm = () => {
+        formRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
 
     return (
         <>
@@ -32,6 +39,23 @@ const ProductDemoPage = () => {
                                     layout="fill"
                                     objectFit="cover"
                                 />
+                                <Button 
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={handleScrollToForm}
+                                    sx={{
+                                        display: { xs: 'block', md: 'none' },
+                                        position: 'absolute',
+                                        bottom: 16,
+                                        right: 16,
+                                        bgcolor: '#006D5B',
+                                        '&:hover': {
+                                            bgcolor: '#005948'
+                                        }
+                                    }}
+                                >
+                                    Sign Up Now
+                                </Button>
                             </Box>
                         </Grid>
                         <Grid item xs={12} md={6} sx={{ order: { xs: 2, md: 2 } }}>
@@ -60,7 +84,9 @@ const ProductDemoPage = () => {
                              <Typography variant="h6" sx={{ mt: 2, mb: 3, color: 'darkmagenta', fontWeight: 'bold' }}>
                                 When: Friday, January 23rd, 2026, at 8:00 PM WAT
                             </Typography>
-                            <DemoSignupForm />
+                            <Box ref={formRef}>
+                                <DemoSignupForm />
+                            </Box>
                             <Typography variant="body2" sx={{ mt: 4, color: '#666', textAlign: 'center' }}>
                                 By registering, you agree to our <Link href="/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>.
                                 We are committed to protecting your privacy and handling your personal information in a lawful, transparent, and secure manner.
