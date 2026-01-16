@@ -39,23 +39,42 @@ const ProductDemoPage = () => {
                                     layout="fill"
                                     objectFit="cover"
                                 />
-                                <Button 
-                                    variant="contained"
-                                    color="primary"
+                                <Box
                                     onClick={handleScrollToForm}
                                     sx={{
                                         display: { xs: 'block', md: 'none' },
                                         position: 'absolute',
-                                        bottom: 16,
-                                        right: 16,
-                                        bgcolor: '#006D5B',
-                                        '&:hover': {
-                                            bgcolor: '#005948'
+                                        bottom: 0,
+                                        right: 0,
+                                        bgcolor: 'maroon',
+                                        color: 'white',
+                                        padding: '10px 20px',
+                                        cursor: 'pointer',
+                                        borderTopLeftRadius: '20px',
+                                        borderBottomRightRadius: '12px',
+                                        '&::before': {
+                                            content: '""',
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            left: -20,
+                                            width: 20,
+                                            height: 20,
+                                            backgroundColor: 'maroon',
+                                        },
+                                        '&::after': {
+                                            content: '""',
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            left: -20,
+                                            width: 20,
+                                            height: 20,
+                                            backgroundColor: '#f8f9fa',
+                                            borderBottomRightRadius: '20px',
                                         }
                                     }}
                                 >
-                                    Sign Up Now
-                                </Button>
+                                    <Typography variant="button" sx={{ fontWeight: 'bold' }}>Sign Up Now</Typography>
+                                </Box>
                             </Box>
                         </Grid>
                         <Grid item xs={12} md={6} sx={{ order: { xs: 2, md: 2 } }}>
@@ -82,7 +101,7 @@ const ProductDemoPage = () => {
                                 Plus a walkthrough of additional platform features.
                             </Typography>
                              <Typography variant="h6" sx={{ mt: 2, mb: 3, color: 'darkmagenta', fontWeight: 'bold' }}>
-                                When: Friday, January 23rd, 2026, at 8:00 PM WAT
+                                Friday, January 23rd, 2026, at 8:00 PM WAT
                             </Typography>
                             <Box ref={formRef}>
                                 <DemoSignupForm />
