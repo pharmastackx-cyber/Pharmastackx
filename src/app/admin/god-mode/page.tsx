@@ -67,6 +67,14 @@ const UserRow = ({ user, index, page, limit, onEdit, onDelete }: { user: any, in
         return cleaned;
     };
 
+    const message = `Good afternoon, Pharm ${user.username} from ${user.stateOfPractice || 'your state'},
+
+Thank you for signing up on PharmaStackX.
+
+To ensure you receive important updates and medicine requests without interruption, please save this number on your phone and reply DONE once completed.`;
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${formatWhatsAppNumber(phoneNumber)}?text=${encodedMessage}`;
+
     // Fields that are either sensitive or already displayed in the main row
     const mainFields = ['_id', 'username', 'email', 'phoneNumber', 'mobile', 'role', 'isPWA', 'fcmTokens', '__v', 'salt', 'hash', 'verificationToken', 'verificationTokenExpires'];
     const extraDetails = Object.entries(user).filter(([key]) => !mainFields.includes(key));
@@ -80,8 +88,7 @@ const UserRow = ({ user, index, page, limit, onEdit, onDelete }: { user: any, in
                 <TableCell>
                     {phoneNumber ? (
                         <Link 
-                        href={`https://wa.me/${formatWhatsAppNumber(phoneNumber)}`}
-
+                        href={whatsappUrl}
                             target="_blank" 
                             rel="noopener noreferrer" 
                             sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit', '&:hover': { textDecoration: 'underline'} }}
