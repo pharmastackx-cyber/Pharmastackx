@@ -7,8 +7,13 @@ import {
     Container, 
     Paper,
     Link,
-    Grid
+    Grid,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText
 } from '@mui/material';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DemoSignupForm from './DemoSignupForm'; // Import the new form
 import Image from 'next/image';
 
@@ -30,13 +35,30 @@ const ProductDemoPage = () => {
                             </Box>
                         </Grid>
                         <Grid item xs={12} md={6} sx={{ order: { xs: 2, md: 2 } }}>
-                            <Typography variant="h4" component="h1" sx={{ fontWeight: 600, mb: 2, color: '#006D5B' }}>
-                                Pharmastackx Product Demo Registration
+                            <Typography variant="h4" component="h1" sx={{ fontWeight: 600, mb: 1, color: '#006D5B' }}>
+                                Turning Medicine Requests Into Revenue
                             </Typography>
-                            <Typography variant="body1" sx={{ mb: 4, lineHeight: 1.6, color: '#444' }}>
-                                PharmaStackX is building the essential digital infrastructure required for modern healthcare in Africa. 
-                                Our core mission is to end the devastating public health problem caused by inventory invisibility. 
-                                Join us to see how we are transforming community pharmacies.
+                            <Typography variant="h6" component="h2" sx={{ mb: 3, color: '#444' }}>
+                                How pharmacists use PharmaStackX to fulfill verified medicine requests and earn additional income.
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.6, color: '#444' }}>
+                                PharmaStackX routes verified medicine requests from patients and partnered clinics directly to community pharmacists.
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                This 45-minute live session will show pharmacists how to:
+                            </Typography>
+                            <List dense sx={{py: 0}}>
+                                <ListItem sx={{py: 0}}><ListItemIcon><CheckCircleOutlineIcon sx={{ color: '#006D5B' }} /></ListItemIcon><ListItemText primary="Sign up and add PharmaStackX as an app" /></ListItem>
+                                <ListItem sx={{py: 0}}><ListItemIcon><CheckCircleOutlineIcon sx={{ color: '#006D5B' }} /></ListItemIcon><ListItemText primary="Enable notifications for real-time alerts" /></ListItem>
+                                <ListItem sx={{py: 0}}><ListItemIcon><CheckCircleOutlineIcon sx={{ color: '#006D5B' }} /></ListItemIcon><ListItemText primary="Receive verified medicine requests" /></ListItem>
+                                <ListItem sx={{py: 0}}><ListItemIcon><CheckCircleOutlineIcon sx={{ color: '#006D5B' }} /></ListItemIcon><ListItemText primary="Respond based on stock availability" /></ListItem>
+                                <ListItem sx={{py: 0}}><ListItemIcon><CheckCircleOutlineIcon sx={{ color: '#006D5B' }} /></ListItemIcon><ListItemText primary="Fulfil requests and earn a 5% service commission" /></ListItem>
+                            </List>
+                            <Typography variant="body1" sx={{ mt: 2, mb: 2, lineHeight: 1.6, color: '#444' }}>
+                                Plus a walkthrough of additional platform features.
+                            </Typography>
+                             <Typography variant="h6" sx={{ mt: 2, mb: 3, color: 'darkmagenta', fontWeight: 'bold' }}>
+                                When: Friday, January 23rd, 2026, at 8:00 PM WAT
                             </Typography>
                             <DemoSignupForm />
                             <Typography variant="body2" sx={{ mt: 4, color: '#666', textAlign: 'center' }}>

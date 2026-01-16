@@ -47,22 +47,57 @@ export async function POST(req: NextRequest) {
         `,
     };
 
-    // 2. Construct the confirmation email for the user
+    // 2. Construct the confirmation email for the user with a calendar invite
+
+    const event = {
+        title: "PharmaStackX Product Demo",
+        description: `Join us for a live session to see how PharmaStackX routes verified medicine requests from patients and partnered clinics directly to community pharmacists.\n\nThis 45-minute session will cover:\n- How to sign up and add PharmaStackX as an app\n- Enabling notifications for real-time alerts\n- Receiving and responding to verified medicine requests\n- Fulfilling requests and earning a 5% service commission`,
+        startTime: new Date('2026-01-23T20:00:00+01:00'), // 8:00 PM WAT (UTC+1)
+        endTime: new Date('2026-01-23T20:45:00+01:00'),   // 8:45 PM WAT (UTC+1)
+        location: "Online / Virtual"
+    };
+
+    const toIcsDate = (date: Date) => date.toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
+    const icalContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//PharmaStackX//Product Demo//EN',
+        'BEGIN:VEVENT',
+        `UID:${new Date().getTime()}-${email}@pharmastackx.com`,
+        `DTSTAMP:${toIcsDate(new Date())}`,
+        `DTSTART:${toIcsDate(event.startTime)}`,
+        `DTEND:${toIcsDate(event.endTime)}`,
+        `SUMMARY:${event.title}`,
+        `DESCRIPTION:${event.description.replace(/\n/g, '\\n')}`,
+        `LOCATION:${event.location}`,
+        'END:VEVENT',
+        'END:VCALENDAR'
+    ].join('\r\n');
+
     const userMailOptions = {
         ...mailOptions,
-        to: email, // Send to the user who signed up
-        subject: "Confirmation: You're Registered for the PharmaStackX Product Demo!",
+        to: email,
+        subject: "✔ Confirmed: Your Spot for the PharmaStackX Product Demo",
         html: `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <h2 style="color: #006D5B;">Thank You for Registering, ${username}!</h2>
                 <p>This email confirms your registration for the <strong>PharmaStackX product demo.</strong></p>
-                <p>We're excited to show you how our platform can revolutionize your pharmacy operations. We will be in touch shortly with more details.</p>
-                <p>In the meantime, your PharmaStackX account has been created. You should receive a separate email shortly to verify your email address. Once verified, you can log in and begin to explore the platform.</p>
+                <p>We have attached a calendar invitation to this email. Please accept it to add the event directly to your calendar.</p>
+                <hr>
+                <p><strong>Event Details:</strong></p>
+                <p><strong>Date:</strong> Friday, January 23rd, 2026</p>
+                <p><strong>Time:</strong> 8:00 PM WAT</p>
+                <p>We look forward to showing you how our platform can revolutionize your pharmacy operations.</p>
                 <br>
                 <p>Best regards,</p>
                 <p><strong>The PharmaStackX Team</strong></p>
             </div>
         `,
+        attachments: [{
+            filename: 'invite.ics',
+            content: icalContent,
+            contentType: 'text/calendar; charset=utf-8; method=REQUEST',
+        }]
     };
 
     // 3. Send both emails in parallel
