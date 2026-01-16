@@ -7,7 +7,7 @@ import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
     Select, MenuItem, FormControl, InputLabel, TextField, Modal, IconButton,
     Grid, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-    Link, Collapse
+    Link, Collapse, Tabs, Tab
 } from '@mui/material';
 import Navbar from '@/app/components/Navbar';
 import { 
@@ -22,6 +22,7 @@ import {
     KeyboardArrowDown as KeyboardArrowDownIcon,
     KeyboardArrowUp as KeyboardArrowUpIcon
 } from '@mui/icons-material';
+import axios from 'axios';
 
 const modalStyle = {
   position: 'absolute' as 'absolute',
@@ -216,10 +217,82 @@ const GenericTable = ({ data, page, limit, onEdit, onDelete, onOpenModal }: { da
     );
 };
 
+interface DemoUser {
+    _id: string;
+    username: string;
+    email: string;
+    mobile: string;
+    stateOfPractice: string;
+    pharmacy: {
+        businessName: string;
+    }
+}
+
+const RegisteredUsersView = () => {
+    const [users, setUsers] = useState<DemoUser[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const { data } = await axios.get('/api/users');
+                if (data && Array.isArray(data.users)) {
+                    setUsers(data.users);
+                } else {
+                    setError('Failed to load users.');
+                }
+            } catch (err) {
+                setError('You do not have permission to view this page.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchUsers();
+    }, []);
+
+    if (loading) {
+        return <CircularProgress />;
+    }
+
+    if (error) {
+        return <Alert severity="error">{error}</Alert>;
+    }
+
+    return (
+        <TableContainer component={Paper} sx={{ mt: 2 }}>
+            <Table>
+                <TableHead>
+                    <TableRow>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Email</TableCell>
+                        <TableCell>Mobile</TableCell>
+                        <TableCell>State of Practice</TableCell>
+                        <TableCell>Pharmacy</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {users.map((user) => (
+                        <TableRow key={user._id}>
+                            <TableCell>{user.username}</TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>{user.mobile}</TableCell>
+                            <TableCell>{user.stateOfPractice}</TableCell>
+                            <TableCell>{user.pharmacy?.businessName || 'N/A'}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
+    );
+}
+
 
 const GodModePage = () => {
     const { user, isLoading: sessionLoading } = useSession();
 
+    const [selectedTab, setSelectedTab] = useState(0);
     const [collections, setCollections] = useState<string[]>([]);
     const [selectedCollection, setSelectedCollection] = useState<string>('');
     const [collectionData, setCollectionData] = useState<any[]>([]);
@@ -311,6 +384,10 @@ const GodModePage = () => {
         }
     }
 
+    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+        setSelectedTab(newValue);
+    };
+
     const handleEdit = (doc: any) => {
         setEditingDoc(doc);
         setModalData(JSON.stringify(doc, null, 2));
@@ -383,14 +460,86 @@ const GodModePage = () => {
     
     const totalPages = Math.ceil(total / limit);
 
-    const renderTable = () => {
-        if (loading) return <Box sx={{textAlign: 'center'}}><CircularProgress /></Box>;
-        if (!selectedCollection) return null;
-
-        if (selectedCollection === 'users') {
-            return <UsersTable data={collectionData} page={page} limit={limit} onEdit={handleEdit} onDelete={handleDelete} />;
+    const renderMainContent = () => {
+        if (selectedTab === 1) {
+            return <RegisteredUsersView />
         }
-        return <GenericTable data={collectionData} page={page} limit={limit} onEdit={handleEdit} onDelete={handleDelete} onOpenModal={handleOpenModal} />;
+        
+        // Original content for the "Database Collections" tab
+        return (
+            <>
+                 <Paper sx={{ p: 2, mb: 4, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <FormControl sx={{ minWidth: 240, flexGrow: 1}}>
+                        <InputLabel id="collection-select-label">Collection</InputLabel>
+                        <Select
+                            labelId="collection-select-label"
+                            value={selectedCollection}
+                            label="Collection"
+                            onChange={(e) => handleCollectionChange(e.target.value as string)}
+                        >
+                            <MenuItem value="">
+                                <em>None</em>
+                            </MenuItem>
+                            {collections.map(collection => (
+                                <MenuItem key={collection} value={collection}>{collection}</MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    <TextField 
+                        label="Search Collection"
+                        variant="outlined"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        sx={{ flexGrow: 2, minWidth: 300 }}
+                        disabled={!selectedCollection}
+                    />
+                    <FormControl sx={{ minWidth: 150 }} disabled={!selectedCollection}>
+                        <InputLabel id="sort-order-label">Sort By</InputLabel>
+                        <Select
+                            labelId="sort-order-label"
+                            value={sortOrder}
+                            label="Sort By"
+                            onChange={(e) => handleSortChange(e.target.value as 'desc' | 'asc')}
+                        >
+                            <MenuItem value="desc">Latest</MenuItem>
+                            <MenuItem value="asc">Oldest</MenuItem>
+                        </Select>
+                    </FormControl>
+                </Paper>
+                <Paper>
+                     {loading ? (
+                        <Box sx={{textAlign: 'center', p: 4}}><CircularProgress /></Box>
+                    ) : selectedCollection ? (
+                        <>
+                            {selectedCollection === 'users' ? 
+                                <UsersTable data={collectionData} page={page} limit={limit} onEdit={handleEdit} onDelete={handleDelete} /> : 
+                                <GenericTable data={collectionData} page={page} limit={limit} onEdit={handleEdit} onDelete={handleDelete} onOpenModal={handleOpenModal} />
+                            }
+                            {total > limit && (
+                                <Grid container justifyContent="space-between" alignItems="center" sx={{ p: 2 }}>
+                                    <Grid item>
+                                        <Typography variant="body2">
+                                            Showing {((page - 1) * limit) + 1} - {Math.min(page * limit, total)} of {total}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item>
+                                        <IconButton onClick={() => fetchCollectionData(selectedCollection, page - 1, sortOrder, debouncedSearchTerm)} disabled={page <= 1}>
+                                            <NavigateBefore />
+                                        </IconButton>
+                                        <Typography display="inline" sx={{ mx: 2 }}>
+                                            Page {page} of {totalPages}
+                                        </Typography>
+                                        <IconButton onClick={() => fetchCollectionData(selectedCollection, page + 1, sortOrder, debouncedSearchTerm)} disabled={page >= totalPages}>
+                                            <NavigateNext />
+                                        </IconButton>
+                                    </Grid>
+                                </Grid>
+                            )}
+                        </>
+                    ) : null}
+                </Paper>
+            </>
+        )
     }
 
     return (
@@ -403,68 +552,15 @@ const GodModePage = () => {
                     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
                     {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
 
-                    <Paper sx={{ p: 2, mb: 4, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-                         <FormControl sx={{ minWidth: 240, flexGrow: 1}}>
-                            <InputLabel id="collection-select-label">Collection</InputLabel>
-                            <Select
-                                labelId="collection-select-label"
-                                value={selectedCollection}
-                                label="Collection"
-                                onChange={(e) => handleCollectionChange(e.target.value as string)}
-                            >
-                                <MenuItem value="">
-                                    <em>None</em>
-                                </MenuItem>
-                                {collections.map(collection => (
-                                    <MenuItem key={collection} value={collection}>{collection}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <TextField 
-                            label="Search Collection"
-                            variant="outlined"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            sx={{ flexGrow: 2, minWidth: 300 }}
-                            disabled={!selectedCollection}
-                        />
-                        <FormControl sx={{ minWidth: 150 }} disabled={!selectedCollection}>
-                            <InputLabel id="sort-order-label">Sort By</InputLabel>
-                            <Select
-                                labelId="sort-order-label"
-                                value={sortOrder}
-                                label="Sort By"
-                                onChange={(e) => handleSortChange(e.target.value as 'desc' | 'asc')}
-                            >
-                                <MenuItem value="desc">Latest</MenuItem>
-                                <MenuItem value="asc">Oldest</MenuItem>
-                            </Select>
-                        </FormControl>
-                    </Paper>
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                        <Tabs value={selectedTab} onChange={handleTabChange} aria-label="god mode tabs">
+                            <Tab label="Database Collections" />
+                            <Tab label="Demo Registrations" />
+                        </Tabs>
+                    </Box>
 
-                    <Paper>
-                        {renderTable()}
-                        {total > limit && !loading && (
-                            <Grid container justifyContent="space-between" alignItems="center" sx={{ p: 2 }}>
-                                <Grid item>
-                                    <Typography variant="body2">
-                                        Showing {((page - 1) * limit) + 1} - {Math.min(page * limit, total)} of {total}
-                                    </Typography>
-                                </Grid>
-                                <Grid item>
-                                    <IconButton onClick={() => fetchCollectionData(selectedCollection, page - 1, sortOrder, debouncedSearchTerm)} disabled={page <= 1}>
-                                        <NavigateBefore />
-                                    </IconButton>
-                                    <Typography display="inline" sx={{ mx: 2 }}>
-                                        Page {page} of {totalPages}
-                                    </Typography>
-                                    <IconButton onClick={() => fetchCollectionData(selectedCollection, page + 1, sortOrder, debouncedSearchTerm)} disabled={page >= totalPages}>
-                                        <NavigateNext />
-                                    </IconButton>
-                                </Grid>
-                            </Grid>
-                        )}
-                    </Paper>
+                    {renderMainContent()}
+
                 </Container>
             </Box>
 

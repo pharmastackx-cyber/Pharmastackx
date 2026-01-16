@@ -7,7 +7,7 @@ import { ReactNode, useEffect } from 'react';
 
 export default function MainLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const showNavbar = pathname !== '/find-medicines';
+  const showNavbar = pathname !== '/find-medicines' && pathname !== '/product-demo';
   const router = useRouter();
 
   // This useEffect will run once when the component mounts
