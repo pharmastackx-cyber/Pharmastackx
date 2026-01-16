@@ -19,7 +19,7 @@ const ProductDemoPage = () => {
             <Container maxWidth="lg">
                 <Paper elevation={3} sx={{ p: { xs: 2, md: 4 }, mt: 4, borderRadius: '16px', bgcolor: '#f8f9fa' }}>
                     <Grid container spacing={4} alignItems="center">
-                        <Grid item xs={12} md={6} sx={{ order: { xs: 2, md: 1 } }}>
+                        <Grid item xs={12} md={6} sx={{ order: { xs: 1, md: 1 } }}>
                             <Box sx={{ position: 'relative', width: '100%', height: { xs: 300, md: '100%' }, minHeight: 400, borderRadius: '12px', overflow: 'hidden' }}>
                                 <Image 
                                     src="/placeholder.png"
@@ -29,7 +29,7 @@ const ProductDemoPage = () => {
                                 />
                             </Box>
                         </Grid>
-                        <Grid item xs={12} md={6} sx={{ order: { xs: 1, md: 2 } }}>
+                        <Grid item xs={12} md={6} sx={{ order: { xs: 2, md: 2 } }}>
                             <Typography variant="h4" component="h1" sx={{ fontWeight: 600, mb: 2, color: '#006D5B' }}>
                                 Pharmastackx Product Demo Registration
                             </Typography>

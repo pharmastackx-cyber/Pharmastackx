@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { username, email, mobile, licenseNumber, stateOfPractice, pharmacy } = body;
 
-    // Construct the email with data from the form
+    // 1. Construct the notification email for the admin
     const adminMailOptions = {
         ...mailOptions,
         to: 'pharmastackx@gmail.com',
@@ -47,15 +47,34 @@ export async function POST(req: NextRequest) {
         `,
     };
 
-    // Send the email
-    await transporter.sendMail(adminMailOptions);
+    // 2. Construct the confirmation email for the user
+    const userMailOptions = {
+        ...mailOptions,
+        to: email, // Send to the user who signed up
+        subject: "Confirmation: You're Registered for the PharmaStackX Product Demo!",
+        html: `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <h2 style="color: #006D5B;">Thank You for Registering, ${username}!</h2>
+                <p>This email confirms your registration for the <strong>PharmaStackX product demo.</strong></p>
+                <p>We're excited to show you how our platform can revolutionize your pharmacy operations. We will be in touch shortly with more details.</p>
+                <p>In the meantime, your PharmaStackX account has been created. You should receive a separate email shortly to verify your email address. Once verified, you can log in and begin to explore the platform.</p>
+                <br>
+                <p>Best regards,</p>
+                <p><strong>The PharmaStackX Team</strong></p>
+            </div>
+        `,
+    };
 
-    return NextResponse.json({ message: 'Notification sent successfully.' }, { status: 200 });
+    // 3. Send both emails in parallel
+    await Promise.all([
+        transporter.sendMail(adminMailOptions),
+        transporter.sendMail(userMailOptions)
+    ]);
+
+    return NextResponse.json({ message: 'Notifications sent successfully.' }, { status: 200 });
 
   } catch (error) {
-    console.error('Failed to send demo signup notification:', error);
-    // This endpoint should not return an error to the client that would block the UI.
-    // We log it on the server and return a success response to the form.
+    console.error('Failed to send demo signup notifications:', error);
     return NextResponse.json({ message: 'Notification processed.' }, { status: 200 });
   }
 }
