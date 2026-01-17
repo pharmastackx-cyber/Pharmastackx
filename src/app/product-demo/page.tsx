@@ -12,8 +12,7 @@ import {
     List,
     ListItem,
     ListItemIcon,
-    ListItemText,
-    Button
+    ListItemText
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DemoSignupForm from './DemoSignupForm';
@@ -32,12 +31,14 @@ const ProductDemoPage = () => {
                 <Paper elevation={3} sx={{ p: { xs: 2, md: 4 }, mt: 4, borderRadius: '16px', bgcolor: '#f8f9fa' }}>
                     <Grid container spacing={4} alignItems="center">
                         <Grid item xs={12} md={6} sx={{ order: { xs: 1, md: 1 } }}>
-                            <Box sx={{ position: 'relative', width: '100%', height: { xs: 300, md: '100%' }, minHeight: 400, borderRadius: '12px', overflow: 'hidden' }}>
+                            <Box sx={{ position: 'relative', width: '100%', height: { xs: 'auto', md: '100%' }, minHeight: 400, borderRadius: '12px', overflow: 'hidden' }}>
                                 <Image 
-                                    src="/placeholder.png"
+                                    src="/product-demo.png"
                                     alt="Pharmastackx Product Demo"
-                                    layout="fill"
-                                    objectFit="cover"
+                                    width={600} 
+                                    height={600}
+                                    layout="responsive"
+                                    objectFit="contain"
                                 />
                                 <Box
                                     onClick={handleScrollToForm}
